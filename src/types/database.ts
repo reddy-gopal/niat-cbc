@@ -1,0 +1,250 @@
+export type JsonObject = Record<string, unknown>;
+
+export type SubmissionStatus =
+  | "not_started"
+  | "pending"
+  | "accepted"
+  | "rejected";
+
+export type Database = {
+  public: {
+    Tables: {
+      regions: {
+        Row: {
+          id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          created_at?: string;
+        };
+      };
+      bootcamps: {
+        Row: {
+          id: string;
+          region_id: string;
+          name: string;
+          date: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          region_id: string;
+          name: string;
+          date: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          region_id?: string;
+          name?: string;
+          date?: string;
+          created_at?: string;
+        };
+      };
+      sections: {
+        Row: {
+          id: string;
+          bootcamp_id: string;
+          label: string;
+          slug: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          bootcamp_id: string;
+          label: string;
+          slug: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          bootcamp_id?: string;
+          label?: string;
+          slug?: string;
+          created_at?: string;
+        };
+      };
+      profiles: {
+        Row: {
+          id: string;
+          email: string;
+          role: string;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          role: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          role?: string;
+          created_at?: string;
+        };
+      };
+      students: {
+        Row: {
+          id: string;
+          full_name: string;
+          mobile: string;
+          section_id: string;
+          bootcamp_id: string;
+          region_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          full_name: string;
+          mobile: string;
+          section_id: string;
+          bootcamp_id: string;
+          region_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          full_name?: string;
+          mobile?: string;
+          section_id?: string;
+          bootcamp_id?: string;
+          region_id?: string;
+          created_at?: string;
+        };
+      };
+      submissions: {
+        Row: {
+          id: string;
+          student_id: string;
+          bootcamp_id: string;
+          section_id: string;
+          region_id: string;
+          task_id: number;
+          file_url: string | null;
+          status: SubmissionStatus;
+          points: number;
+          ai_reason: string | null;
+          resubmit_count: number;
+          override_by: string | null;
+          override_note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          bootcamp_id: string;
+          section_id: string;
+          region_id: string;
+          task_id: number;
+          file_url?: string | null;
+          status?: SubmissionStatus;
+          points?: number;
+          ai_reason?: string | null;
+          resubmit_count?: number;
+          override_by?: string | null;
+          override_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          bootcamp_id?: string;
+          section_id?: string;
+          region_id?: string;
+          task_id?: number;
+          file_url?: string | null;
+          status?: SubmissionStatus;
+          points?: number;
+          ai_reason?: string | null;
+          resubmit_count?: number;
+          override_by?: string | null;
+          override_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      audit_logs: {
+        Row: {
+          id: string;
+          admin_id: string | null;
+          action: string;
+          entity: string;
+          entity_id: string;
+          note: string | null;
+          metadata: JsonObject | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          admin_id?: string | null;
+          action: string;
+          entity: string;
+          entity_id: string;
+          note?: string | null;
+          metadata?: JsonObject | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          admin_id?: string | null;
+          action?: string;
+          entity?: string;
+          entity_id?: string;
+          note?: string | null;
+          metadata?: JsonObject | null;
+          created_at?: string;
+        };
+      };
+      otp_attempts: {
+        Row: {
+          id: string;
+          mobile: string;
+          request_id: string;
+          verified: boolean;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          mobile: string;
+          request_id: string;
+          verified?: boolean;
+          expires_at: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          mobile?: string;
+          request_id?: string;
+          verified?: boolean;
+          expires_at?: string;
+          created_at?: string;
+        };
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
+};
+
+export type Region = Database["public"]["Tables"]["regions"]["Row"];
+export type Bootcamp = Database["public"]["Tables"]["bootcamps"]["Row"];
+export type Section = Database["public"]["Tables"]["sections"]["Row"];
+export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type Student = Database["public"]["Tables"]["students"]["Row"];
+export type Submission = Database["public"]["Tables"]["submissions"]["Row"];
+export type AuditLog = Database["public"]["Tables"]["audit_logs"]["Row"];
+export type OtpAttempt = Database["public"]["Tables"]["otp_attempts"]["Row"];

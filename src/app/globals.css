@@ -1,26 +1,208 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  /* Brand Core */
+  --primary: #991b1b;
+  --primary-hover: #b91c1c;
+  --primary-dark: #7f1d1d;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Backgrounds */
+  --bg-base: #ffffff;
+  --bg-warm: #fff8eb;
+  --bg-tint: #fbf2f3;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Hero */
+  --hero-from: #220000;
+  --hero-to: #974039;
+
+  /* Text */
+  --text-base: #1e293b;
+  --text-muted: #64748b;
+  --text-dark: #111827;
+  --text-secondary: #334155;
+
+  /* Accents */
+  --purple: #7678ed;
+  --purple-light: #9496f0;
+  --purple-dark: #5a5cb8;
+  --yellow: #f7b801;
+  --orange: #f18701;
+  --red-orange: #f35b04;
+
+  /* Functional */
+  --success: #22c55e;
+  --teal: #14b8a6;
+  --link: #2563eb;
+  --link-hover: #1d4ed8;
+
+  /* Challenge Status Colors */
+  --status-accepted-bg: #dcfce7;
+  --status-accepted-text: #15803d;
+  --status-rejected-bg: #fee2e2;
+  --status-rejected-text: #991b1b;
+  --status-pending-bg: #fef9c3;
+  --status-pending-text: #a16207;
+  --status-not-started-bg: #f1f5f9;
+  --status-not-started-text: #64748b;
+
+  /* Surfaces */
+  --card-bg: #ffffff;
+  --card-border: #f1e8e8;
+  --card-shadow: 0 2px 16px rgba(153, 27, 27, 0.08);
+
+  /* Fonts */
+  --font-heading: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-base);
+  font-family: var(--font-body), Arial, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading), sans-serif;
+}
+
+/* Cards */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+}
+
+.card-warm {
+  background: var(--bg-warm);
+  border: 1px solid #f3e4c6;
+  border-radius: 16px;
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  border-radius: 10px;
+  padding: 12px 24px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  transition: all 0.15s ease;
+  border: none;
+  cursor: pointer;
+}
+.btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(153,27,27,0.3); }
+.btn-primary:active { transform: scale(0.97); }
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid var(--primary);
+  color: var(--primary);
+  border-radius: 10px;
+  padding: 10px 22px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.btn-outline:hover { background: var(--bg-tint); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 8px 16px;
+  transition: all 0.15s;
+}
+.btn-ghost:hover { background: var(--bg-tint); color: var(--text-base); }
+
+/* Inputs */
+.input-field {
+  background: var(--bg-base);
+  border: 2px solid #e2d5d5;
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: var(--text-base);
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 15px;
+  transition: border-color 0.15s;
+  outline: none;
+}
+.input-field:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(153,27,27,0.1); }
+.input-field::placeholder { color: var(--text-muted); }
+
+/* Status Badges */
+.badge { border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+.badge-accepted { background: var(--status-accepted-bg); color: var(--status-accepted-text); }
+.badge-rejected { background: var(--status-rejected-bg); color: var(--status-rejected-text); }
+.badge-pending { background: var(--status-pending-bg); color: var(--status-pending-text); }
+.badge-not-started { background: var(--status-not-started-bg); color: var(--status-not-started-text); }
+
+/* Progress bar */
+.progress-track { background: #f1e8e8; border-radius: 999px; height: 10px; overflow: hidden; }
+.progress-fill { background: linear-gradient(90deg, var(--primary), var(--red-orange)); border-radius: 999px; height: 100%; transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* Animations */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes confettiBurst {
+  0% { transform: translate(0,0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes progressFill {
+  from { width: 0%; }
+  to { width: var(--target-width); }
+}
+
+/* 3D Flip & HUD Utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.25) 51%);
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 10;
+}
+.neon-text {
+  text-shadow: 0 0 10px rgba(220, 38, 38, 0.8), 0 0 20px rgba(220, 38, 38, 0.4);
+}
+@keyframes glitch-flash {
+  0% { transform: translate(0); filter: hue-rotate(0deg); opacity: 1; }
+  20% { transform: translate(-2px, 2px); filter: hue-rotate(90deg); opacity: 0.8; }
+  40% { transform: translate(2px, -2px); filter: invert(1); opacity: 0.9; }
+  60% { transform: translate(-2px, -2px); filter: hue-rotate(45deg); opacity: 0.7; }
+  80% { transform: translate(2px, 2px); filter: sepia(1); opacity: 0.9; }
+  100% { transform: translate(0); filter: none; opacity: 1; }
+}
+.glitch-flash {
+  animation: glitch-flash 0.2s linear infinite;
 }
