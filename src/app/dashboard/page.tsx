@@ -15,7 +15,7 @@ const Dashboard = dynamic(() => import("@/components/student/Dashboard"));
 export default async function DashboardPage() {
   const session = await getStudentSession();
   if (!session) {
-    redirect("/invalid");
+    redirect("/");
   }
 
   const supabase = await createClient();

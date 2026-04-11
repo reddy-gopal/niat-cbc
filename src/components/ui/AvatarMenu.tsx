@@ -27,7 +27,7 @@ export function AvatarMenu({
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/join");
+    router.push("/");
   };
 
   const initial = firstName ? firstName.charAt(0).toUpperCase() : "U";

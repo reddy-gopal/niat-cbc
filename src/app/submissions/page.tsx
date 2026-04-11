@@ -26,7 +26,7 @@ type AttemptRow = {
 export default async function SubmissionsPage() {
   const session = await getStudentSession();
   if (!session) {
-    redirect("/invalid");
+    redirect("/");
   }
 
   const { data: rows, error } = await adminClient

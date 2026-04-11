@@ -103,7 +103,7 @@ export default function ProfileClient({
       const data = await res.json();
       if (data.success) {
         showToast("Account deleted permanently.", "success");
-        router.push("/join");
+        router.push("/");
       } else {
         showToast(data.error || "Failed to delete account.", "error");
         setIsDeleting(false);

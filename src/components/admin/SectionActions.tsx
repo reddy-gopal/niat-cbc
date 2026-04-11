@@ -6,9 +6,17 @@ import { useRouter } from "next/navigation";
 type Props = {
   bootcampId?: string;
   joinUrl?: string;
+  /** Element id wrapping the QRCode so download targets the correct SVG (not the first svg on the page). */
+  qrContainerId?: string;
+  downloadFileName?: string;
 };
 
-export default function SectionActions({ bootcampId, joinUrl }: Props) {
+export default function SectionActions({
+  bootcampId,
+  joinUrl,
+  qrContainerId,
+  downloadFileName,
+}: Props) {
   const router = useRouter();
   const [label, setLabel] = useState("");
 
@@ -32,17 +40,35 @@ export default function SectionActions({ bootcampId, joinUrl }: Props) {
 
   function downloadQr() {
     if (!joinUrl) return;
-    const svg = document.querySelector("svg");
-    if (!svg) return;
+    const root = qrContainerId ? document.getElementById(qrContainerId) : null;
+    const svgEl = root?.querySelector("svg");
+    if (!svgEl) return;
+
+    const svg = svgEl.cloneNode(true) as SVGSVGElement;
+    if (!svg.getAttribute("xmlns")) {
+      svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    }
     const serializer = new XMLSerializer();
-    const source = serializer.serializeToString(svg);
-    const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+    let serialized = serializer.serializeToString(svg);
+    if (!serialized.includes("xmlns=")) {
+      serialized = serialized.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+
+    const blob = new Blob([serialized], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
+    const filename = downloadFileName ?? "section-qr.svg";
+
     const a = document.createElement("a");
     a.href = url;
-    a.download = "section-qr.svg";
+    a.download = filename;
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    window.requestAnimationFrame(() => {
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+    });
   }
 
   return (

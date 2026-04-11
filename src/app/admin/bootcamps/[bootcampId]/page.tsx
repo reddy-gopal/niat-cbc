@@ -48,11 +48,15 @@ export default async function BootcampDetailPage({ params }: Props) {
                     Students: {(section.students as unknown[] | null)?.length ?? 0}
                   </p>
                 </div>
-                <div className="bg-white p-2 rounded">
+                <div id={`section-qr-${section.id}`} className="bg-white p-2 rounded">
                   <QRCode value={joinUrl} size={120} />
                 </div>
               </div>
-              <SectionActions joinUrl={joinUrl} />
+              <SectionActions
+                joinUrl={joinUrl}
+                qrContainerId={`section-qr-${section.id}`}
+                downloadFileName={`${section.slug}-qr.svg`}
+              />
             </div>
           );
         })}

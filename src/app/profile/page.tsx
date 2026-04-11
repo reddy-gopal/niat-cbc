@@ -13,7 +13,7 @@ type StudentWithContext = Student & {
 export default async function ProfilePage() {
   const session = await getStudentSession();
   if (!session) {
-    redirect("/join");
+    redirect("/");
   }
 
   const supabase = await createClient();

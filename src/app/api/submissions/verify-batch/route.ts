@@ -1,4 +1,6 @@
+import { waitUntil } from "@vercel/functions";
 import { NextResponse } from "next/server";
+import { verifySubmissionById } from "@/lib/submission-verify";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
 type SubmissionBatchRow = {
@@ -12,16 +14,6 @@ export async function POST(request: Request) {
   if (secret !== process.env.INTERNAL_API_SECRET) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
-
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!baseUrl) {
-    return NextResponse.json(
-      { success: false, error: "NEXT_PUBLIC_APP_URL is not set." },
-      { status: 500 }
-    );
-  }
-
-  const internalSecret = process.env.INTERNAL_API_SECRET ?? "";
 
   try {
     const thresholdMs = Date.now() - 60 * 1000;
@@ -46,15 +38,10 @@ export async function POST(request: Request) {
         (r) =>
           !r.last_attempted_at || new Date(r.last_attempted_at).getTime() < thresholdMs
       )
-      .slice(0, 5);
+      .slice(0, 1);
 
     if (eligible.length === 0) {
-      return NextResponse.json({
-        success: true,
-        processed: 0,
-        succeeded: 0,
-        failed: 0,
-      });
+      return NextResponse.json({ accepted: true, count: 0 });
     }
 
     const claimNow = new Date().toISOString();
@@ -72,40 +59,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const verifyUrl = `${baseUrl.replace(/\/$/, "")}/api/submissions/verify`;
+    const submissionId = ids[0] as string;
 
-    const results = await Promise.allSettled(
-      ids.map((submissionId) =>
-        fetch(verifyUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-internal-secret": internalSecret,
-          },
-          body: JSON.stringify({ submissionId }),
-        }).then(async (res) => {
-          const json = (await res.json()) as { success?: boolean };
-          return { ok: res.ok && Boolean(json.success) };
-        })
-      )
+    waitUntil(
+      (async () => {
+        try {
+          const result = await verifySubmissionById(submissionId);
+          if (!result.ok) {
+            console.error("[verify-batch] background verify failed", {
+              submissionId,
+              status: result.status,
+              error: result.error,
+            });
+          }
+        } catch (err) {
+          console.error("[verify-batch] background verify threw", { submissionId, err });
+        }
+      })()
     );
 
-    let succeeded = 0;
-    let failed = 0;
-    for (const r of results) {
-      if (r.status === "fulfilled" && r.value.ok) {
-        succeeded += 1;
-      } else {
-        failed += 1;
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      processed: eligible.length,
-      succeeded,
-      failed,
-    });
+    return NextResponse.json({ accepted: true, count: eligible.length });
   } catch {
     return NextResponse.json(
       { success: false, error: "Batch verification failed." },

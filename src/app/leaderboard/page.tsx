@@ -7,7 +7,7 @@ import { createClient } from "../../../utils/supabase/server";
 export default async function LeaderboardPage() {
   const session = await getStudentSession();
   if (!session) {
-    redirect("/invalid");
+    redirect("/");
   }
 
   const supabase = await createClient();
