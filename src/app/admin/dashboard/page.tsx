@@ -1,33 +1,40 @@
-import AdminShell from "@/components/admin/AdminShell";
-import { requireAdmin } from "@/lib/admin-auth";
 import { adminClient } from "../../../../utils/supabase/admin";
 
 export default async function AdminDashboardPage() {
-  const admin = await requireAdmin();
   const oneDayAgo = new Date();
   oneDayAgo.setHours(oneDayAgo.getHours() - 24);
-  const [{ count: bootcamps }, { count: students }, { count: todaySubmissions }] =
-    await Promise.all([
-      adminClient.from("bootcamps").select("id", { count: "exact", head: true }),
-      adminClient.from("students").select("id", { count: "exact", head: true }),
-      adminClient
-        .from("submissions")
-        .select("id", { count: "exact", head: true })
-        .gt("created_at", oneDayAgo.toISOString())
-        .neq("status", "not_started"),
-    ]);
+  const [
+    { count: bootcamps },
+    { count: students },
+    { count: todaySubmissions },
+    { count: acceptedCount },
+    { count: reviewedCount },
+    { data: regions },
+    { data: studentsData },
+  ] = await Promise.all([
+    adminClient.from("bootcamps").select("id", { count: "exact", head: true }),
+    adminClient.from("students").select("id", { count: "exact", head: true }),
+    adminClient
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .gt("created_at", oneDayAgo.toISOString())
+      .neq("status", "not_started"),
+    adminClient
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "accepted"),
+    adminClient
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["accepted", "rejected"]),
+    adminClient.from("regions").select("id, name"),
+    adminClient.from("students").select("region_id"),
+  ]);
 
-  const { data: allSubs } = await adminClient.from("submissions").select("status");
-  const reviewed = (allSubs ?? []).filter(
-    (item) => item.status === "accepted" || item.status === "rejected"
-  );
-  const accepted = reviewed.filter((item) => item.status === "accepted").length;
-  const acceptanceRate = reviewed.length
-    ? (accepted * 100) / reviewed.length
-    : 0;
-
-  const { data: regions } = await adminClient.from("regions").select("id, name");
-  const { data: studentsData } = await adminClient.from("students").select("region_id");
+  const acceptanceRate =
+    reviewedCount && reviewedCount > 0
+      ? ((acceptedCount ?? 0) * 100) / reviewedCount
+      : 0;
   const total = studentsData?.length ?? 0;
   const byRegion = (regions ?? []).map((region) => {
     const count = (studentsData ?? []).filter(
@@ -37,7 +44,6 @@ export default async function AdminDashboardPage() {
   });
 
   return (
-    <AdminShell adminEmail={admin.email}>
     <div>
       <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -79,6 +85,5 @@ export default async function AdminDashboardPage() {
         </div>
       </section>
     </div>
-    </AdminShell>
   );
 }

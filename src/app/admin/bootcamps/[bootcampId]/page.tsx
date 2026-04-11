@@ -1,13 +1,10 @@
 import QRCode from "react-qr-code";
-import AdminShell from "@/components/admin/AdminShell";
 import SectionActions from "@/components/admin/SectionActions";
-import { requireAdmin } from "@/lib/admin-auth";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
 type Props = { params: Promise<{ bootcampId: string }> };
 
 export default async function BootcampDetailPage({ params }: Props) {
-  const admin = await requireAdmin();
   const { bootcampId } = await params;
   const { data: bootcamp } = await adminClient
     .from("bootcamps")
@@ -15,7 +12,7 @@ export default async function BootcampDetailPage({ params }: Props) {
     .eq("id", bootcampId)
     .maybeSingle();
 
-  if (!bootcamp) return <AdminShell adminEmail={admin.email}><div>Bootcamp not found.</div></AdminShell>;
+  if (!bootcamp) return <div>Bootcamp not found.</div>;
 
   const { data: sections } = await adminClient
     .from("sections")
@@ -26,7 +23,6 @@ export default async function BootcampDetailPage({ params }: Props) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
 
   return (
-    <AdminShell adminEmail={admin.email}>
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -62,6 +58,5 @@ export default async function BootcampDetailPage({ params }: Props) {
         })}
       </div>
     </div>
-    </AdminShell>
   );
 }

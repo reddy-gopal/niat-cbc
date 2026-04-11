@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Challenge, StudentSession } from "@/types/app";
 import type { Submission } from "@/types/database";
+import { buildChallenge8ReferralUrl } from "@/lib/utils";
 
 type ChallengeCardProps = {
   challenge: Challenge;
@@ -27,6 +28,10 @@ export default function ChallengeCard({
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const referralUrl = useMemo(
+    () => buildChallenge8ReferralUrl(studentSession),
+    [studentSession]
+  );
 
   useEffect(() => {
     setLocalSubmission(submission);
@@ -116,7 +121,7 @@ export default function ChallengeCard({
   const handleCardClick = () => {
     if (canUpload) {
       if (!challenge.requiresUpload) {
-        window.open(`https://niat.ac.in/refer?utm_source=cbc_bootcamp&utm_medium=magic_link&bc=${studentSession.bootcampId}&sec=${studentSession.sectionId}`, "_blank");
+        window.open(referralUrl, "_blank", "noopener,noreferrer");
       } else {
         setIsModalOpen(true);
       }
@@ -253,7 +258,7 @@ export default function ChallengeCard({
                          onClick={() => { if (!uploading) fileRef.current?.click(); }}
                        >
                          {previewUrl ? (
-                            <img src={previewUrl} alt="Proof" className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                            <img src={previewUrl} alt="Proof" className="absolute inset-0 w-full h-full object-contain bg-black/40 opacity-80" />
                          ) : (
                             <>
                                <div className="text-3xl text-red-500 mb-3 group-hover:scale-110 transition-transform tracking-tighter">⚠️</div>

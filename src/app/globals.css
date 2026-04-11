@@ -53,6 +53,26 @@
   /* Fonts */
   --font-heading: 'Syne', sans-serif;
   --font-body: 'DM Sans', sans-serif;
+
+  /**
+   * Offset for content below fixed StudentNavbar (matches safe-area + inner h-14 + gap).
+   * sm matches Tailwind — inner bar becomes h-16 (4rem).
+   */
+  --student-nav-height: calc(
+    env(safe-area-inset-top, 0px) + 3.5rem + 0.75rem
+  );
+}
+
+@media (min-width: 640px) {
+  :root {
+    --student-nav-height: calc(
+      env(safe-area-inset-top, 0px) + 4rem + 0.75rem
+    );
+  }
+}
+
+html {
+  scroll-padding-top: var(--student-nav-height);
 }
 
 body {

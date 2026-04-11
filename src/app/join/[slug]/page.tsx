@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import JoinPage from "@/components/join/JoinPage";
 import { getStudentSession } from "@/lib/session";
 import { createClient } from "../../../../utils/supabase/server";
@@ -8,7 +9,7 @@ type JoinRouteProps = {
   params: Promise<{ slug: string }>;
 };
 
-async function getSectionBySlug(slug: string) {
+const getSectionBySlug = cache(async (slug: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("sections")
@@ -47,7 +48,7 @@ async function getSectionBySlug(slug: string) {
         } | null;
       }
     | null;
-}
+});
 
 export async function generateMetadata({ params }: JoinRouteProps): Promise<Metadata> {
   const { slug } = await params;

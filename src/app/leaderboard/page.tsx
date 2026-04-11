@@ -41,12 +41,15 @@ export default async function LeaderboardPage() {
   const sectionLabel = (studentsData?.[0]?.sections as { label?: string } | null)?.label ?? "";
   const bootcampName = (studentsData?.[0]?.bootcamps as { name?: string } | null)?.name ?? "";
 
+  const firstName = session.fullName.split(" ")[0] ?? session.fullName;
+
   return (
     <Leaderboard
       entries={entries}
       currentStudentId={session.studentId}
       sectionLabel={sectionLabel}
       bootcampName={bootcampName}
+      firstName={firstName}
     />
   );
 }

@@ -13,9 +13,15 @@ export async function createClient() {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // Session refresh may call setAll during Server Component render, where
+            // Next.js forbids mutating cookies (only Route Handlers / Server Actions).
+            // Safe to ignore here; use middleware to refresh auth cookies if needed.
+          }
         },
       },
     }

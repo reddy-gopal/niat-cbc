@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { verifyStudentSession } from "@/lib/session";
 import { adminClient } from "../../../../../utils/supabase/admin";
@@ -8,6 +9,9 @@ function getCookieValue(cookieHeader: string | null, key: string): string | null
   const match = pairs.find((item) => item.startsWith(`${key}=`));
   return match ? decodeURIComponent(match.slice(key.length + 1)) : null;
 }
+
+const PLAGIARISM_REASON =
+  "Submission rejected: this proof image is identical to another student's submission for this challenge. If you believe this is an error, please contact your instructor.";
 
 export async function POST(request: Request) {
   try {
@@ -50,7 +54,7 @@ export async function POST(request: Request) {
 
     const { data: submission, error: submissionError } = await adminClient
       .from("submissions")
-      .select("*")
+      .select("id, resubmit_count, bootcamp_id")
       .eq("student_id", session.studentId)
       .eq("task_id", taskId)
       .maybeSingle();
@@ -69,7 +73,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const hash = createHash("sha256").update(buffer).digest("hex");
+    const bytes = new Uint8Array(buffer);
+
+    const { data: duplicateRow } = await adminClient
+      .from("submissions")
+      .select("id, student_id")
+      .eq("file_hash", hash)
+      .eq("task_id", taskId)
+      .eq("bootcamp_id", session.bootcampId)
+      .neq("student_id", session.studentId)
+      .neq("status", "not_started")
+      .limit(1)
+      .maybeSingle();
+
+    const isPlagiarism = Boolean(duplicateRow);
+
     const extension = file.type === "image/png" ? "png" : "jpg";
     const storagePath = `${session.bootcampId}/${session.studentId}/${taskId}-${Date.now()}.${extension}`;
 
@@ -87,13 +107,80 @@ export async function POST(request: Request) {
       );
     }
 
+    const now = new Date().toISOString();
+    const nextResubmit = submission.resubmit_count + 1;
+
+    if (isPlagiarism) {
+      const { error: updateError } = await adminClient
+        .from("submissions")
+        .update({
+          status: "rejected",
+          file_url: storagePath,
+          file_hash: hash,
+          ai_reason: PLAGIARISM_REASON,
+          resubmit_count: nextResubmit,
+          verification_attempts: 3,
+          last_attempted_at: now,
+          verified_at: now,
+          updated_at: now,
+        })
+        .eq("id", submission.id);
+
+      if (updateError) {
+        return NextResponse.json(
+          { success: false, error: "Failed to update submission." },
+          { status: 500 }
+        );
+      }
+
+      const { data: attemptRow, error: attemptInsertError } = await adminClient
+        .from("submission_attempts")
+        .insert({
+          submission_id: submission.id,
+          student_id: session.studentId,
+          task_id: taskId,
+          bootcamp_id: submission.bootcamp_id,
+          attempt_number: nextResubmit,
+          file_url: storagePath,
+          file_hash: hash,
+          status: "rejected",
+          ai_reason: PLAGIARISM_REASON,
+          verification_attempts: 3,
+          verified_at: now,
+          points: 0,
+        })
+        .select("id")
+        .single();
+
+      if (attemptInsertError || !attemptRow) {
+        return NextResponse.json(
+          { success: false, error: "Failed to record submission attempt." },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: { submissionId: submission.id, attemptId: attemptRow.id },
+          message: "Proof received! We are reviewing your submission.",
+        },
+        { status: 200 }
+      );
+    }
+
     const { error: updateError } = await adminClient
       .from("submissions")
       .update({
         status: "pending",
         file_url: storagePath,
-        resubmit_count: submission.resubmit_count + 1,
-        updated_at: new Date().toISOString(),
+        file_hash: hash,
+        resubmit_count: nextResubmit,
+        ai_reason: null,
+        verification_attempts: 0,
+        last_attempted_at: null,
+        verified_at: null,
+        updated_at: now,
       })
       .eq("id", submission.id);
 
@@ -104,15 +191,36 @@ export async function POST(request: Request) {
       );
     }
 
-    const origin = new URL(request.url).origin;
-    void fetch(`${origin}/api/submissions/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ submissionId: submission.id }),
-    }).catch(() => {});
+    const { data: attemptRow, error: attemptInsertError } = await adminClient
+      .from("submission_attempts")
+      .insert({
+        submission_id: submission.id,
+        student_id: session.studentId,
+        task_id: taskId,
+        bootcamp_id: submission.bootcamp_id,
+        attempt_number: nextResubmit,
+        file_url: storagePath,
+        file_hash: hash,
+        status: "pending",
+        verification_attempts: 0,
+        points: 0,
+      })
+      .select("id")
+      .single();
+
+    if (attemptInsertError || !attemptRow) {
+      return NextResponse.json(
+        { success: false, error: "Failed to record submission attempt." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
-      { success: true, data: { submissionId: submission.id } },
+      {
+        success: true,
+        data: { submissionId: submission.id, attemptId: attemptRow.id },
+        message: "Proof received! We are reviewing your submission.",
+      },
       { status: 200 }
     );
   } catch {

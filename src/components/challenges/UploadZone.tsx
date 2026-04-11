@@ -5,26 +5,35 @@ import Image from "next/image";
 export default function UploadZone({
   onFileSelect,
   preview,
+  disabled = false,
 }: {
   onFileSelect: (file: File) => void;
   preview: string | null;
+  disabled?: boolean;
 }) {
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles[0]) onFileSelect(acceptedFiles[0]);
-  }, [onFileSelect]);
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      if (disabled) return;
+      if (acceptedFiles[0]) onFileSelect(acceptedFiles[0]);
+    },
+    [onFileSelect, disabled]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { "image/png": [], "image/jpeg": [], "image/jpg": [] },
     maxSize: 10 * 1024 * 1024,
     multiple: false,
+    disabled,
   });
 
   return (
     <div
       {...getRootProps()}
-      className={`relative w-full min-h-40 h-44 sm:h-48 border-4 border-dashed rounded-xl flex items-center justify-center cursor-pointer transition-all bg-[#991b1b] shadow-inner ${
-        isDragActive ? "border-[#ffffff] scale-105" : "border-[#f7b801] hover:border-[#ffffff]"
+      className={`relative w-full min-h-40 h-44 sm:h-48 border-4 border-dashed rounded-xl flex items-center justify-center transition-all bg-[#991b1b] shadow-inner ${
+        disabled
+          ? "cursor-not-allowed border-[#f7b801]/50 opacity-60 pointer-events-none"
+          : `cursor-pointer ${isDragActive ? "border-[#ffffff] scale-105" : "border-[#f7b801] hover:border-[#ffffff]"}`
       }`}
     >
       <input {...getInputProps()} />
@@ -36,7 +45,7 @@ export default function UploadZone({
               alt="Evidence"
               fill
               unoptimized
-              className="object-cover rounded-lg border-2 border-[#f7b801]"
+              className="object-contain rounded-lg border-2 border-[#f7b801] bg-[#991b1b]"
             />
           </div>
         </div>

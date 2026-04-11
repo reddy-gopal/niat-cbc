@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
     const { data: submission, error } = await adminClient
       .from("submissions")
-      .select("id, student_id, status, points, ai_reason")
+      .select("id, student_id, status, points, ai_reason, verified_at")
       .eq("id", submissionId)
       .maybeSingle();
 
@@ -62,6 +62,7 @@ export async function GET(request: Request) {
           status: submission.status,
           points: submission.points,
           aiReason: submission.ai_reason,
+          verifiedAt: submission.verified_at,
         },
       },
       { status: 200 }

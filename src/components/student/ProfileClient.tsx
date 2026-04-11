@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "../ui/Toast";
 import type { StudentSession } from "@/types/app";
 import type { Student } from "@/types/database";
+import { StudentAppShell } from "./StudentAppShell";
+import { studentMainTopPaddingClass } from "./StudentNavbar";
 
 type StudentWithContext = Student & {
   sections: { label: string } | null;
@@ -114,19 +115,16 @@ export default function ProfileClient({
   };
 
   const initial = student.full_name ? student.full_name.charAt(0).toUpperCase() : "U";
+  const firstName = student.full_name?.split(" ")[0] ?? "Student";
 
   return (
-    <main className="min-h-screen bg-[var(--bg-tint)] text-[var(--text-base)] pb-20">
-      <div className="mx-auto max-w-2xl px-4 py-8 md:py-12 mt-10">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center text-sm font-bold text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors mb-8"
+    <StudentAppShell firstName={firstName}>
+      <main className="min-h-screen bg-[var(--bg-tint)] text-[var(--text-base)] pb-8 md:pb-20">
+        <div
+          className={`mx-auto max-w-2xl px-4 pb-8 md:pb-12 ${studentMainTopPaddingClass}`}
         >
-          ← Back to Dashboard
-        </Link>
-
         {/* Profile Card */}
-        <section className="card px-8 pt-12 pb-8 shadow-lg border-0 bg-white relative mt-8">
+        <section className="card px-8 pt-12 pb-8 shadow-lg border-0 bg-white relative mt-4 sm:mt-8">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full bg-[var(--primary)] text-white text-4xl font-heading font-bold flex items-center justify-center shadow-xl border-4 border-white">
             {initial}
           </div>
@@ -254,6 +252,7 @@ export default function ProfileClient({
           </div>
         </section>
       </div>
-    </main>
+      </main>
+    </StudentAppShell>
   );
 }

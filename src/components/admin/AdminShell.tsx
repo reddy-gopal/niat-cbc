@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   FileCheck,
@@ -28,7 +29,7 @@ const nav = [
 export default function AdminShell({ adminEmail, children }: AdminShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   async function signOut() {
     await supabase.auth.signOut();

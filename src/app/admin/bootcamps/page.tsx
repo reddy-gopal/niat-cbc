@@ -1,7 +1,5 @@
-import Link from "next/link";
-import AdminShell from "@/components/admin/AdminShell";
 import BootcampsClient from "@/components/admin/BootcampsClient";
-import { requireAdmin } from "@/lib/admin-auth";
+import BootcampRowActions from "@/components/admin/BootcampRowActions";
 import { adminClient } from "../../../../utils/supabase/admin";
 
 type BootcampRow = {
@@ -14,7 +12,6 @@ type BootcampRow = {
 };
 
 export default async function AdminBootcampsPage() {
-  const admin = await requireAdmin();
   const { data: bootcamps } = await adminClient
     .from("bootcamps")
     .select("id, name, date, region_id, regions(name), sections(id), students(id)")
@@ -33,7 +30,6 @@ export default async function AdminBootcampsPage() {
   );
 
   return (
-    <AdminShell adminEmail={admin.email}>
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Bootcamps</h1>
@@ -55,12 +51,12 @@ export default async function AdminBootcampsPage() {
                   <div>Sections: {bootcamp.sections?.length ?? 0}</div>
                   <div>Students: {bootcamp.students?.length ?? 0}</div>
                   <div>
-                    <Link
-                      href={`/admin/bootcamps/${bootcamp.id}`}
-                      className="text-[var(--primary)]"
-                    >
-                      Manage →
-                    </Link>
+                    <BootcampRowActions
+                      bootcampId={bootcamp.id}
+                      name={bootcamp.name}
+                      regionName={region}
+                      manageHref={`/admin/bootcamps/${bootcamp.id}`}
+                    />
                   </div>
                 </div>
               ))}
@@ -69,6 +65,5 @@ export default async function AdminBootcampsPage() {
         ))}
       </div>
     </div>
-    </AdminShell>
   );
 }

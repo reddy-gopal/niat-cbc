@@ -1,3 +1,4 @@
+import type { StudentSession } from "@/types/app";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -45,4 +46,17 @@ export function getMobileDisplay(mobile: string): string {
   const first = local.slice(0, 5);
   const second = local.slice(5, 10);
   return `+91 ${first} ${second}`.trim();
+}
+
+export function buildChallenge8ReferralUrl(session: StudentSession): string {
+  const url = new URL(
+    "https://accounts.ccbp.in/public/register/niat-boot-camp"
+  );
+
+  url.searchParams.set("utm_source", "bootcamp");
+  url.searchParams.set("utm_medium", "whatsapp");
+  url.searchParams.set("utm_campaign", `invite-niat-referral-platform-${session.sectionId}`);
+  url.searchParams.set("section_id", session.sectionId);
+
+  return url.toString();
 }

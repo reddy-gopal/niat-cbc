@@ -1,32 +1,37 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { updateSession } from "../utils/supabase/middleware";
 
-export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const isAdminRoute = pathname.startsWith("/admin");
+  const isAuthRoute = pathname === "/admin/login";
 
-  // Avoid intercepting API routes with Supabase session refresh.
-  if (pathname.startsWith("/api/")) {
+  if (!isAdminRoute) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/admin/")) {
-    if (pathname === "/admin/login") {
-      const { response } = await updateSession(request);
-      return response;
-    }
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-admin-path", pathname);
 
-    const { response, user } = await updateSession(request);
-    if (!user) {
-      const loginUrl = new URL("/admin/login", request.url);
-      return NextResponse.redirect(loginUrl);
-    }
-    return response;
+  if (isAuthRoute) {
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
   }
 
-  const { response } = await updateSession(request);
-  return response;
+  // Fast path: cookie presence check only in proxy.
+  const supabaseAccessToken =
+    request.cookies.get("sb-access-token") ??
+    request.cookies.get("sb-rdamfrqzccwzlnuymlho-auth-token");
+
+  if (!supabaseAccessToken?.value) {
+    return NextResponse.redirect(new URL("/admin/login", request.url));
+  }
+
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|public/).*)"],
+  matcher: ["/admin/:path*"],
 };

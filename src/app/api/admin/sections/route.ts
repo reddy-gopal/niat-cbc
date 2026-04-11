@@ -58,7 +58,7 @@ export async function POST(request: Request) {
         label: parsed.data.label,
         slug,
       })
-      .select("*")
+      .select("id,bootcamp_id,label,slug,created_at")
       .single();
 
     if (error) {

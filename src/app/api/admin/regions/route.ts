@@ -8,7 +8,10 @@ const schema = z.object({ name: z.string().min(2).max(60) });
 export async function GET() {
   try {
     await requireAdmin();
-    const { data, error } = await adminClient.from("regions").select("*").order("name");
+    const { data, error } = await adminClient
+      .from("regions")
+      .select("id,name,created_at")
+      .order("name");
     if (error) {
       return NextResponse.json(
         { success: false, error: "Unable to fetch regions right now." },
@@ -38,7 +41,7 @@ export async function POST(request: Request) {
     const { data, error } = await adminClient
       .from("regions")
       .insert({ name: parsed.data.name })
-      .select("*")
+      .select("id,name,created_at")
       .single();
     if (error) {
       return NextResponse.json(

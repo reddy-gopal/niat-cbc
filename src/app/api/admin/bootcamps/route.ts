@@ -14,7 +14,7 @@ export async function GET() {
     await requireAdmin();
     const { data, error } = await adminClient
       .from("bootcamps")
-      .select("*, regions(name)")
+      .select("id,name,date,region_id,created_at,regions(name)")
       .order("date", { ascending: false });
     if (error) {
       return NextResponse.json(
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
         name: parsed.data.name,
         date: new Date().toISOString().slice(0, 10),
       })
-      .select("*")
+      .select("id,name,date,region_id,created_at")
       .single();
     if (error) {
       return NextResponse.json(

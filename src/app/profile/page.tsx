@@ -34,5 +34,10 @@ export default async function ProfilePage() {
     redirect("/invalid");
   }
 
-  return <ProfileClient session={session} student={studentData as StudentWithContext} />;
+  return (
+    <ProfileClient
+      session={session}
+      student={studentData as StudentWithContext}
+    />
+  );
 }
