@@ -13,6 +13,7 @@ type StudentWithContext = Student & {
   sections: { label: string } | null;
   bootcamps: { name: string; date: string } | null;
   regions: { name: string } | null;
+  teams: { name: string; invite_code: string; leader_id: string } | null;
 };
 
 type DashboardProps = {
@@ -29,6 +30,15 @@ export default function Dashboard({
   const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions);
 
   const firstName = session.fullName.split(" ")[0] ?? session.fullName;
+  const leaderInvite = useMemo(() => {
+    if (!student.teams) return null;
+    if (student.teams.leader_id !== student.id) return null;
+    return {
+      teamName: student.teams.name,
+      inviteCode: student.teams.invite_code,
+    };
+  }, [student.id, student.teams]);
+
   const submissionByTask = useMemo(
     () => new Map(submissions.map((item) => [item.task_id, item])),
     [submissions]
@@ -54,6 +64,23 @@ export default function Dashboard({
         return submission?.status !== "accepted";
       }).reduce((sum, challenge) => sum + challenge.points, 0),
     [submissionByTask]
+  );
+
+  /** Referral link uses names (not UUIDs); merge from loaded student context. */
+  const sessionWithReferralContext = useMemo(
+    () => ({
+      ...session,
+      bootcampName: student.bootcamps?.name,
+      sectionLabel: [student.regions?.name, student.sections?.label]
+        .filter((part): part is string => Boolean(part && part.trim()))
+        .join(" "),
+    }),
+    [
+      session,
+      student.bootcamps?.name,
+      student.regions?.name,
+      student.sections?.label,
+    ]
   );
 
   const getSubTitle = () => {
@@ -150,12 +177,22 @@ export default function Dashboard({
             <p className="text-sm font-medium text-[var(--text-secondary)]">
               View status and proof for all nine challenges in one place.
             </p>
-            <Link
-              href="/submissions"
-              className="inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 shrink-0"
-            >
-              My Submissions →
-            </Link>
+            <div className="flex w-full sm:w-auto gap-2 shrink-0">
+              {leaderInvite && (
+                <Link
+                  href="/invite"
+                  className="inline-flex flex-1 sm:flex-none items-center justify-center rounded-lg bg-[var(--teal)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--teal)] focus-visible:ring-offset-2"
+                >
+                  Invite Tribe
+                </Link>
+              )}
+              <Link
+                href="/submissions"
+                className="inline-flex flex-1 sm:flex-none items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+              >
+                My Submissions →
+              </Link>
+            </div>
           </div>
 
           {/* CHALLENGE GRID */}
@@ -164,7 +201,7 @@ export default function Dashboard({
               challenges={CHALLENGES}
               submissions={submissions}
               setSubmissions={setSubmissions}
-              session={session}
+              session={sessionWithReferralContext}
             />
           </section>
         </div>

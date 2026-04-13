@@ -8,6 +8,7 @@ type StudentWithContext = Student & {
   sections: { label: string } | null;
   bootcamps: { name: string; date: string } | null;
   regions: { name: string } | null;
+  teams: { name: string; invite_code: string; leader_id: string } | null;
 };
 
 const Dashboard = dynamic(() => import("@/components/student/Dashboard"));
@@ -32,9 +33,11 @@ export default async function DashboardPage() {
         bootcamp_id,
         region_id,
         created_at,
+        team_id,
         sections:section_id (label),
         bootcamps:bootcamp_id (name, date),
-        regions:region_id (name)
+        regions:region_id (name),
+        teams:team_id (name, invite_code, leader_id)
       `
       )
       .eq("id", session.studentId)

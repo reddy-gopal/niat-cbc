@@ -13,6 +13,11 @@ export type Challenge = {
   points: number;
   description: string;
   requiresUpload: boolean;
+  requiresText?: boolean;
+  placeholder?: string;
+  maxWords?: number;
+  isReferral?: boolean;
+  streakDays?: number;
 };
 
 export type StudentSession = {
@@ -22,6 +27,11 @@ export type StudentSession = {
   regionId: string;
   fullName: string;
   mobile: string;
+  teamId?: string;
+  /** Bootcamp display name (for outbound referral URLs). */
+  bootcampName?: string;
+  /** Section display label, optionally scoped with region (for outbound referral URLs). */
+  sectionLabel?: string;
 };
 
 export type LeaderboardEntry = {
@@ -36,6 +46,18 @@ export type AdminUser = {
   id: string;
   email: string;
   role: string;
+};
+
+export type Team = {
+  id: string;
+  name: string;
+  section_id: string;
+  bootcamp_id: string;
+  leader_id: string;
+  invite_code: string;
+  total_points: number;
+  last_point_at: string;
+  created_at: string;
 };
 
 export type ApiResponse<T = void> = {

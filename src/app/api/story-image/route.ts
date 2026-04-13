@@ -1,0 +1,32 @@
+import { NextResponse } from "next/server";
+
+const STORY_SOURCE_URL =
+  "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&auto=format&fit=crop&q=80";
+
+export async function GET() {
+  try {
+    const upstream = await fetch(STORY_SOURCE_URL, { cache: "no-store" });
+    if (!upstream.ok) {
+      return NextResponse.json(
+        { success: false, error: "Unable to load story image." },
+        { status: 502 }
+      );
+    }
+
+    const bytes = await upstream.arrayBuffer();
+    const contentType = upstream.headers.get("content-type") || "image/jpeg";
+
+    return new NextResponse(bytes, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "private, no-store, max-age=0",
+      },
+    });
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Unable to load story image." },
+      { status: 500 }
+    );
+  }
+}

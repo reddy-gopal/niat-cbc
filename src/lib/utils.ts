@@ -53,10 +53,22 @@ export function buildChallenge8ReferralUrl(session: StudentSession): string {
     "https://accounts.ccbp.in/public/register/niat-boot-camp"
   );
 
+  const bootcampSlug = session.bootcampName?.trim()
+    ? slugify(session.bootcampName)
+    : "";
+  const campaignSuffix = bootcampSlug || "bootcamp";
+
+  const sectionValue =
+    session.sectionLabel?.trim() ||
+    session.sectionId;
+
   url.searchParams.set("utm_source", "bootcamp");
   url.searchParams.set("utm_medium", "whatsapp");
-  url.searchParams.set("utm_campaign", `invite-niat-referral-platform-${session.sectionId}`);
-  url.searchParams.set("section_id", session.sectionId);
+  url.searchParams.set(
+    "utm_campaign",
+    `invite-niat-referral-platform-${campaignSuffix}`
+  );
+  url.searchParams.set("section_id", sectionValue);
 
   return url.toString();
 }

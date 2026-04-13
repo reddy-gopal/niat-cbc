@@ -52,7 +52,7 @@ export async function verifySubmissionById(
 
   const { data: submission, error: submissionError } = await adminClient
     .from("submissions")
-    .select("id,task_id,file_url,status,verification_attempts")
+    .select("id,task_id,student_id,file_url,text_response,status,verification_attempts")
     .eq("id", submissionId)
     .maybeSingle();
 
@@ -74,7 +74,14 @@ export async function verifySubmissionById(
     return { ok: false, status: 400, error: "Submission not pending." };
   }
 
-  if (!submission.file_url) {
+  const challenge = CHALLENGES.find((item) => item.id === submission.task_id);
+  if (!challenge) {
+    logSegment("dbFetch", segmentDb);
+    onPhase?.("total", Math.round(performance.now() - totalStart));
+    return { ok: false, status: 400, error: "Challenge not found." };
+  }
+
+  if (!challenge.requiresText && !submission.file_url) {
     logSegment("dbFetch", segmentDb);
     onPhase?.("total", Math.round(performance.now() - totalStart));
     return { ok: false, status: 400, error: "Submission file missing." };
@@ -96,27 +103,26 @@ export async function verifySubmissionById(
     return { ok: false, status: 500, error: "Failed to update submission attempt." };
   }
 
-  const { data: signedData, error: signedError } = await adminClient.storage
-    .from("submissions")
-    .createSignedUrl(submission.file_url, 60);
+  let base64Image: string | null = null;
+  if (!challenge.requiresText && submission.file_url) {
+    const { data: signedData, error: signedError } = await adminClient.storage
+      .from("submissions")
+      .createSignedUrl(submission.file_url, 60);
 
-  logSegment("dbFetch", segmentDb);
+    logSegment("dbFetch", segmentDb);
 
-  if (signedError || !signedData?.signedUrl) {
-    onPhase?.("total", Math.round(performance.now() - totalStart));
-    return { ok: false, status: 500, error: "Unable to read submission file." };
-  }
+    if (signedError || !signedData?.signedUrl) {
+      onPhase?.("total", Math.round(performance.now() - totalStart));
+      return { ok: false, status: 500, error: "Unable to read submission file." };
+    }
 
-  const segmentImage = performance.now();
-  const imageResponse = await fetch(signedData.signedUrl);
-  const imageBuffer = await imageResponse.arrayBuffer();
-  const base64Image = Buffer.from(imageBuffer).toString("base64");
-  logSegment("imageDownload", segmentImage);
-
-  const challenge = CHALLENGES.find((item) => item.id === submission.task_id);
-  if (!challenge) {
-    onPhase?.("total", Math.round(performance.now() - totalStart));
-    return { ok: false, status: 400, error: "Challenge not found." };
+    const segmentImage = performance.now();
+    const imageResponse = await fetch(signedData.signedUrl);
+    const imageBuffer = await imageResponse.arrayBuffer();
+    base64Image = Buffer.from(imageBuffer).toString("base64");
+    logSegment("imageDownload", segmentImage);
+  } else {
+    logSegment("dbFetch", segmentDb);
   }
 
   try {
@@ -136,20 +142,31 @@ export async function verifySubmissionById(
         messages: [
           {
             role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Challenge: ${challenge.title}. Verification criteria: ${challenge.description}. Please verify if the attached screenshot meets this criteria.`,
-              },
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: submission.file_url.endsWith(".png") ? "image/png" : "image/jpeg",
-                  data: base64Image,
-                },
-              },
-            ],
+            content: challenge.requiresText
+              ? [
+                  {
+                    type: "text",
+                    text: `Challenge: ${challenge.title}. Verification criteria: ${challenge.description}. Student response: "${submission.text_response}". Please verify if the text response meets the criteria.`,
+                  },
+                ]
+              : [
+                  {
+                    type: "text",
+                    text: `Challenge: ${challenge.title}. Verification criteria: ${challenge.description}. Please verify if the attached screenshot meets this criteria.`,
+                  },
+                  base64Image
+                    ? {
+                        type: "image",
+                        source: {
+                          type: "base64",
+                          media_type: submission.file_url?.endsWith(".png")
+                            ? "image/png"
+                            : "image/jpeg",
+                          data: base64Image,
+                        },
+                      }
+                    : { type: "text", text: "(No image provided)" },
+                ],
           },
         ],
       }),
@@ -183,6 +200,30 @@ export async function verifySubmissionById(
           updated_at: verifiedAt,
         })
         .eq("id", submission.id);
+
+      const { data: student } = await adminClient
+        .from("students")
+        .select("team_id")
+        .eq("id", submission.student_id)
+        .maybeSingle();
+
+      if (student?.team_id) {
+         const { data: teamData } = await adminClient
+           .from("teams")
+           .select("total_points")
+           .eq("id", student.team_id)
+           .maybeSingle();
+         
+         if (teamData) {
+            await adminClient
+              .from("teams")
+              .update({
+                total_points: teamData.total_points + challenge.points,
+                last_point_at: verifiedAt,
+              })
+              .eq("id", student.team_id);
+         }
+      }
     } else {
       await adminClient
         .from("submissions")

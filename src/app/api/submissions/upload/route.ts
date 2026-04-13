@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { verifyStudentSession } from "@/lib/session";
+import { CHALLENGES } from "@/lib/challenges";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
 function getCookieValue(cookieHeader: string | null, key: string): string | null {
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const taskId = Number(formData.get("taskId"));
     const file = formData.get("file");
+    const textResponse = formData.get("textResponse") as string | null;
 
     if (!Number.isInteger(taskId) || taskId < 1 || taskId > 9) {
       return NextResponse.json(
@@ -36,87 +38,134 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!(file instanceof File)) {
-      return NextResponse.json({ success: false, error: "File is required." }, { status: 400 });
-    }
-    if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
-      return NextResponse.json(
-        { success: false, error: "Only PNG and JPG images are allowed." },
-        { status: 400 }
-      );
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json(
-        { success: false, error: "File size must be 10MB or less." },
-        { status: 400 }
-      );
+    const challenge = CHALLENGES.find((c) => c.id === taskId);
+    if (!challenge) {
+      return NextResponse.json({ success: false, error: "Challenge not found." }, { status: 404 });
     }
 
-    const { data: submission, error: submissionError } = await adminClient
+    if (!challenge.requiresText && !(file instanceof File)) {
+      return NextResponse.json({ success: false, error: "File is required." }, { status: 400 });
+    }
+
+    if (challenge.requiresText && !textResponse) {
+      return NextResponse.json({ success: false, error: "Response is required." }, { status: 400 });
+    }
+
+    let storagePath: string | null = null;
+    let hash: string | null = null;
+    let isPlagiarism = false;
+
+    if (file instanceof File) {
+      if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
+        return NextResponse.json(
+          { success: false, error: "Only PNG and JPG images are allowed." },
+          { status: 400 }
+        );
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return NextResponse.json(
+          { success: false, error: "File size must be 10MB or less." },
+          { status: 400 }
+        );
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      hash = createHash("sha256").update(buffer).digest("hex");
+      const bytes = new Uint8Array(buffer);
+
+      const { data: duplicateRow } = await adminClient
+        .from("submissions")
+        .select("id, student_id")
+        .eq("file_hash", hash)
+        .eq("task_id", taskId)
+        .eq("bootcamp_id", session.bootcampId)
+        .neq("student_id", session.studentId)
+        .neq("status", "not_started")
+        .limit(1)
+        .maybeSingle();
+
+      isPlagiarism = Boolean(duplicateRow);
+
+      const extension = file.type === "image/png" ? "png" : "jpg";
+      storagePath = `${session.bootcampId}/${session.studentId}/${taskId}-${Date.now()}.${extension}`;
+
+      const { error: uploadError } = await adminClient.storage
+        .from("submissions")
+        .upload(storagePath, bytes, {
+          contentType: file.type,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error("File upload error:", uploadError);
+        return NextResponse.json(
+          { success: false, error: "Failed to upload file." },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Lookup existing submission row
+    const { data: submission, error: submissionLookupError } = await adminClient
       .from("submissions")
       .select("id, resubmit_count, bootcamp_id")
       .eq("student_id", session.studentId)
       .eq("task_id", taskId)
       .maybeSingle();
 
-    if (submissionError || !submission) {
+    if (submissionLookupError) {
+      console.error("Submission lookup error:", submissionLookupError);
       return NextResponse.json(
-        { success: false, error: "Submission record not found." },
-        { status: 400 }
-      );
-    }
-
-    if (submission.resubmit_count >= 3) {
-      return NextResponse.json(
-        { success: false, error: "Maximum attempts reached." },
-        { status: 400 }
-      );
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const hash = createHash("sha256").update(buffer).digest("hex");
-    const bytes = new Uint8Array(buffer);
-
-    const { data: duplicateRow } = await adminClient
-      .from("submissions")
-      .select("id, student_id")
-      .eq("file_hash", hash)
-      .eq("task_id", taskId)
-      .eq("bootcamp_id", session.bootcampId)
-      .neq("student_id", session.studentId)
-      .neq("status", "not_started")
-      .limit(1)
-      .maybeSingle();
-
-    const isPlagiarism = Boolean(duplicateRow);
-
-    const extension = file.type === "image/png" ? "png" : "jpg";
-    const storagePath = `${session.bootcampId}/${session.studentId}/${taskId}-${Date.now()}.${extension}`;
-
-    const { error: uploadError } = await adminClient.storage
-      .from("submissions")
-      .upload(storagePath, bytes, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      return NextResponse.json(
-        { success: false, error: "Failed to upload file." },
+        { success: false, error: "Unable to lookup submission." },
         { status: 500 }
       );
     }
 
+    let targetSubmission = submission;
+
+    // Self-heal: create missing row if not found
+    if (!targetSubmission) {
+      console.warn(
+        `No submission row found for student=${session.studentId} task=${taskId}. Creating one.`
+      );
+
+      const { data: inserted, error: insertError } = await adminClient
+        .from("submissions")
+        .insert({
+          student_id: session.studentId,
+          bootcamp_id: session.bootcampId,
+          section_id: session.sectionId,
+          region_id: session.regionId,
+          task_id: taskId,
+          status: "not_started",
+          points: 0,
+          resubmit_count: 0,
+        })
+        .select("id, resubmit_count, bootcamp_id")
+        .single();
+
+      if (insertError || !inserted) {
+        console.error("Submission insert error:", insertError);
+        return NextResponse.json(
+          { success: false, error: "Unable to initialize submission." },
+          { status: 500 }
+        );
+      }
+
+      targetSubmission = inserted;
+    }
+
     const now = new Date().toISOString();
-    const nextResubmit = submission.resubmit_count + 1;
+    const nextResubmit = targetSubmission.resubmit_count + 1;
 
     if (isPlagiarism) {
       const { error: updateError } = await adminClient
         .from("submissions")
         .update({
           status: "rejected",
-          file_url: storagePath,
-          file_hash: hash,
+          ...(storagePath !== null && { file_url: storagePath }),
+          ...(hash !== null && { file_hash: hash }),
+          text_response: textResponse,
           ai_reason: PLAGIARISM_REASON,
           resubmit_count: nextResubmit,
           verification_attempts: 3,
@@ -124,11 +173,12 @@ export async function POST(request: Request) {
           verified_at: now,
           updated_at: now,
         })
-        .eq("id", submission.id);
+        .eq("id", targetSubmission.id);
 
       if (updateError) {
+        console.error("Plagiarism submission update error:", updateError);
         return NextResponse.json(
-          { success: false, error: "Failed to update submission." },
+          { success: false, error: "Failed to update submission.", detail: updateError.message },
           { status: 500 }
         );
       }
@@ -136,13 +186,14 @@ export async function POST(request: Request) {
       const { data: attemptRow, error: attemptInsertError } = await adminClient
         .from("submission_attempts")
         .insert({
-          submission_id: submission.id,
+          submission_id: targetSubmission.id,
           student_id: session.studentId,
           task_id: taskId,
-          bootcamp_id: submission.bootcamp_id,
+          bootcamp_id: targetSubmission.bootcamp_id,
           attempt_number: nextResubmit,
-          file_url: storagePath,
-          file_hash: hash,
+          ...(storagePath !== null && { file_url: storagePath }),
+          ...(hash !== null && { file_hash: hash }),
+          text_response: textResponse,
           status: "rejected",
           ai_reason: PLAGIARISM_REASON,
           verification_attempts: 3,
@@ -153,6 +204,7 @@ export async function POST(request: Request) {
         .single();
 
       if (attemptInsertError || !attemptRow) {
+        console.error("Plagiarism attempt insert error:", attemptInsertError);
         return NextResponse.json(
           { success: false, error: "Failed to record submission attempt." },
           { status: 500 }
@@ -162,19 +214,21 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: true,
-          data: { submissionId: submission.id, attemptId: attemptRow.id },
+          data: { submissionId: targetSubmission.id, attemptId: attemptRow.id },
           message: "Proof received! We are reviewing your submission.",
         },
         { status: 200 }
       );
     }
 
+    // Normal (non-plagiarism) submission update
     const { error: updateError } = await adminClient
       .from("submissions")
       .update({
         status: "pending",
-        file_url: storagePath,
-        file_hash: hash,
+        ...(storagePath !== null && { file_url: storagePath }),
+        ...(hash !== null && { file_hash: hash }),
+        text_response: textResponse,
         resubmit_count: nextResubmit,
         ai_reason: null,
         verification_attempts: 0,
@@ -182,11 +236,12 @@ export async function POST(request: Request) {
         verified_at: null,
         updated_at: now,
       })
-      .eq("id", submission.id);
+      .eq("id", targetSubmission.id);
 
     if (updateError) {
+      console.error("Submission update error:", updateError);
       return NextResponse.json(
-        { success: false, error: "Failed to update submission." },
+        { success: false, error: "Failed to update submission.", detail: updateError.message },
         { status: 500 }
       );
     }
@@ -194,13 +249,14 @@ export async function POST(request: Request) {
     const { data: attemptRow, error: attemptInsertError } = await adminClient
       .from("submission_attempts")
       .insert({
-        submission_id: submission.id,
+        submission_id: targetSubmission.id,
         student_id: session.studentId,
         task_id: taskId,
-        bootcamp_id: submission.bootcamp_id,
+        bootcamp_id: targetSubmission.bootcamp_id,
         attempt_number: nextResubmit,
-        file_url: storagePath,
-        file_hash: hash,
+        ...(storagePath !== null && { file_url: storagePath }),
+        ...(hash !== null && { file_hash: hash }),
+        text_response: textResponse,
         status: "pending",
         verification_attempts: 0,
         points: 0,
@@ -209,8 +265,13 @@ export async function POST(request: Request) {
       .single();
 
     if (attemptInsertError || !attemptRow) {
+      console.error("Attempt insert error:", attemptInsertError);
       return NextResponse.json(
-        { success: false, error: "Failed to record submission attempt." },
+        {
+          success: false,
+          error: "Failed to record submission attempt.",
+          detail: attemptInsertError?.message,
+        },
         { status: 500 }
       );
     }
@@ -218,12 +279,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        data: { submissionId: submission.id, attemptId: attemptRow.id },
+        data: { submissionId: targetSubmission.id, attemptId: attemptRow.id },
         message: "Proof received! We are reviewing your submission.",
       },
       { status: 200 }
     );
-  } catch {
+  } catch (err) {
+    console.error("Unhandled submission error:", err);
     return NextResponse.json(
       { success: false, error: "Invalid submission payload." },
       { status: 400 }

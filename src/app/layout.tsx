@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, Syne } from "next/font/google";
 import { ToastProvider } from "@/components/ui/Toast";
+import { SiteFooter } from "@/components/ui/SiteFooter";
 import "./globals.css";
 
 const syne = Syne({
@@ -39,7 +40,10 @@ export default function RootLayout({
         suppressHydrationWarning
         className="min-h-full flex flex-col bg-[var(--bg-base)] text-[var(--text-base)] antialiased"
       >
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          {children}
+          <SiteFooter />
+        </ToastProvider>
       </body>
     </html>
   );

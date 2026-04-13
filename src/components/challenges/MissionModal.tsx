@@ -23,42 +23,48 @@ export default function MissionModal({
   const [accepted, setAccepted] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [textResponse, setTextResponse] = useState("");
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [error, setError] = useState<string | null>(null);
+
   const referralUrl = useMemo(
     () => buildChallenge8ReferralUrl(session),
     [session]
   );
+
+  const wordCount = useMemo(() => {
+    if (!textResponse.trim()) return 0;
+    return textResponse.trim().split(/\s+/).length;
+  }, [textResponse]);
 
   useEffect(() => {
     if (!isOpen) {
       setAccepted(false);
       setSelectedFile(null);
       setPreview(null);
+      setTextResponse("");
       setError(null);
       setUploadState("idle");
     }
   }, [isOpen]);
 
   const handleClose = () => {
-    setAccepted(false);
-    setSelectedFile(null);
-    setPreview(null);
-    setError(null);
-    setUploadState("idle");
     onClose();
   };
 
   if (!challenge || typeof window === "undefined") return null;
 
   const handleSubmit = async () => {
-    if (!selectedFile) return;
+    if (challenge.requiresUpload && !selectedFile) return;
+    if (challenge.requiresText && !textResponse.trim()) return;
+    
     setUploadState("uploading");
     setError(null);
 
     const formData = new FormData();
     formData.append("taskId", String(challenge.id));
-    formData.append("file", selectedFile);
+    if (selectedFile) formData.append("file", selectedFile);
+    if (textResponse) formData.append("textResponse", textResponse);
 
     try {
       const res = await fetch("/api/submissions/upload", { method: "POST", body: formData });
@@ -68,7 +74,7 @@ export default function MissionModal({
         message?: string;
       };
       if (!res.ok || !result.success) {
-        setError(result.error || "Upload failed. Try again.");
+        setError(result.error || "Submission failed. Try again.");
         setUploadState("idle");
         return;
       }
@@ -152,19 +158,39 @@ export default function MissionModal({
 
           <div className="w-full">
             {!accepted ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (!challenge.requiresUpload) {
-                    window.open(referralUrl, "_blank", "noopener,noreferrer");
-                  } else {
-                    setAccepted(true);
-                  }
-                }}
-                className="w-full bg-[#f7b801] text-[#991b1b] font-black text-xs sm:text-sm md:text-base tracking-[0.05em] sm:tracking-[0.08em] py-2.5 sm:py-3.5 rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-[0_4px_15px_rgba(247,184,1,0.5)] border-2 border-[#f18701]"
-              >
-                {challenge.requiresUpload ? "ACCEPT MISSION" : "INITIATE REFERRAL"}
-              </button>
+              challenge.isReferral ? (
+                <div className="space-y-4">
+                   <div className="bg-orange-50 border-2 border-dashed border-orange-200 p-4 rounded-xl">
+                      <p className="text-[10px] uppercase font-bold text-orange-800 mb-2 tracking-wider">Your Referral Link</p>
+                      <div className="flex gap-2">
+                         <input 
+                            type="text" 
+                            readOnly 
+                            value={referralUrl} 
+                            className="flex-1 bg-white border border-orange-200 px-3 py-2 rounded text-xs text-orange-900 outline-none" 
+                         />
+                         <button 
+                            className="bg-orange-500 text-white px-4 py-2 rounded text-xs font-bold hover:bg-orange-600 transition-colors"
+                            onClick={() => {
+                               navigator.clipboard.writeText(referralUrl);
+                               alert("Referral link copied!");
+                            }}
+                         >
+                            COPY
+                         </button>
+                      </div>
+                   </div>
+                   <p className="text-[10px] text-center text-orange-700 font-medium">Points will be added automatically when someone joins using your link.</p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAccepted(true)}
+                  className="w-full bg-[#f7b801] text-[#991b1b] font-black text-xs sm:text-sm md:text-base tracking-[0.05em] sm:tracking-[0.08em] py-2.5 sm:py-3.5 rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-[0_4px_15px_rgba(247,184,1,0.5)] border-2 border-[#f18701]"
+                >
+                  ACCEPT MISSION
+                </button>
+              )
             ) : uploadState === "received" ? (
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
@@ -184,25 +210,49 @@ export default function MissionModal({
               </motion.div>
             ) : (
               <div className="space-y-4 animate-in fade-in">
-                <UploadZone
-                  onFileSelect={(f) => {
-                    setSelectedFile(f);
-                    setPreview(URL.createObjectURL(f));
-                    setError(null);
-                  }}
-                  preview={preview}
-                  disabled={formLocked}
-                />
+                {challenge.requiresText ? (
+                  <div className="space-y-2">
+                    <textarea 
+                      className="w-full min-h-[120px] p-4 rounded-xl border-2 border-[#f7b801] text-xs sm:text-sm text-[#991b1b] focus:outline-none focus:ring-2 focus:ring-[#f7b801]/50 placeholder:text-[#991b1b]/40 bg-[#fff8eb]"
+                      placeholder={challenge.placeholder}
+                      value={textResponse}
+                      onChange={(e) => setTextResponse(e.target.value)}
+                      disabled={formLocked}
+                    />
+                    {challenge.maxWords && (
+                      <div className="flex justify-between items-center px-1">
+                        <span className={`text-[10px] font-bold ${wordCount > challenge.maxWords ? 'text-red-500' : 'text-[#991b1b]/60'}`}>
+                          {wordCount} / {challenge.maxWords} words
+                        </span>
+                        {wordCount > challenge.maxWords && (
+                          <span className="text-[10px] font-bold text-red-500">Too long!</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <UploadZone
+                    onFileSelect={(f) => {
+                      setSelectedFile(f);
+                      setPreview(URL.createObjectURL(f));
+                      setError(null);
+                    }}
+                    preview={preview}
+                    disabled={formLocked}
+                  />
+                )}
+                
                 {error && (
                   <div className="text-[#ffffff] bg-[#991b1b] text-xs font-bold text-center px-4 py-3 rounded-lg border border-[#f7b801]">
                     {error}
                   </div>
                 )}
-                {preview && (
+
+                {(preview || (challenge.requiresText && textResponse.trim())) && (
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    disabled={uploadState === "uploading"}
+                    disabled={formLocked || (challenge.maxWords ? wordCount > challenge.maxWords : false)}
                     className="w-full bg-[#991b1b] border-[3px] border-[#f7b801] text-[#f7b801] font-black tracking-[0.08em] sm:tracking-widest text-xs sm:text-sm md:text-base py-2.5 sm:py-3.5 rounded-xl hover:bg-[#b91c1c] active:scale-95 transition-all shadow-[0_4px_15px_rgba(153,27,27,0.4)] disabled:opacity-50 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
                   >
                     {uploadState === "uploading" ? (

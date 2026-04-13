@@ -92,6 +92,41 @@ export type Database = {
           created_at?: string;
         };
       };
+      teams: {
+        Row: {
+          id: string;
+          name: string;
+          section_id: string;
+          bootcamp_id: string;
+          leader_id: string;
+          invite_code: string;
+          total_points: number;
+          last_point_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          section_id: string;
+          bootcamp_id: string;
+          leader_id: string;
+          invite_code: string;
+          total_points?: number;
+          last_point_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          section_id?: string;
+          bootcamp_id?: string;
+          leader_id?: string;
+          invite_code?: string;
+          total_points?: number;
+          last_point_at?: string;
+          created_at?: string;
+        };
+      };
       students: {
         Row: {
           id: string;
@@ -100,6 +135,8 @@ export type Database = {
           section_id: string;
           bootcamp_id: string;
           region_id: string;
+          team_id: string | null;
+          referred_by: string | null;
           created_at: string;
         };
         Insert: {
@@ -109,6 +146,8 @@ export type Database = {
           section_id: string;
           bootcamp_id: string;
           region_id: string;
+          team_id?: string | null;
+          referred_by?: string | null;
           created_at?: string;
         };
         Update: {
@@ -118,6 +157,8 @@ export type Database = {
           section_id?: string;
           bootcamp_id?: string;
           region_id?: string;
+          team_id?: string | null;
+          referred_by?: string | null;
           created_at?: string;
         };
       };
@@ -129,11 +170,13 @@ export type Database = {
           section_id: string;
           region_id: string;
           task_id: number;
+          streak_day: number | null;
           file_url: string | null;
           file_hash: string | null;
           status: SubmissionStatus;
           points: number;
           ai_reason: string | null;
+          text_response: string | null;
           resubmit_count: number;
           verification_attempts: number;
           last_attempted_at: string | null;
@@ -150,11 +193,13 @@ export type Database = {
           section_id: string;
           region_id: string;
           task_id: number;
+          streak_day?: number | null;
           file_url?: string | null;
           file_hash?: string | null;
           status?: SubmissionStatus;
           points?: number;
           ai_reason?: string | null;
+          text_response?: string | null;
           resubmit_count?: number;
           verification_attempts?: number;
           last_attempted_at?: string | null;
@@ -171,11 +216,13 @@ export type Database = {
           section_id?: string;
           region_id?: string;
           task_id?: number;
+          streak_day?: number | null;
           file_url?: string | null;
           file_hash?: string | null;
           status?: SubmissionStatus;
           points?: number;
           ai_reason?: string | null;
+          text_response?: string | null;
           resubmit_count?: number;
           verification_attempts?: number;
           last_attempted_at?: string | null;
@@ -198,6 +245,7 @@ export type Database = {
           file_hash: string | null;
           status: string;
           ai_reason: string | null;
+          text_response: string | null;
           points: number;
           verification_attempts: number;
           last_attempted_at: string | null;
@@ -215,6 +263,7 @@ export type Database = {
           file_hash?: string | null;
           status?: string;
           ai_reason?: string | null;
+          text_response?: string | null;
           points?: number;
           verification_attempts?: number;
           last_attempted_at?: string | null;
@@ -310,6 +359,7 @@ export type Bootcamp = Database["public"]["Tables"]["bootcamps"]["Row"];
 export type Section = Database["public"]["Tables"]["sections"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Student = Database["public"]["Tables"]["students"]["Row"];
+export type Team = Database["public"]["Tables"]["teams"]["Row"];
 export type Submission = Database["public"]["Tables"]["submissions"]["Row"];
 export type SubmissionAttemptRow = Database["public"]["Tables"]["submission_attempts"]["Row"];
 
