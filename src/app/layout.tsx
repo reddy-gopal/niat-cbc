@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { DM_Sans, Syne } from "next/font/google";
+import { Inter, Outfit } from "next/font/google";
 import { ToastProvider } from "@/components/ui/Toast";
-import { SiteFooter } from "@/components/ui/SiteFooter";
+import { ConditionalFooter } from "@/components/ui/ConditionalFooter";
 import "./globals.css";
 
-const syne = Syne({
+const outfit = Outfit({
   variable: "--font-heading",
   subsets: ["latin"],
   weight: ["600", "700", "800"],
 });
 
-const dmSans = DM_Sans({
+const inter = Inter({
   variable: "--font-body",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -35,14 +35,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${syne.variable} ${dmSans.variable} h-full`}>
+    <html lang="en" className={`${outfit.variable} ${inter.variable} h-full`}>
       <body
         suppressHydrationWarning
         className="min-h-full flex flex-col bg-[var(--bg-base)] text-[var(--text-base)] antialiased"
       >
         <ToastProvider>
           {children}
-          <SiteFooter />
+          <ConditionalFooter />
         </ToastProvider>
       </body>
     </html>

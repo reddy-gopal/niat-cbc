@@ -6,8 +6,10 @@ import { CHALLENGES } from "@/lib/challenges";
 import type { StudentSession } from "@/types/app";
 import type { Submission, Student } from "@/types/database";
 import ChallengeBoard from "../challenges/ChallengeBoard";
+import GrandFinale from "../challenges/GrandFinale";
 import { StudentAppShell } from "./StudentAppShell";
 import { studentMainTopPaddingClass } from "./StudentNavbar";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 type StudentWithContext = Student & {
   sections: { label: string } | null;
@@ -28,6 +30,8 @@ export default function Dashboard({
   session,
 }: DashboardProps) {
   const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions);
+  const [showGrandFinale, setShowGrandFinale] = useState(false);
+  const [isHoveringChart, setIsHoveringChart] = useState(false);
 
   const firstName = session.fullName.split(" ")[0] ?? session.fullName;
   const leaderInvite = useMemo(() => {
@@ -57,14 +61,17 @@ export default function Dashboard({
     [submissions]
   );
 
-  const pointsRemaining = useMemo(
-    () =>
-      CHALLENGES.filter((challenge) => {
-        const submission = submissionByTask.get(challenge.id);
-        return submission?.status !== "accepted";
-      }).reduce((sum, challenge) => sum + challenge.points, 0),
-    [submissionByTask]
+  const maxPoints = useMemo(
+    () => CHALLENGES.reduce((sum, c) => sum + (c.id === 9 ? (c.points * (c.streakDays || 1)) : c.points), 0),
+    []
   );
+
+  const pointsRemaining = maxPoints - totalPoints;
+
+  const chartData = [
+    { name: "Earned", value: totalPoints, color: "#f7b801" },
+    { name: "Remaining", value: Math.max(0, pointsRemaining), color: "rgba(255,255,255,0.15)" },
+  ];
 
   /** Referral link uses names (not UUIDs); merge from loaded student context. */
   const sessionWithReferralContext = useMemo(
@@ -84,11 +91,11 @@ export default function Dashboard({
   );
 
   const getSubTitle = () => {
-    if (completedCount === 0) return "🎯 Your journey starts here. Complete your first challenge!";
-    if (completedCount < 5) return "🔥 You're on a roll! Keep pushing.";
+    if (completedCount === 0) return "🎯 Start your journey. Your first challenge awaits!";
+    if (completedCount < 5) return "🔥 You're gaining momentum! Keep collecting points.";
     if (completedCount < 9)
-      return `⚡ So close! Just ${9 - completedCount} challenge${9 - completedCount > 1 ? "s" : ""} left!`;
-    return "🏆 LEGEND STATUS. You crushed all 9 challenges!";
+      return `⚡ Great progress! Just ${9 - completedCount} more to unlock the full story.`;
+    return "🏆 LEGEND. You've conquered every challenge in the championship!";
   };
 
   return (
@@ -96,107 +103,126 @@ export default function Dashboard({
       <main className="min-h-screen bg-[var(--bg-tint)] text-[var(--text-base)] pb-8 md:pb-20">
         {/* HERO BANNER */}
         <section
-          className={`${studentMainTopPaddingClass} bg-gradient-to-br from-[var(--hero-from)] to-[var(--hero-to)] text-white`}
+          className={`${studentMainTopPaddingClass} bg-gradient-to-br from-[var(--hero-from)] to-[var(--hero-to)] text-white overflow-hidden`}
         >
-          <div className="mx-auto max-w-6xl px-4 py-10 md:py-16 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="flex-1 animate-[fadeSlideUp_0.4s_ease-out]">
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold mb-4 border border-white/20">
-                Section {student.sections?.label}
+          <div className="mx-auto max-w-6xl px-4 py-8 md:py-12 flex flex-col md:flex-row items-center justify-between gap-8 relative">
+            <div className="flex-1 animate-[fadeSlideUp_0.4s_ease-out] relative z-10 w-full md:w-auto">
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-bold mb-6 border border-white/20 uppercase tracking-widest">
+                Section {student.sections?.label} • {student.regions?.name}
               </div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-heading font-bold mb-3 leading-tight [overflow-wrap:anywhere]">
-                Welcome back, {firstName}! 🔥
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-black mb-4 leading-tight tracking-tighter">
+                Hi {session.fullName}! 👋
               </h1>
-              <p className="text-white/80 text-xs sm:text-sm md:text-base font-medium">
-                {student.bootcamps?.name} · {student.regions?.name}
+              <p className="text-white/70 text-sm sm:text-base font-medium mb-8 max-w-xl">
+                 {getSubTitle()}
               </p>
-              <p className="text-white/90 mt-4 text-sm bg-black/20 p-3 rounded-xl border border-white/10 shadow-inner">
-                {getSubTitle()}
-              </p>
-            </div>
-            <div className="hidden md:flex relative w-48 h-48 items-center justify-center animate-[countUp_0.5s_ease-out]">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.1)"
-                  strokeWidth="8"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="var(--yellow)"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={`${(completedCount / 9) * 251.2} 251.2`}
-                  className="transition-all duration-1000 ease-out"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-heading font-bold text-white">{completedCount}/9</span>
-                <span className="text-xs font-semibold text-white/70 uppercase tracking-widest mt-1">
-                  Done
-                </span>
+              
+              <div className="flex gap-4">
+                 <div className="bg-black/20 backdrop-blur-sm border border-white/10 p-4 rounded-2xl flex flex-col min-w-[120px]">
+                    <span className="text-[10px] font-black uppercase text-white/50 tracking-widest mb-1">Total Score</span>
+                    <span className="text-3xl font-heading font-black text-[var(--yellow)]">{totalPoints}</span>
+                 </div>
+                 <div className="bg-black/20 backdrop-blur-sm border border-white/10 p-4 rounded-2xl flex flex-col min-w-[120px]">
+                    <span className="text-[10px] font-black uppercase text-white/50 tracking-widest mb-1">Status</span>
+                    <span className="text-sm font-black uppercase text-white/90 mt-2">
+                       {completedCount === 9 ? "LEGEND" : "EVOLVING"}
+                    </span>
+                 </div>
               </div>
+            </div>
+
+            {/* INFOGRAPHIC SECTION */}
+            <div 
+               className="relative w-64 h-64 sm:w-80 sm:h-80 flex items-center justify-center animate-[fadeSlideIn_0.8s_ease-out]"
+               onMouseEnter={() => setIsHoveringChart(true)}
+               onMouseLeave={() => setIsHoveringChart(false)}
+            >
+               <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                     <Pie
+                        data={chartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="65%"
+                        outerRadius="85%"
+                        paddingAngle={5}
+                        dataKey="value"
+                        stroke="none"
+                        startAngle={180}
+                        endAngle={-180}
+                     >
+                        {chartData.map((entry, index) => (
+                           <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                     </Pie>
+                  </PieChart>
+               </ResponsiveContainer>
+
+               <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none transition-all duration-300">
+                  {isHoveringChart ? (
+                     <div className="animate-in fade-in zoom-in duration-300">
+                        <span className="text-4xl font-heading font-black text-[#f7b801]">{completedCount}/9</span>
+                        <span className="block text-[10px] font-black uppercase text-white/50 tracking-widest mt-1">Challenges Done</span>
+                     </div>
+                  ) : (
+                     <div className="animate-in fade-in zoom-in duration-300">
+                        <span className="text-4xl font-heading font-black text-white">{totalPoints}</span>
+                        <span className="block text-[10px] font-black uppercase text-white/50 tracking-widest mt-1">Points Recieved</span>
+                     </div>
+                  )}
+               </div>
+
+               {/* Ambient Circular Glow */}
+               <div className="absolute inset-4 rounded-full border border-white/5 bg-white/5 backdrop-blur-3xl -z-10" />
             </div>
           </div>
         </section>
 
-        <div className="mx-auto max-w-6xl px-4 -mt-8 relative z-20">
-          {/* STATS ROW */}
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="card-warm p-6 animate-[fadeSlideUp_0.5s_ease-out]">
-              <p className="text-sm font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
-                🏆 Total Points
-              </p>
-              <p className="mt-2 text-4xl font-heading font-bold text-[var(--primary)]">{totalPoints}</p>
+        <div className="mx-auto max-w-6xl px-4 mt-8 relative z-20">
+          
+          {completedCount === 9 && (
+            <div 
+              onClick={() => setShowGrandFinale(true)}
+              className="mb-8 bg-gradient-to-r from-[#991b1b] to-[#1a1a1a] p-8 rounded-[2.5rem] border-4 border-[#f7b801] shadow-[0_0_40px_rgba(247,184,1,0.4)] cursor-pointer hover:scale-[1.01] transition-all group overflow-hidden relative"
+            >
+                <div className="absolute inset-0 bg-[url('/api/story-image')] opacity-20 grayscale blur-sm group-hover:scale-105 transition-transform duration-[15s]" />
+                <div className="relative z-10 flex flex-col items-center justify-center text-center py-4">
+                    <div className="bg-[#f7b801] text-[#991b1b] px-4 py-1 rounded-full text-[10px] font-black uppercase mb-4 tracking-[0.2em] animate-bounce">Showcase Unlocked</div>
+                    <h3 className="text-[#f7b801] font-heading font-black text-3xl sm:text-4xl mb-2 italic tracking-tight uppercase">THE STORY IS COMPLETE</h3>
+                    <p className="text-white/60 text-xs sm:text-sm font-bold uppercase tracking-[0.2em]">You've reached total mastery. Tap to reveal your legacy.</p>
+                </div>
             </div>
-            <div className="card-warm p-6 animate-[fadeSlideUp_0.6s_ease-out]">
-              <p className="text-sm font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
-                ✅ Challenges Done
-              </p>
-              <p className="mt-2 text-3xl sm:text-4xl font-heading font-bold text-[var(--text-dark)] tabular-nums">
-                {completedCount}{" "}
-                <span className="text-lg sm:text-xl text-[var(--text-muted)] font-medium">of 9</span>
-              </p>
-            </div>
-            <div className="card-warm p-6 animate-[fadeSlideUp_0.7s_ease-out]">
-              <p className="text-sm font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
-                ⚡ Points Available
-              </p>
-              <p className="mt-2 text-3xl sm:text-4xl font-heading font-bold text-[var(--text-dark)] tabular-nums">
-                {pointsRemaining}
-              </p>
-            </div>
-          </section>
+          )}
 
-          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-[var(--card-border)] bg-white px-4 py-3 shadow-sm">
-            <p className="text-sm font-medium text-[var(--text-secondary)]">
-              View status and proof for all nine challenges in one place.
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-3xl border border-[var(--card-border)] bg-white px-6 py-4 shadow-sm">
+            <p className="text-sm font-bold text-[var(--text-secondary)]">
+              Manage your progress, invite tribe members, and verify your mission outcomes.
             </p>
-            <div className="flex w-full sm:w-auto gap-2 shrink-0">
+            <div className="flex w-full sm:w-auto gap-3 shrink-0">
               {leaderInvite && (
                 <Link
                   href="/invite"
-                  className="inline-flex flex-1 sm:flex-none items-center justify-center rounded-lg bg-[var(--teal)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--teal)] focus-visible:ring-offset-2"
+                  className="inline-flex flex-1 sm:flex-none items-center justify-center rounded-xl bg-[var(--teal)] px-6 py-3 text-sm font-black uppercase text-white shadow-md transition hover:brightness-95 active:scale-95"
                 >
                   Invite Tribe
                 </Link>
               )}
               <Link
                 href="/submissions"
-                className="inline-flex flex-1 sm:flex-none items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                className="inline-flex flex-1 sm:flex-none items-center justify-center rounded-xl bg-[var(--primary)] px-6 py-3 text-sm font-black uppercase text-white shadow-md transition hover:brightness-95 active:scale-95"
               >
-                My Submissions →
+                Track Proof
               </Link>
             </div>
           </div>
 
           {/* CHALLENGE GRID */}
           <section>
+            <div className="flex items-center gap-4 mb-6">
+                <div className="h-px flex-1 bg-[var(--card-border)]" />
+                <h2 className="text-xs font-black uppercase text-[var(--text-muted)] tracking-[0.3em]">Challenge Board</h2>
+                <div className="h-px flex-1 bg-[var(--card-border)]" />
+            </div>
             <ChallengeBoard
               challenges={CHALLENGES}
               submissions={submissions}
@@ -205,6 +231,12 @@ export default function Dashboard({
             />
           </section>
         </div>
+
+        <GrandFinale 
+          isOpen={showGrandFinale}
+          onClose={() => setShowGrandFinale(false)}
+          studentName={student.full_name}
+        />
       </main>
     </StudentAppShell>
   );

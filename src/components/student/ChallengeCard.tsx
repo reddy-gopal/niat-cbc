@@ -174,9 +174,11 @@ export default function ChallengeCard({
                  <span className="text-red-400 text-[10px] font-bold font-mono border border-red-400/30 px-2 py-0.5 rounded-sm bg-red-950/30">
                    {challenge.points} XP
                  </span>
-                 <span className="text-zinc-400 text-[10px] font-mono tracking-widest uppercase">
-                   {challenge.day}
-                 </span>
+                {challenge.id === 9 && (
+                  <span className="text-zinc-400 text-[10px] font-mono tracking-widest uppercase">
+                    {challenge.day}
+                  </span>
+                )}
                </div>
                
                <h3 className="text-white font-heading font-bold text-lg leading-tight mb-2 uppercase tracking-wide shrink-0">

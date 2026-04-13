@@ -20,6 +20,13 @@ export default async function InvitePage() {
     redirect("/invalid");
   }
 
+  const teamId = student.team_id;
+  const { data: members } = await supabase
+    .from("students")
+    .select("full_name, created_at")
+    .eq("team_id", teamId)
+    .order("created_at", { ascending: true });
+
   const firstName = (student.full_name as string)?.split(" ")[0] ?? session.fullName;
   const teamRelation = student.teams as
     | { id: string; name: string; invite_code: string; leader_id: string }
@@ -36,6 +43,10 @@ export default async function InvitePage() {
       firstName={firstName}
       teamName={team.name}
       inviteCode={team.invite_code}
+      members={(members || []).map(m => ({
+        fullName: m.full_name,
+        joinedAt: m.created_at
+      }))}
     />
   );
 }

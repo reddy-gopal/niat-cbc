@@ -152,7 +152,9 @@ export async function verifySubmissionById(
               : [
                   {
                     type: "text",
-                    text: `Challenge: ${challenge.title}. Verification criteria: ${challenge.description}. Please verify if the attached screenshot meets this criteria.`,
+                    text: challenge.id === 7 
+                      ? `Challenge: ${challenge.title}. Verification criteria: Is there a name clearly written on the paper/item in this photo? This is a "Time Capsule" challenge where students write their name on a folded paper and give it to a leader. REJECT if no name is visible. ACCEPT if a name or text representing a name is written on the item.`
+                      : `Challenge: ${challenge.title}. Verification criteria: ${challenge.description}. Please verify if the attached screenshot meets this criteria.`,
                   },
                   base64Image
                     ? {

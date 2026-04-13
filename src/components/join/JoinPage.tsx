@@ -305,7 +305,7 @@ export default function JoinPage({
         body: JSON.stringify({ name: tribeName }),
       });
       const result = await response.json();
-      
+
       if (!response.ok || !result.success) {
         setError(result.error ?? "Unable to create tribe.");
         return;
@@ -314,7 +314,7 @@ export default function JoinPage({
       const inviteCode = result.invite_code as string;
       const inviteUrl = `${window.location.origin}/join/team/${inviteCode}`;
       setInviteData({ url: inviteUrl, code: inviteCode });
-      
+
       const QRCode = (await import("qrcode")).default;
       const dataUrl = await QRCode.toDataURL(inviteUrl, { width: 300, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
       setQrCodeDataUrl(dataUrl);
@@ -359,11 +359,11 @@ export default function JoinPage({
               🎯 You&apos;re joining Section {sectionLabel}
             </div>
           ))}
-          
+
           {step !== "create_team" && (
-          <p className="text-[var(--text-muted)] text-sm mb-6 font-medium">
-            {regionName} · {formattedDate}
-          </p>
+            <p className="text-[var(--text-muted)] text-sm mb-6 font-medium">
+              {regionName} · {formattedDate}
+            </p>
           )}
 
           {step === "create_team" ? (
@@ -525,36 +525,36 @@ export default function JoinPage({
             </form>
           ) : (
             <div className="space-y-6 text-center animate-[fadeSlideUp_0.3s_ease]">
-               <div className="p-6 bg-green-50 border border-green-200 rounded-2xl mb-6 flex flex-col items-center">
-                 <h3 className="text-xl font-bold text-green-800 mb-2">Tribe Created! 🎉</h3>
-                 <p className="text-sm text-green-700 mb-4">Share this QR code or link with your friends so they can join you.</p>
-                 
-                 {qrCodeDataUrl && (
-                   <div className="bg-white p-3 rounded-xl shadow-sm mb-4 inline-block">
-                     <img src={qrCodeDataUrl} alt="Invite QR Code" width={180} height={180} />
-                   </div>
-                 )}
-                 <div className="flex gap-2 items-center w-full bg-white rounded-lg p-2 border border-green-200">
-                   <input type="text" readOnly value={inviteData?.url || ""} className="flex-1 bg-transparent text-sm text-gray-700 px-2 outline-none" />
-                   <button 
-                     className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-bold rounded-md transition-colors"
-                     onClick={() => {
-                        navigator.clipboard.writeText(inviteData?.url || "");
-                        alert("Link Copied!");
-                     }}
-                   >
-                     Copy
-                   </button>
-                 </div>
-               </div>
-               
-               <button
-                 type="button"
-                 onClick={() => router.push("/dashboard")}
-                 className="btn-primary w-full py-4 text-lg"
-               >
-                 Go to Dashboard →
-               </button>
+              <div className="p-6 bg-green-50 border border-green-200 rounded-2xl mb-6 flex flex-col items-center">
+                <h3 className="text-xl font-bold text-green-800 mb-2">Tribe Created! 🎉</h3>
+                <p className="text-sm text-green-700 mb-4">Share this QR code or link with your friends so they can join you.</p>
+
+                {qrCodeDataUrl && (
+                  <div className="bg-white p-3 rounded-xl shadow-sm mb-4 inline-block">
+                    <img src={qrCodeDataUrl} alt="Invite QR Code" width={180} height={180} />
+                  </div>
+                )}
+                <div className="flex gap-2 items-center w-full bg-white rounded-lg p-2 border border-green-200">
+                  <input type="text" readOnly value={inviteData?.url || ""} className="flex-1 bg-transparent text-sm text-gray-700 px-2 outline-none" />
+                  <button
+                    className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-bold rounded-md transition-colors"
+                    onClick={() => {
+                      navigator.clipboard.writeText(inviteData?.url || "");
+                      alert("Link Copied!");
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard")}
+                className="btn-primary w-full py-4 text-lg"
+              >
+                Go to Dashboard →
+              </button>
             </div>
           )}
 

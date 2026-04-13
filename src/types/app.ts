@@ -42,6 +42,17 @@ export type LeaderboardEntry = {
   completedChallenges: number;
 };
 
+export type TeamLeaderboardEntry = {
+  rank: number;
+  teamId: string;
+  name: string;
+  leaderName: string;
+  averagePoints: number;
+  totalPoints: number;
+  memberCount: number;
+  members: string[];
+};
+
 export type AdminUser = {
   id: string;
   email: string;

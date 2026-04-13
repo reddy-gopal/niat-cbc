@@ -31,13 +31,27 @@ function formatTableDate(iso: string | null): string {
   if (!iso) return "—";
   try {
     const d = new Date(iso);
-    return d.toLocaleString(undefined, {
+    const parts = new Intl.DateTimeFormat("en-GB", {
       year: "numeric",
       month: "short",
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
-    });
+      hour12: true,
+      timeZone: "Asia/Kolkata",
+    }).formatToParts(d);
+
+    const get = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((p) => p.type === type)?.value ?? "";
+
+    const day = get("day");
+    const month = get("month");
+    const year = get("year");
+    const hour = get("hour");
+    const minute = get("minute");
+    const dayPeriod = get("dayPeriod").toUpperCase();
+
+    return `${day} ${month} ${year}, ${hour}:${minute} ${dayPeriod}`;
   } catch {
     return "—";
   }
@@ -99,7 +113,7 @@ export default function SubmissionsClient({
           const was = prev.find((p) => p.id === row.id);
           if (!was) continue;
           if (was.status === "pending" && row.status === "accepted") {
-            setToastData({ id: row.task_id, points: row.points * 50 });
+            setToastData({ id: row.task_id, points: row.points });
             break;
           }
           if (
@@ -141,11 +155,11 @@ export default function SubmissionsClient({
     return { accepted, pending, rejected, total: attempts.length };
   }, [attempts]);
 
-  const totalXpEarned = useMemo(
+  const totalPointsEarned = useMemo(
     () =>
       attempts
         .filter((a) => a.status === "accepted")
-        .reduce((sum, a) => sum + a.points * 50, 0),
+        .reduce((sum, a) => sum + a.points, 0),
     [attempts]
   );
 
@@ -214,7 +228,7 @@ export default function SubmissionsClient({
                 Showing {filtered.length} of {counts.total} submissions
               </p>
               <p className="text-sm font-bold text-[var(--text-dark)]">
-                Total: {totalXpEarned} XP
+                Total: {totalPointsEarned} Points
               </p>
             </div>
 
@@ -334,7 +348,7 @@ export default function SubmissionsClient({
                           </td>
                           <td className="px-4 py-3 align-top font-medium tabular-nums">
                             {attempt.status === "accepted" && attempt.points > 0 ? (
-                              <span className="text-emerald-600">+{attempt.points * 50} XP</span>
+                              <span className="text-emerald-600">+{attempt.points} Points</span>
                             ) : (
                               "—"
                             )}

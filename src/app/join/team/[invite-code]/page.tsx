@@ -43,7 +43,7 @@ const getTeamDetails = cache(async (inviteCode: string) => {
 export async function generateMetadata({ params }: TeamJoinRouteProps): Promise<Metadata> {
   const { "invite-code": inviteCode } = await params;
   const teamData = await getTeamDetails(inviteCode);
-  
+
   if (!teamData) {
     return { title: "Join Tribe — NIAT CBC" };
   }

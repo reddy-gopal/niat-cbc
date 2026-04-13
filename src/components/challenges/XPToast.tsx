@@ -10,7 +10,7 @@ export default function XPToast({ points, onComplete }: { points: number, onComp
       className="fixed inset-0 m-auto w-fit h-fit z-[100] text-[#f7b801] font-black pointer-events-none drop-shadow-[0_0_10px_#f7b801] text-4xl sm:text-6xl px-4 text-center"
       style={{ WebkitTextStroke: "1.5px #991b1b", textShadow: "0px 4px 10px rgba(153,27,27,0.8)" }}
     >
-      +{points} XP
+      +{points} Points
     </motion.div>
   );
 }

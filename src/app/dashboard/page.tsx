@@ -45,7 +45,7 @@ export default async function DashboardPage() {
     supabase
       .from("submissions")
       .select(
-        "id,student_id,bootcamp_id,section_id,region_id,task_id,file_url,status,points,ai_reason,resubmit_count,verification_attempts,last_attempted_at,verified_at,override_by,override_note,created_at,updated_at"
+        "id,student_id,bootcamp_id,section_id,region_id,task_id,streak_day,file_url,status,points,ai_reason,resubmit_count,verification_attempts,last_attempted_at,verified_at,override_by,override_note,created_at,updated_at"
       )
       .eq("student_id", session.studentId)
       .order("task_id", { ascending: true }),

@@ -205,8 +205,8 @@ export default function ProofLightbox({
     })();
   };
 
-  const showXp = status === "accepted" && points !== undefined && points > 0;
-  const xp = showXp ? points! * 50 : 0;
+  const showPoints = status === "accepted" && points !== undefined && points > 0;
+  const displayPoints = showPoints ? points! : 0;
   const rejected = status === "rejected" && Boolean(aiReason?.trim());
 
   if (!isOpen) return null;
@@ -296,8 +296,8 @@ export default function ProofLightbox({
               </div>
             )}
           </div>
-          {showXp && (
-            <p className="mt-3 text-sm font-bold text-emerald-600">+{xp} XP</p>
+          {showPoints && (
+            <p className="mt-3 text-sm font-bold text-emerald-600">+{displayPoints} Points</p>
           )}
           {rejected && aiReason && (
             <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-medium leading-snug text-orange-950">

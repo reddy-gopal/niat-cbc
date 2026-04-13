@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Challenge, StudentSession } from "@/types/app";
 import type { Submission } from "@/types/database";
 import { useSubmissionPolling } from "@/hooks/useSubmissionPolling";
-import { buildChallenge8ReferralUrl } from "@/lib/utils";
 import MissionModal from "./MissionModal";
 import XPToast from "./XPToast";
 import RejectToast from "./RejectToast";
@@ -32,7 +31,6 @@ export default function ChallengeBoard({
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
   const [toastData, setToastData] = useState<{ id: number; points: number } | null>(null);
   const [rejectToastMessage, setRejectToastMessage] = useState<string | null>(null);
-  const challenge5FormUrl = useMemo(() => buildChallenge8ReferralUrl(session), [session]);
 
   useSubmissionPolling(submissions, setSubmissions, {
     onAccepted: ({ taskId, pointsXp }) => {
@@ -43,7 +41,15 @@ export default function ChallengeBoard({
   });
 
   const submissionByTask = useMemo(
-    () => new Map(submissions.map((s) => [s.task_id, s])),
+    () => {
+      const map = new Map<number, Submission[]>();
+      for (const row of submissions) {
+        const list = map.get(row.task_id) ?? [];
+        list.push(row);
+        map.set(row.task_id, list);
+      }
+      return map;
+    },
     [submissions]
   );
   const activeChallenge = useMemo(
@@ -51,20 +57,134 @@ export default function ChallengeBoard({
     [activeTaskId, challenges]
   );
 
-  const getCellStatus = (submission?: Submission): CellStatus => {
-    if (!submission) return "locked";
-    if (submission.status === "accepted") return "completed";
-    if (submission.status === "pending") return "pending";
+  const getCellStatus = (challenge: Challenge): CellStatus => {
+    const rows = submissionByTask.get(challenge.id) ?? [];
+    if (rows.length === 0) return "locked";
+
+    if (challenge.id === 9) {
+      const acceptedCount = rows.filter((row) => row.status === "accepted").length;
+      const required = challenge.streakDays ?? 3;
+      if (acceptedCount >= required) return "completed";
+      if (rows.some((row) => row.status === "pending")) return "pending";
+      return "locked";
+    }
+
+    if (rows.some((row) => row.status === "accepted")) return "completed";
+    if (rows.some((row) => row.status === "pending")) return "pending";
     return "locked";
   };
 
-  const handleSubmitted = (taskId: number) => {
+  const isSubmissionLocked = (challenge: Challenge): boolean => {
+    const status = getCellStatus(challenge);
+    if (challenge.id === 5) return false;
+    if (challenge.id === 9) return status === "completed";
+    return status === "completed";
+  };
+
+  const handleSubmitted = ({
+    taskId,
+    submissionId,
+  }: {
+    taskId: number;
+    submissionId?: string;
+  }) => {
     setSubmissions((prev) => {
-      const next = prev.map((item) =>
-        item.task_id === taskId
-          ? { ...item, status: "pending" as const, resubmit_count: item.resubmit_count + 1 }
-          : item
-      );
+      let next = prev;
+      if (taskId === 9) {
+        const target = [...prev]
+          .filter((item) => item.task_id === 9 && item.status !== "accepted")
+          .sort((a, b) => (a.streak_day ?? 999) - (b.streak_day ?? 999))[0];
+
+        if (target) {
+          next = prev.map((item) =>
+            item.id === target.id
+              ? { ...item, status: "pending" as const, resubmit_count: item.resubmit_count + 1 }
+              : item
+          );
+        } else if (submissionId) {
+          const existingTask9Rows = prev.filter((item) => item.task_id === 9);
+          const nextStreakDay = Math.min(existingTask9Rows.length + 1, 3);
+          const now = new Date().toISOString();
+          next = [
+            ...prev,
+            {
+              id: submissionId,
+              student_id: session.studentId,
+              bootcamp_id: session.bootcampId,
+              section_id: session.sectionId,
+              region_id: session.regionId,
+              task_id: 9,
+              streak_day: nextStreakDay,
+              file_url: null,
+              file_hash: null,
+              status: "pending",
+              points: 0,
+              ai_reason: null,
+              text_response: null,
+              resubmit_count: 1,
+              verification_attempts: 0,
+              last_attempted_at: null,
+              verified_at: null,
+              override_by: null,
+              override_note: null,
+              created_at: now,
+              updated_at: now,
+            },
+          ];
+        }
+      } else {
+        let found = false;
+        next = prev.map((item) => {
+          if (submissionId && item.id === submissionId) {
+            found = true;
+            return {
+              ...item,
+              status: "pending" as const,
+              resubmit_count: item.resubmit_count + 1,
+            };
+          }
+          if (!submissionId && item.task_id === taskId) {
+            found = true;
+            return {
+              ...item,
+              status: "pending" as const,
+              resubmit_count: item.resubmit_count + 1,
+            };
+          }
+          return item;
+        });
+
+        if (!found && submissionId) {
+          const now = new Date().toISOString();
+          next = [
+            ...next,
+            {
+              id: submissionId,
+              student_id: session.studentId,
+              bootcamp_id: session.bootcampId,
+              section_id: session.sectionId,
+              region_id: session.regionId,
+              task_id: taskId,
+              streak_day: null,
+              file_url: null,
+              file_hash: null,
+              status: "pending",
+              points: 0,
+              ai_reason: null,
+              text_response: null,
+              resubmit_count: 1,
+              verification_attempts: 0,
+              last_attempted_at: null,
+              verified_at: null,
+              override_by: null,
+              override_note: null,
+              created_at: now,
+              updated_at: now,
+            },
+          ];
+        }
+      }
+
       onSubmissionsUpdate?.(next);
       return next;
     });
@@ -94,8 +214,8 @@ export default function ChallengeBoard({
 
       <div className="grid grid-cols-3 gap-1 bg-[#f7b801]/30 border-2 border-[#f7b801]/40 rounded-2xl overflow-hidden shadow-2xl aspect-square">
         {challenges.slice(0, 9).map((challenge, i) => {
-          const submission = submissionByTask.get(challenge.id);
-          const status = getCellStatus(submission);
+          const status = getCellStatus(challenge);
+          const locked = isSubmissionLocked(challenge);
           const row = Math.floor(i / 3);
           const col = i % 3;
 
@@ -104,12 +224,9 @@ export default function ChallengeBoard({
               key={challenge.id}
               whileHover={{ scale: status !== "completed" ? 1.02 : 1 }}
               whileTap={{ scale: 0.98 }}
-              className="relative cursor-pointer group overflow-hidden"
+              className={`relative group overflow-hidden ${locked ? "cursor-not-allowed" : "cursor-pointer"}`}
               onClick={() => {
-                if (challenge.id === 5) {
-                  window.location.assign(challenge5FormUrl);
-                  return;
-                }
+                if (locked) return;
                 setActiveTaskId(challenge.id);
               }}
               onDragStart={(event) => event.preventDefault()}
@@ -190,7 +307,7 @@ export default function ChallengeBoard({
                     text-[8px] sm:text-[10px] font-black px-1.5 py-0.5 rounded shadow-sm
                     ${status === "completed" ? "bg-[#f7b801] text-[#991b1b]" : "bg-white/10 text-white/60"}
                    `}>
-                     +{challenge.points * 50} XP
+                     +{challenge.points} Points
                    </div>
                 </div>
               </div>
@@ -214,6 +331,7 @@ export default function ChallengeBoard({
         session={session}
         onClose={() => setActiveTaskId(null)}
         onSubmitSuccess={handleSubmitted}
+        isSubmissionLocked={activeChallenge ? isSubmissionLocked(activeChallenge) : false}
       />
     </div>
   );

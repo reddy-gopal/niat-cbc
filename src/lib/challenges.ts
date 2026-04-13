@@ -65,9 +65,8 @@ export const CHALLENGES: Challenge[] = [
     description: "One sentence to your future self. Sealed. Collected by your tribe leader. Opened one year from today.",
     day: "Day 2",
     points: 2,
-    requiresUpload: false,
-    requiresText: true,
-    placeholder: "Write your one sentence to your future self. Make it true.",
+    requiresUpload: true,
+    requiresText: false,
   },
   {
     id: 8,

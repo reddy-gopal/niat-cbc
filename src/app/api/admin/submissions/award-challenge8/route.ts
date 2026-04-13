@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/admin-auth";
 import { logAudit } from "@/lib/audit";
+import { CHALLENGES } from "@/lib/challenges";
 import { adminClient } from "../../../../../../utils/supabase/admin";
 
 const schema = z.object({ studentId: z.string().uuid() });
 
 export async function POST(request: Request) {
   try {
+    const challenge8Points = CHALLENGES.find((item) => item.id === 8)?.points ?? 3;
     const admin = await requireAdmin();
     const body = await request.json();
     const parsed = schema.safeParse(body);
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
       .from("submissions")
       .update({
         status: "accepted",
-        points: 5,
+        points: challenge8Points,
         updated_at: new Date().toISOString(),
         override_by: admin.id,
         override_note: "Challenge 8 manually awarded",
@@ -42,7 +44,7 @@ export async function POST(request: Request) {
       action: "award",
       entity: "challenge8",
       entityId: parsed.data.studentId,
-      note: "Manually awarded 5 points for challenge 8",
+      note: `Manually awarded ${challenge8Points} points for challenge 8`,
     });
 
     return NextResponse.json({ success: true }, { status: 200 });
