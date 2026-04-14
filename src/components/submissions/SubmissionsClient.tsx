@@ -10,6 +10,7 @@ import XPToast from "@/components/challenges/XPToast";
 import RejectToast from "@/components/challenges/RejectToast";
 import { StudentAppShell } from "@/components/student/StudentAppShell";
 import { studentMainTopPaddingClass } from "@/components/student/StudentNavbar";
+import { Eye } from "lucide-react";
 
 type SubmissionsClientProps = {
   session: StudentSession;
@@ -25,6 +26,7 @@ type LightboxState = {
   aiReason?: string;
   verifiedAt?: string;
   points?: number;
+  textResponse?: string;
 };
 
 function formatTableDate(iso: string | null): string {
@@ -62,11 +64,6 @@ function isPlagiarismReason(reason: string | null | undefined): boolean {
   return reason.includes("identical to another student");
 }
 
-function truncateReason(text: string | null, max: number): string {
-  if (!text) return "—";
-  if (text.length <= max) return text;
-  return `${text.slice(0, max)}…`;
-}
 
 type AttemptsPollResponse = {
   success?: boolean;
@@ -84,6 +81,11 @@ export default function SubmissionsClient({
   const [loadingAttemptId, setLoadingAttemptId] = useState<string | null>(null);
   const [toastData, setToastData] = useState<{ id: number; points: number } | null>(null);
   const [rejectToastMessage, setRejectToastMessage] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const attemptsRef = useRef(attempts);
   useEffect(() => {
@@ -164,9 +166,24 @@ export default function SubmissionsClient({
   );
 
   const handleViewProof = async (attempt: SafeAttempt) => {
-    if (!attempt.hasProof) return;
+    if (!attempt.hasProof && !attempt.text_response) return;
     const challenge = CHALLENGES.find((c) => c.id === attempt.task_id);
     const taskName = challenge?.title ?? `Task ${attempt.task_id}`;
+    
+    // If only text proof exists, open directly
+    if (!attempt.hasProof) {
+      setLightbox({
+        attemptId: attempt.id,
+        taskName,
+        status: attempt.status,
+        aiReason: attempt.ai_reason ?? undefined,
+        verifiedAt: attempt.verified_at ?? undefined,
+        points: attempt.points,
+        textResponse: attempt.text_response ?? undefined,
+      });
+      return;
+    }
+
     setLoadingAttemptId(attempt.id);
     setLightboxSignedUrl(null);
     try {
@@ -189,6 +206,7 @@ export default function SubmissionsClient({
         aiReason: attempt.ai_reason ?? undefined,
         verifiedAt: attempt.verified_at ?? undefined,
         points: attempt.points,
+        textResponse: attempt.text_response ?? undefined,
       });
     } catch {
       setRejectToastMessage("Could not load proof image.");
@@ -263,7 +281,7 @@ export default function SubmissionsClient({
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Points</th>
                     <th className="px-4 py-3">Reason</th>
-                    <th className="px-4 py-3">Proof</th>
+                    <th className="px-4 py-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -308,7 +326,7 @@ export default function SubmissionsClient({
                             </span>
                           </td>
                           <td className="px-4 py-3 align-top text-[var(--text-secondary)] tabular-nums">
-                            {formatTableDate(attempt.created_at)}
+                            {isMounted ? formatTableDate(attempt.created_at) : "—"}
                           </td>
                           <td className="px-4 py-3 align-top">
                             {attempt.status === "pending" ? (
@@ -321,7 +339,7 @@ export default function SubmissionsClient({
                               </span>
                             ) : (
                               <span className="text-[var(--text-secondary)] tabular-nums">
-                                {formatTableDate(attempt.verified_at)}
+                                {isMounted ? formatTableDate(attempt.verified_at) : "—"}
                               </span>
                             )}
                           </td>
@@ -353,29 +371,32 @@ export default function SubmissionsClient({
                               "—"
                             )}
                           </td>
-                          <td className="max-w-[200px] px-4 py-3 align-top text-xs text-[var(--text-secondary)]">
+                          <td className="max-w-[300px] px-4 py-3 align-top text-sm leading-relaxed text-[var(--text-secondary)]">
                             {plagiarized ? (
                               <span className="font-semibold text-orange-600">
                                 ⚠ Duplicate submission
                               </span>
                             ) : (
-                              <span title={attempt.ai_reason ?? undefined}>
-                                {truncateReason(attempt.ai_reason, 60)}
-                              </span>
+                              <span>{attempt.ai_reason || "—"}</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 align-top">
-                            {attempt.hasProof ? (
+                          <td className="px-4 py-3 align-top text-right">
+                            {attempt.hasProof || attempt.text_response ? (
                               <button
                                 type="button"
                                 onClick={() => void handleViewProof(attempt)}
                                 disabled={loadingAttemptId === attempt.id}
-                                className="font-bold text-blue-600 hover:underline disabled:opacity-50"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-blue-600 transition-all hover:bg-blue-600 hover:text-white disabled:opacity-50"
+                                title="View details"
                               >
-                                {loadingAttemptId === attempt.id ? "Loading…" : "View →"}
+                                {loadingAttemptId === attempt.id ? (
+                                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                ) : (
+                                  <Eye size={18} />
+                                )}
                               </button>
                             ) : (
-                              "—"
+                              <span className="text-slate-300">—</span>
                             )}
                           </td>
                         </tr>
@@ -397,6 +418,7 @@ export default function SubmissionsClient({
           aiReason={lightbox.aiReason}
           verifiedAt={lightbox.verifiedAt}
           points={lightbox.points}
+          textResponse={lightbox.textResponse}
           initialSignedUrl={lightboxSignedUrl}
           imageEndpoint="attempt"
           isOpen

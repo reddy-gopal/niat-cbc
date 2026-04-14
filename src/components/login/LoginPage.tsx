@@ -210,22 +210,28 @@ export default function LoginPage() {
               <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2">
                 Mobile number
               </label>
-              <input
-                {...register("mobile")}
-                inputMode="numeric"
-                maxLength={10}
-                className="input-field"
-                placeholder="9876543210"
-                disabled={isLoading}
-                autoComplete="tel-national"
-              />
+                <input
+                  {...register("mobile")}
+                  inputMode="numeric"
+                  maxLength={10}
+                  className="input-field"
+                  placeholder="9876543210"
+                  disabled={isLoading}
+                  autoComplete="tel-national"
+                  suppressHydrationWarning
+                />
               {errors.mobile ? (
                 <p className="mt-1 text-sm text-[var(--primary)] font-medium">
                   {errors.mobile.message}
                 </p>
               ) : null}
             </div>
-            <button type="submit" disabled={isLoading} className="btn-primary w-full py-3 text-base">
+            <button 
+              type="submit" 
+              disabled={isLoading} 
+              className="btn-primary w-full py-3 text-base"
+              suppressHydrationWarning
+            >
               {isLoading ? "Sending…" : "Send OTP"}
             </button>
           </form>
@@ -247,23 +253,29 @@ export default function LoginPage() {
             </div>
             <div className="flex items-center justify-between gap-2">
               {otpValues.map((digit, index) => (
-                <input
-                  key={`otp-${index}`}
-                  ref={(el) => {
-                    otpRefs.current[index] = el;
-                  }}
-                  value={digit}
-                  onChange={(e) => handleOtpChange(index, e.target.value)}
-                  onKeyDown={(e) => handleOtpKeyDown(e, index)}
-                  onPaste={handleOtpPaste}
-                  maxLength={1}
-                  inputMode="numeric"
-                  className="w-14 h-16 border-2 border-[#e2d5d5] rounded-xl text-center text-2xl font-bold text-[var(--text-dark)] focus:border-[var(--primary)] focus:outline-none transition-colors"
-                  disabled={isLoading}
-                />
+                  <input
+                    key={`otp-${index}`}
+                    ref={(el) => {
+                      otpRefs.current[index] = el;
+                    }}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(index, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(e, index)}
+                    onPaste={handleOtpPaste}
+                    maxLength={1}
+                    inputMode="numeric"
+                    className="w-14 h-16 border-2 border-[#e2d5d5] rounded-xl text-center text-2xl font-bold text-[var(--text-dark)] focus:border-[var(--primary)] focus:outline-none transition-colors"
+                    disabled={isLoading}
+                    suppressHydrationWarning
+                  />
               ))}
             </div>
-            <button type="submit" disabled={isLoading} className="btn-primary w-full py-3 text-base">
+            <button 
+              type="submit" 
+              disabled={isLoading} 
+              className="btn-primary w-full py-3 text-base"
+              suppressHydrationWarning
+            >
               {isLoading ? "Verifying…" : "Sign in"}
             </button>
             <div className="text-center text-sm">

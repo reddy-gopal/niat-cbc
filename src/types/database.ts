@@ -386,6 +386,7 @@ export interface SubmissionAttempt {
 export interface SafeAttempt
   extends Omit<SubmissionAttempt, "file_url" | "file_hash"> {
   hasProof: boolean;
+  text_response: string | null;
 }
 export type AuditLog = Database["public"]["Tables"]["audit_logs"]["Row"];
 export type OtpAttempt = Database["public"]["Tables"]["otp_attempts"]["Row"];

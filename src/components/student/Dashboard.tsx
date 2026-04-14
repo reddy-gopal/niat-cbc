@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { CHALLENGES } from "@/lib/challenges";
 import type { StudentSession } from "@/types/app";
 import type { Submission, Student } from "@/types/database";
@@ -9,7 +9,7 @@ import ChallengeBoard from "../challenges/ChallengeBoard";
 import GrandFinale from "../challenges/GrandFinale";
 import { StudentAppShell } from "./StudentAppShell";
 import { studentMainTopPaddingClass } from "./StudentNavbar";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { motion, AnimatePresence } from "framer-motion";
 
 type StudentWithContext = Student & {
   sections: { label: string } | null;
@@ -32,6 +32,11 @@ export default function Dashboard({
   const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions);
   const [showGrandFinale, setShowGrandFinale] = useState(false);
   const [isHoveringChart, setIsHoveringChart] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const firstName = session.fullName.split(" ")[0] ?? session.fullName;
   const leaderInvite = useMemo(() => {
@@ -68,10 +73,6 @@ export default function Dashboard({
 
   const pointsRemaining = maxPoints - totalPoints;
 
-  const chartData = [
-    { name: "Earned", value: totalPoints, color: "#f7b801" },
-    { name: "Remaining", value: Math.max(0, pointsRemaining), color: "rgba(255,255,255,0.15)" },
-  ];
 
   /** Referral link uses names (not UUIDs); merge from loaded student context. */
   const sessionWithReferralContext = useMemo(
@@ -133,47 +134,71 @@ export default function Dashboard({
 
             {/* INFOGRAPHIC SECTION */}
             <div 
-               className="relative w-64 h-64 sm:w-80 sm:h-80 flex items-center justify-center animate-[fadeSlideIn_0.8s_ease-out]"
+               className="relative hidden md:flex w-64 h-64 sm:w-80 sm:h-80 items-center justify-center shrink-0"
                onMouseEnter={() => setIsHoveringChart(true)}
                onMouseLeave={() => setIsHoveringChart(false)}
             >
-               <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                     <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius="65%"
-                        outerRadius="85%"
-                        paddingAngle={5}
-                        dataKey="value"
-                        stroke="none"
-                        startAngle={180}
-                        endAngle={-180}
-                     >
-                        {chartData.map((entry, index) => (
-                           <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                     </Pie>
-                  </PieChart>
-               </ResponsiveContainer>
-
-               <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none transition-all duration-300">
-                  {isHoveringChart ? (
-                     <div className="animate-in fade-in zoom-in duration-300">
-                        <span className="text-4xl font-heading font-black text-[#f7b801]">{completedCount}/9</span>
-                        <span className="block text-[10px] font-black uppercase text-white/50 tracking-widest mt-1">Challenges Done</span>
-                     </div>
-                  ) : (
-                     <div className="animate-in fade-in zoom-in duration-300">
-                        <span className="text-4xl font-heading font-black text-white">{totalPoints}</span>
-                        <span className="block text-[10px] font-black uppercase text-white/50 tracking-widest mt-1">Points Recieved</span>
-                     </div>
-                  )}
-               </div>
-
                {/* Ambient Circular Glow */}
                <div className="absolute inset-4 rounded-full border border-white/5 bg-white/5 backdrop-blur-3xl -z-10" />
+               
+               {/* CUSTOM SVG METER */}
+               <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+                  {/* Background Track */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke="rgba(255,255,255,0.1)"
+                    strokeWidth="8"
+                    fill="transparent"
+                  />
+                  {/* Progress Ring (Animated) */}
+                  <motion.circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke="#f7b801"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    fill="transparent"
+                    initial={{ pathLength: 0 }}
+                    animate={{ 
+                      pathLength: isHoveringChart ? Math.min(1, totalPoints / (maxPoints || 1)) : 0 
+                    }}
+                    transition={{ duration: 1.2, ease: "circOut" }}
+                    style={{ 
+                      filter: "drop-shadow(0 0 8px rgba(247,184,1,0.5))"
+                    }}
+                  />
+               </svg>
+
+               <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                  <AnimatePresence mode="wait">
+                    {isHoveringChart ? (
+                      <motion.div 
+                        key="challenges"
+                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                        className="flex flex-col items-center"
+                      >
+                         <span className="text-5xl font-heading font-black text-[#f7b801]">{completedCount}/9</span>
+                         <span className="block text-[10px] font-black uppercase text-white/50 tracking-[0.2em] mt-2">Challenges Done</span>
+                      </motion.div>
+                    ) : (
+                      <motion.div 
+                        key="points"
+                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                        className="flex flex-col items-center"
+                      >
+                         <span className="text-6xl font-heading font-black text-white">{totalPoints}</span>
+                         <span className="block text-[10px] font-black uppercase text-white/50 tracking-[0.2em] mt-2">Points Received</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+               </div>
             </div>
           </div>
         </section>
