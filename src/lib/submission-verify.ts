@@ -6,6 +6,11 @@ type AnthropicResponse = {
   content?: Array<{ type: string; text?: string }>;
 };
 
+const GLOBAL_FALLBACK_PROMPT =
+  'You are verifying student challenge submissions for a bootcamp program called NIAT CBC. Use a strongly student-friendly, benefit-of-the-doubt policy. Default to ACCEPT unless there is clear evidence the submission is not a real attempt. ACCEPT when the response is reasonably related to the challenge topic, even if short, vague, imperfect, emotional, partially incorrect, or missing details. If you are uncertain between accepted and rejected, choose accepted. Do not penalize grammar, spelling, style, brevity, image quality, lighting, composition, or minor ambiguity. For text tasks: any genuine topic-related response should be accepted. For image tasks: accept if the image plausibly matches the scenario. Only REJECT when clearly off-topic, blank/gibberish, spam/copied junk, inappropriate, or clearly not an attempt. Respond ONLY with valid JSON, no other text: {"verdict": "accepted" or "rejected", "reason": "one plain English sentence"}. For accepted verdicts, give an encouraging and specific reason. For rejected verdicts, give a brief kind reason.';
+
+const PROMPT_VERSION = "2026-04-16";
+
 export type VerifySubmissionPhaseLogger = (phase: string, durationMs: number) => void;
 
 export type VerifySubmissionResult =
@@ -80,6 +85,12 @@ export async function verifySubmissionById(
     onPhase?.("total", Math.round(performance.now() - totalStart));
     return { ok: false, status: 400, error: "Challenge not found." };
   }
+  const promptType = challenge.verificationPrompt
+    ? "challenge_specific"
+    : "global_fallback";
+  const promptKey = challenge.verificationPrompt
+    ? `challenge_${challenge.id}_custom`
+    : "global_fallback";
 
   if (!challenge.requiresText && !submission.file_url) {
     logSegment("dbFetch", segmentDb);
@@ -127,6 +138,7 @@ export async function verifySubmissionById(
 
   try {
     const segmentAnthropic = performance.now();
+    const hasChallengePrompt = Boolean(challenge.verificationPrompt);
     const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -137,8 +149,7 @@ export async function verifySubmissionById(
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 200,
-        system:
-          'You are verifying student challenge submissions for a bootcamp program called NIAT CBC. Be fair but strict. Respond ONLY with valid JSON, no other text: {"verdict": "accepted" or "rejected", "reason": "one plain English sentence"}',
+        system: challenge.verificationPrompt ?? GLOBAL_FALLBACK_PROMPT,
         messages: [
           {
             role: "user",
@@ -146,15 +157,17 @@ export async function verifySubmissionById(
               ? [
                   {
                     type: "text",
-                    text: `Challenge: ${challenge.title}. Verification criteria: ${challenge.description}. Student response: "${submission.text_response}". Please verify if the text response meets the criteria.`,
+                    text: hasChallengePrompt
+                      ? `Student response: "${submission.text_response}". Evaluate using the system prompt only.`
+                      : `Challenge: ${challenge.title}. Challenge description: ${challenge.description}.${challenge.verificationHint ? ` Verification hint: ${challenge.verificationHint}` : ""} Student response: "${submission.text_response}". This is a text-only challenge. Apply the system prompt exactly. Accept if the response is genuinely related to the challenge, even if it is very short, informal, incomplete, or only 2-3 words. Reject only if it is blank, gibberish, spam, abusive/inappropriate, or clearly unrelated.`,
                   },
                 ]
               : [
                   {
                     type: "text",
-                    text: challenge.id === 7 
-                      ? `Challenge: ${challenge.title}. Verification criteria: Is there a name clearly written on the paper/item in this photo? This is a "Time Capsule" challenge where students write their name on a folded paper and give it to a leader. REJECT if no name is visible. ACCEPT if a name or text representing a name is written on the item.`
-                      : `Challenge: ${challenge.title}. Verification criteria: ${challenge.description}. Please verify if the attached screenshot meets this criteria.`,
+                    text: hasChallengePrompt
+                      ? `This is an image-only submission. Evaluate using the system prompt only.`
+                      : `Challenge: ${challenge.title}. Challenge description: ${challenge.description}.${challenge.verificationHint ? ` Verification hint: ${challenge.verificationHint}` : ""} This is an image-only challenge. Apply the system prompt exactly. Accept if the image plausibly shows a related attempt, even if it is blurry, dark, cropped, partial, casual, or imperfect. Reject only if it is blank/corrupt, abusive/inappropriate, clearly unrelated, or an obvious non-attempt.`,
                   },
                   base64Image
                     ? {
@@ -192,40 +205,19 @@ export async function verifySubmissionById(
     const verifiedAt = new Date().toISOString();
 
     if (parsedVerdict.verdict === "accepted") {
-      await adminClient
-        .from("submissions")
-        .update({
-          status: "accepted",
-          points: challenge.points,
-          ai_reason: parsedVerdict.reason,
-          verified_at: verifiedAt,
-          updated_at: verifiedAt,
-        })
-        .eq("id", submission.id);
-
       const { data: student } = await adminClient
         .from("students")
         .select("team_id")
         .eq("id", submission.student_id)
         .maybeSingle();
 
-      if (student?.team_id) {
-         const { data: teamData } = await adminClient
-           .from("teams")
-           .select("total_points")
-           .eq("id", student.team_id)
-           .maybeSingle();
-         
-         if (teamData) {
-            await adminClient
-              .from("teams")
-              .update({
-                total_points: teamData.total_points + challenge.points,
-                last_point_at: verifiedAt,
-              })
-              .eq("id", student.team_id);
-         }
-      }
+      await adminClient.rpc("accept_submission_and_award_points", {
+        p_submission_id: submission.id,
+        p_points: challenge.points,
+        p_ai_reason: parsedVerdict.reason,
+        p_verified_at: verifiedAt,
+        p_team_id: student?.team_id ?? null,
+      });
     } else {
       await adminClient
         .from("submissions")
@@ -246,6 +238,9 @@ export async function verifySubmissionById(
         .update({
           status: parsedVerdict.verdict,
           ai_reason: parsedVerdict.reason,
+          prompt_type: promptType,
+          prompt_key: promptKey,
+          prompt_version: PROMPT_VERSION,
           verified_at: verifiedAt,
           points: parsedVerdict.verdict === "accepted" ? challenge.points : 0,
         })

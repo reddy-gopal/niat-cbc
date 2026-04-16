@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { waitUntil } from "@vercel/functions";
 import { NextResponse } from "next/server";
 import { verifyStudentSession } from "@/lib/session";
 import { CHALLENGES } from "@/lib/challenges";
@@ -49,6 +50,19 @@ export async function POST(request: Request) {
 
     if (challenge.requiresText && !textResponse) {
       return NextResponse.json({ success: false, error: "Response is required." }, { status: 400 });
+    }
+
+    if (challenge.maxWords && textResponse) {
+      const wordCount = textResponse.trim().split(/\s+/).filter(Boolean).length;
+      if (wordCount > challenge.maxWords) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Response exceeds ${challenge.maxWords} word limit. Your submission has ${wordCount} words.`,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     let storagePath: string | null = null;
@@ -362,6 +376,22 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    // Always verify on the same origin that handled this upload request.
+    // This avoids local uploads accidentally hitting a deployed verifier.
+    const origin = new URL(request.url).origin;
+    const internalSecret =
+      process.env.INTERNAL_SECRET ?? process.env.INTERNAL_API_SECRET ?? "";
+    waitUntil(
+      fetch(`${origin}/api/submissions/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-secret": internalSecret,
+        },
+        body: JSON.stringify({ submissionId: targetSubmission.id }),
+      }).catch((error) => console.error("Verify trigger failed:", error))
+    );
 
     return NextResponse.json(
       {

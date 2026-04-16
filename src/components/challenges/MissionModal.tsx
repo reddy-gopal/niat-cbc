@@ -28,6 +28,11 @@ export default function MissionModal({
   const [textResponse, setTextResponse] = useState("");
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimMessage, setClaimMessage] = useState<{
+    kind: "success" | "info" | "error";
+    text: string;
+  } | null>(null);
 
   const referralUrl = useMemo(
     () => buildChallenge8ReferralUrl(session),
@@ -47,6 +52,8 @@ export default function MissionModal({
       setTextResponse("");
       setError(null);
       setUploadState("idle");
+      setClaimLoading(false);
+      setClaimMessage(null);
     }
   }, [isOpen]);
 
@@ -93,6 +100,53 @@ export default function MissionModal({
     } catch {
       setError("Network error. Try again.");
       setUploadState("idle");
+    }
+  };
+
+  const handleClaimChallenge5 = async () => {
+    setClaimLoading(true);
+    setClaimMessage(null);
+    try {
+      const response = await fetch("/api/submissions/claim-challenge5", {
+        method: "POST",
+      });
+      const result = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+        referralCount?: number;
+        pointsAwarded?: number;
+      };
+
+      if (!response.ok || !result.success) {
+        if (result.message === "No referrals found yet.") {
+          setClaimMessage({
+            kind: "info",
+            text: "No referrals verified yet. Share your link and try again.",
+          });
+          return;
+        }
+        setClaimMessage({
+          kind: "error",
+          text: result.message ?? "Unable to claim points right now. Please try again.",
+        });
+        return;
+      }
+
+      setClaimMessage({
+        kind: "success",
+        text: `🎉 ${result.referralCount ?? 0} referrals found! ${result.pointsAwarded ?? 0} points awarded.`,
+      });
+      window.setTimeout(() => {
+        onClose();
+        window.location.reload();
+      }, 1400);
+    } catch {
+      setClaimMessage({
+        kind: "error",
+        text: "Unable to claim points right now. Please try again.",
+      });
+    } finally {
+      setClaimLoading(false);
     }
   };
 
@@ -233,9 +287,35 @@ export default function MissionModal({
                     </button>
                   </div>
                 </div>
-                <p className="text-[10px] text-center text-orange-700 font-medium">
-                  Points will be added automatically when someone joins using your link.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleClaimChallenge5();
+                  }}
+                  disabled={claimLoading}
+                  className="w-full bg-[#991b1b] border-[2px] border-[#f7b801] text-[#f7b801] font-black tracking-wide text-xs sm:text-sm py-2.5 rounded-xl hover:bg-[#b91c1c] active:scale-[0.99] transition-all disabled:opacity-60 disabled:pointer-events-none"
+                >
+                  {claimLoading
+                    ? "CHECKING REFERRALS..."
+                    : "Check My Referrals & Claim Points"}
+                </button>
+                {claimMessage ? (
+                  <div
+                    className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+                      claimMessage.kind === "success"
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                        : claimMessage.kind === "info"
+                          ? "border-orange-300 bg-orange-50 text-orange-800"
+                          : "border-red-300 bg-red-50 text-red-800"
+                    }`}
+                  >
+                    {claimMessage.text}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-center text-orange-700 font-medium">
+                    Share your link, then use the button above to claim your referral points.
+                  </p>
+                )}
               </div>
             ) : (
               <div className="space-y-4 animate-in fade-in">

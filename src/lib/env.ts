@@ -4,12 +4,16 @@ type EnvKey =
   | "SUPABASE_SERVICE_ROLE_KEY"
   | "ANTHROPIC_API_KEY"
   | "STUDENT_SESSION_SECRET"
-  | "MSG91_TEMPLATE_ID";
+  | "MSG91_TEMPLATE_ID"
+  | "NW_API_KEY"
+  | "NW_CLIENT_KEY_DETAILS_ID"
+  | "NW_CHALLENGE5_STAGE_CODE";
 
 type OptionalEnvKey =
   | "MSG91_API_KEY"
   | "MSG91_AUTH_KEY"
-  | "MSG91_SENDER_ID";
+  | "MSG91_SENDER_ID"
+  | "NW_BASE_URL";
 
 const requiredEnv: EnvKey[] = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -18,6 +22,9 @@ const requiredEnv: EnvKey[] = [
   "ANTHROPIC_API_KEY",
   "STUDENT_SESSION_SECRET",
   "MSG91_TEMPLATE_ID",
+  "NW_API_KEY",
+  "NW_CLIENT_KEY_DETAILS_ID",
+  "NW_CHALLENGE5_STAGE_CODE",
 ];
 
 function getEnv(): Record<EnvKey | OptionalEnvKey, string> {
@@ -47,7 +54,17 @@ function getEnv(): Record<EnvKey | OptionalEnvKey, string> {
     MSG91_TEMPLATE_ID: process.env.MSG91_TEMPLATE_ID!,
     MSG91_AUTH_KEY: process.env.MSG91_AUTH_KEY ?? "",
     MSG91_SENDER_ID: process.env.MSG91_SENDER_ID ?? "",
+    NW_API_KEY: process.env.NW_API_KEY!,
+    NW_CLIENT_KEY_DETAILS_ID: process.env.NW_CLIENT_KEY_DETAILS_ID!,
+    NW_CHALLENGE5_STAGE_CODE: process.env.NW_CHALLENGE5_STAGE_CODE!,
+    NW_BASE_URL:
+      process.env.NW_BASE_URL ??
+      "https://nw-payouts-backend-gamma.earlywave.in",
   };
 }
 
 export const env = getEnv();
+export const NW_API_KEY = env.NW_API_KEY;
+export const NW_CLIENT_KEY_DETAILS_ID = Number(env.NW_CLIENT_KEY_DETAILS_ID);
+export const NW_BASE_URL = env.NW_BASE_URL;
+export const NW_CHALLENGE5_STAGE_CODE = env.NW_CHALLENGE5_STAGE_CODE;

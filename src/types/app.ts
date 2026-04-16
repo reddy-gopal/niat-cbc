@@ -12,6 +12,10 @@ export type Challenge = {
   day: string;
   points: number;
   description: string;
+  /** Optional verifier guidance appended to AI evaluation prompts. */
+  verificationHint?: string;
+  /** Optional full system prompt override for this challenge's AI verification. */
+  verificationPrompt?: string;
   requiresUpload: boolean;
   requiresText?: boolean;
   placeholder?: string;

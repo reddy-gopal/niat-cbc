@@ -244,6 +244,9 @@ export type Database = {
           file_url: string | null;
           file_hash: string | null;
           status: string;
+          prompt_type: "challenge_specific" | "global_fallback" | null;
+          prompt_key: string | null;
+          prompt_version: string | null;
           ai_reason: string | null;
           text_response: string | null;
           points: number;
@@ -262,6 +265,9 @@ export type Database = {
           file_url?: string | null;
           file_hash?: string | null;
           status?: string;
+          prompt_type?: "challenge_specific" | "global_fallback" | null;
+          prompt_key?: string | null;
+          prompt_version?: string | null;
           ai_reason?: string | null;
           text_response?: string | null;
           points?: number;
@@ -280,7 +286,11 @@ export type Database = {
           file_url?: string | null;
           file_hash?: string | null;
           status?: string;
+          prompt_type?: "challenge_specific" | "global_fallback" | null;
+          prompt_key?: string | null;
+          prompt_version?: string | null;
           ai_reason?: string | null;
+          text_response?: string | null;
           points?: number;
           verification_attempts?: number;
           last_attempted_at?: string | null;
@@ -374,7 +384,11 @@ export interface SubmissionAttempt {
   file_url: string | null;
   file_hash: string | null;
   status: "pending" | "accepted" | "rejected";
+  prompt_type?: "challenge_specific" | "global_fallback" | null;
+  prompt_key?: string | null;
+  prompt_version?: string | null;
   ai_reason: string | null;
+  text_response: string | null;
   points: number;
   verification_attempts: number;
   last_attempted_at: string | null;

@@ -19,6 +19,7 @@ type AttemptRow = {
   attempt_number: number;
   status: string;
   ai_reason: string | null;
+  text_response: string | null;
   points: number;
   verified_at: string | null;
   created_at: string;
@@ -60,7 +61,7 @@ export async function GET(request: Request) {
     let query = adminClient
       .from("submission_attempts")
       .select(
-        "id, submission_id, student_id, task_id, bootcamp_id, attempt_number, status, ai_reason, points, verified_at, created_at, file_url, verification_attempts, last_attempted_at"
+        "id, submission_id, student_id, task_id, bootcamp_id, attempt_number, status, ai_reason, text_response, points, verified_at, created_at, file_url, verification_attempts, last_attempted_at"
       )
       .eq("student_id", session.studentId)
       .order("created_at", { ascending: false })
@@ -91,6 +92,7 @@ export async function GET(request: Request) {
       attempt_number: a.attempt_number,
       status: a.status as SafeAttempt["status"],
       ai_reason: a.ai_reason,
+      text_response: a.text_response,
       points: a.points,
       verified_at: a.verified_at,
       created_at: a.created_at,

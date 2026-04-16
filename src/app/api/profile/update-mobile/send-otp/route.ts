@@ -21,6 +21,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Invalid payload" }, { status: 400 });
     }
 
+    const { data: existingStudent, error: existingStudentError } = await adminClient
+      .from("students")
+      .select("id")
+      .eq("mobile", parsed.data.mobile)
+      .neq("id", session.studentId)
+      .maybeSingle();
+
+    if (existingStudentError) {
+      return NextResponse.json(
+        { success: false, error: "Could not validate mobile number right now." },
+        { status: 500 }
+      );
+    }
+
+    if (existingStudent) {
+      return NextResponse.json(
+        { success: false, error: "This phone number is already registered." },
+        { status: 409 }
+      );
+    }
+
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { count, error: countError } = await adminClient
       .from("otp_attempts")

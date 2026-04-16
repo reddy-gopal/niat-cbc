@@ -23,6 +23,7 @@ type LightboxState = {
   attemptId: string;
   taskName: string;
   status: string;
+  hasProof: boolean;
   aiReason?: string;
   verifiedAt?: string;
   points?: number;
@@ -166,16 +167,23 @@ export default function SubmissionsClient({
   );
 
   const handleViewProof = async (attempt: SafeAttempt) => {
-    if (!attempt.hasProof && !attempt.text_response) return;
     const challenge = CHALLENGES.find((c) => c.id === attempt.task_id);
+    const hasTextResponse = Boolean(attempt.text_response?.trim());
+    const expectsImage = Boolean(challenge?.requiresUpload);
+    const expectsText = Boolean(challenge?.requiresText);
+    const hasImageProof = expectsImage && attempt.hasProof;
+    const hasTextProof = expectsText && hasTextResponse;
+    if (!hasImageProof && !hasTextProof) return;
+
     const taskName = challenge?.title ?? `Task ${attempt.task_id}`;
     
     // If only text proof exists, open directly
-    if (!attempt.hasProof) {
+    if (!hasImageProof) {
       setLightbox({
         attemptId: attempt.id,
         taskName,
         status: attempt.status,
+        hasProof: false,
         aiReason: attempt.ai_reason ?? undefined,
         verifiedAt: attempt.verified_at ?? undefined,
         points: attempt.points,
@@ -203,6 +211,7 @@ export default function SubmissionsClient({
         attemptId: attempt.id,
         taskName,
         status: attempt.status,
+        hasProof: true,
         aiReason: attempt.ai_reason ?? undefined,
         verifiedAt: attempt.verified_at ?? undefined,
         points: attempt.points,
@@ -298,6 +307,14 @@ export default function SubmissionsClient({
                       const challenge = CHALLENGES.find((c) => c.id === attempt.task_id);
                       const title = challenge?.title ?? `Task ${attempt.task_id}`;
                       const day = challenge?.day ?? "";
+                      const hasTextResponse = Boolean(attempt.text_response?.trim());
+                      const canViewDetails = challenge
+                        ? challenge.requiresUpload
+                          ? attempt.hasProof
+                          : challenge.requiresText
+                            ? hasTextResponse
+                            : false
+                        : (attempt.hasProof || hasTextResponse);
                       const borderClass =
                         attempt.status === "accepted"
                           ? "border-l-2 border-green-400"
@@ -381,7 +398,7 @@ export default function SubmissionsClient({
                             )}
                           </td>
                           <td className="px-4 py-3 align-top text-right">
-                            {attempt.hasProof || attempt.text_response ? (
+                            {canViewDetails ? (
                               <button
                                 type="button"
                                 onClick={() => void handleViewProof(attempt)}
@@ -415,6 +432,7 @@ export default function SubmissionsClient({
           submissionId={lightbox.attemptId}
           taskName={lightbox.taskName}
           status={lightbox.status}
+          hasProof={lightbox.hasProof}
           aiReason={lightbox.aiReason}
           verifiedAt={lightbox.verifiedAt}
           points={lightbox.points}

@@ -7,6 +7,7 @@ import { Eye, Pencil, LockOpen, Check, X } from "lucide-react";
 
 type Row = {
   id: string;
+  submission_id?: string;
   status: string;
   task_id: number;
   file_url: string | null;
@@ -22,6 +23,20 @@ type Props = {
   rows: Row[];
   signedImageMap: Record<string, string>;
 };
+
+function formatUtcTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const hours = String(date.getUTCHours()).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
+
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds} UTC`;
+}
 
 export default function SubmissionsTable({ rows, signedImageMap }: Props) {
   const [selectedRow, setSelectedRow] = useState<Row | null>(null);
@@ -62,6 +77,13 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
           </tr>
         </thead>
         <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={6} className="py-6 text-center text-[var(--text-muted)]">
+                No submissions found for the selected filters.
+              </td>
+            </tr>
+          ) : null}
           {rows.map((row) => (
             <tr key={row.id} className="border-b border-[var(--border)] align-top">
               <td className="py-3 font-semibold">
@@ -70,6 +92,7 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
               <td>
                 {row.file_url && signedImageMap[row.file_url] ? (
                   <button
+                    suppressHydrationWarning
                     type="button"
                     className="relative w-16 h-12 rounded overflow-hidden border border-[var(--card-border)]"
                     onClick={() => setSelectedImage(signedImageMap[row.file_url!])}
@@ -100,10 +123,11 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
                 </span>
               </td>
               <td className="max-w-64">{row.ai_reason ?? "-"}</td>
-              <td>{new Date(row.created_at).toLocaleString()}</td>
+              <td>{formatUtcTimestamp(row.created_at)}</td>
               <td>
                 <div className="flex items-center gap-2">
                   <button
+                    suppressHydrationWarning
                     type="button"
                     className="btn-outline !py-1.5 !px-2"
                     title="View submission details"
@@ -118,6 +142,7 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
                     <Eye size={16} />
                   </button>
                   <button
+                    suppressHydrationWarning
                     type="button"
                     className="btn-outline !py-1.5 !px-2"
                     title="Edit submission status"
@@ -178,11 +203,12 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
                 <p><span className="font-semibold">Status:</span> {selectedRow.status}</p>
                 <p><span className="font-semibold">AI Reason:</span> {selectedRow.ai_reason ?? "-"}</p>
                 <p><span className="font-semibold">Attempts:</span> {selectedRow.resubmit_count}</p>
-                <p><span className="font-semibold">Submitted:</span> {new Date(selectedRow.created_at).toLocaleString()}</p>
+                <p><span className="font-semibold">Submitted:</span> {formatUtcTimestamp(selectedRow.created_at)}</p>
 
                 {modalMode === "edit" ? (
                   <div className="space-y-2 pt-2">
                     <input
+                      suppressHydrationWarning
                       className="input-field"
                       placeholder="Override note"
                       value={note[selectedRow.id] ?? ""}
@@ -192,22 +218,37 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
                     />
                     <div className="flex items-center gap-2">
                       <button
+                        suppressHydrationWarning
                         className="btn-primary !py-2 !px-3 inline-flex items-center gap-1"
-                        onClick={() => override(selectedRow.id, "accepted")}
+                        onClick={() =>
+                          override(
+                            selectedRow.submission_id ?? selectedRow.id,
+                            "accepted"
+                          )
+                        }
                       >
                         <Check size={14} /> Accept
                       </button>
                       <button
+                        suppressHydrationWarning
                         className="btn-outline !py-2 !px-3 inline-flex items-center gap-1"
-                        onClick={() => override(selectedRow.id, "rejected")}
+                        onClick={() =>
+                          override(
+                            selectedRow.submission_id ?? selectedRow.id,
+                            "rejected"
+                          )
+                        }
                       >
                         <X size={14} /> Reject
                       </button>
                       {selectedRow.status === "rejected" &&
                       selectedRow.resubmit_count >= 3 ? (
                         <button
+                          suppressHydrationWarning
                           className="btn-outline !py-2 !px-3 inline-flex items-center gap-1"
-                          onClick={() => unlock(selectedRow.id)}
+                          onClick={() =>
+                            unlock(selectedRow.submission_id ?? selectedRow.id)
+                          }
                         >
                           <LockOpen size={14} /> Unlock
                         </button>

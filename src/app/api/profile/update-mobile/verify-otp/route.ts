@@ -43,12 +43,39 @@ export async function POST(request: Request) {
 
     await adminClient.from("otp_attempts").update({ verified: true }).eq("id", otpAttempt.id);
 
+    const { data: existingStudent, error: existingStudentError } = await adminClient
+      .from("students")
+      .select("id")
+      .eq("mobile", parsed.data.mobile)
+      .neq("id", session.studentId)
+      .maybeSingle();
+
+    if (existingStudentError) {
+      return NextResponse.json(
+        { success: false, error: "Could not validate mobile number right now." },
+        { status: 500 }
+      );
+    }
+
+    if (existingStudent) {
+      return NextResponse.json(
+        { success: false, error: "This phone number is already registered." },
+        { status: 409 }
+      );
+    }
+
     const { error: updateError } = await adminClient
       .from("students")
       .update({ mobile: parsed.data.mobile })
       .eq("id", session.studentId);
 
     if (updateError) {
+      if ((updateError as { code?: string }).code === "23505") {
+        return NextResponse.json(
+          { success: false, error: "This phone number is already registered." },
+          { status: 409 }
+        );
+      }
       return NextResponse.json({ success: false, error: "Unable to update mobile." }, { status: 500 });
     }
 

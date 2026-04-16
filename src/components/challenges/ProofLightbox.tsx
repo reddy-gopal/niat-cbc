@@ -8,6 +8,7 @@ export type ProofLightboxProps = {
   submissionId: string;
   taskName: string;
   status: string;
+  hasProof?: boolean;
   aiReason?: string;
   verifiedAt?: string;
   points?: number;
@@ -132,6 +133,7 @@ export default function ProofLightbox({
   submissionId,
   taskName,
   status,
+  hasProof = true,
   aiReason,
   verifiedAt,
   points,
@@ -160,6 +162,13 @@ export default function ProofLightbox({
 
     if (initialSignedUrl) {
       setSignedUrl(initialSignedUrl);
+      setLoading(false);
+      setError(false);
+      return;
+    }
+
+    if (!hasProof) {
+      setSignedUrl(null);
       setLoading(false);
       setError(false);
       return;
@@ -196,7 +205,7 @@ export default function ProofLightbox({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, submissionId, initialSignedUrl, imageEndpoint, reset]);
+  }, [isOpen, submissionId, hasProof, initialSignedUrl, imageEndpoint, reset]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -227,6 +236,7 @@ export default function ProofLightbox({
 
   const handleRetry = () => {
     if (!isOpen) return;
+    if (!hasProof) return;
     setLoading(true);
     setError(false);
     setSignedUrl(null);
@@ -306,41 +316,43 @@ export default function ProofLightbox({
             </div>
           )}
 
-          <div className="flex min-h-[100px] flex-col items-center justify-center">
-          {loading && (
-            <div className="flex flex-col items-center gap-3 py-12">
-              <span
-                className="inline-block h-10 w-10 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent"
-                aria-hidden
-              />
-              <span className="text-sm text-[var(--text-muted)]">Loading image…</span>
+          {hasProof && (
+            <div className="flex min-h-[100px] flex-col items-center justify-center">
+              {loading && (
+                <div className="flex flex-col items-center gap-3 py-12">
+                  <span
+                    className="inline-block h-10 w-10 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent"
+                    aria-hidden
+                  />
+                  <span className="text-sm text-[var(--text-muted)]">Loading image…</span>
+                </div>
+              )}
+              {!loading && error && (
+                <div className="flex flex-col items-center gap-4 py-8 text-center">
+                  <p className="text-sm font-medium text-[var(--text-dark)]">
+                    Failed to load image. Please try again.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {!loading && !error && signedUrl && (
+                <div className="w-full overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--bg-tint)] p-1 shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL */}
+                  <img
+                    src={signedUrl}
+                    alt="Proof"
+                    className="max-h-[60vh] w-full rounded-xl object-contain"
+                  />
+                </div>
+              )}
             </div>
           )}
-          {!loading && error && (
-            <div className="flex flex-col items-center gap-4 py-8 text-center">
-              <p className="text-sm font-medium text-[var(--text-dark)]">
-                Failed to load image. Please try again.
-              </p>
-              <button
-                type="button"
-                onClick={handleRetry}
-                className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-          {!loading && !error && signedUrl && (
-            <div className="w-full overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--bg-tint)] p-1 shadow-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL */}
-              <img
-                src={signedUrl}
-                alt="Proof"
-                className="max-h-[60vh] w-full rounded-xl object-contain"
-              />
-            </div>
-          )}
-        </div>
       </div>
 
         <div className="border-t border-[var(--card-border)] px-4 py-4 sm:px-6 sm:py-4">
