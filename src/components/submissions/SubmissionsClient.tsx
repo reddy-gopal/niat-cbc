@@ -279,7 +279,116 @@ export default function SubmissionsClient({
               })}
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-[var(--card-border)] bg-white shadow-sm">
+            <div className="space-y-3 md:hidden">
+              {filtered.length === 0 ? (
+                <div className="rounded-xl border border-[var(--card-border)] bg-white px-4 py-8 text-center text-sm text-[var(--text-secondary)] shadow-sm">
+                  {filterStatus === "all"
+                    ? "No submissions found"
+                    : `No ${filterStatus} submissions found`}
+                </div>
+              ) : (
+                filtered.map((attempt) => {
+                  const challenge = CHALLENGES.find((c) => c.id === attempt.task_id);
+                  const title = challenge?.title ?? `Task ${attempt.task_id}`;
+                  const day = challenge?.day ?? "";
+                  const hasTextResponse = Boolean(attempt.text_response?.trim());
+                  const canViewDetails = challenge
+                    ? challenge.requiresUpload
+                      ? attempt.hasProof
+                      : challenge.requiresText
+                        ? hasTextResponse
+                        : false
+                    : (attempt.hasProof || hasTextResponse);
+                  const plagiarized = isPlagiarismReason(attempt.ai_reason);
+
+                  return (
+                    <article
+                      key={attempt.id}
+                      className="rounded-xl border border-[var(--card-border)] bg-white p-3 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-[var(--text-dark)] [overflow-wrap:anywhere]">
+                            {title}
+                          </p>
+                          {day && (
+                            <span className="mt-1 inline-block rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                              {day}
+                            </span>
+                          )}
+                        </div>
+                        <span className="inline-flex rounded-md bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-700">
+                          #{attempt.attempt_number}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {attempt.status === "pending" && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold uppercase text-amber-900 ring-1 ring-amber-200">
+                            <span
+                              className="inline-block h-2 w-2 animate-spin rounded-full border-2 border-amber-600 border-t-transparent"
+                              aria-hidden
+                            />
+                            Under Review
+                          </span>
+                        )}
+                        {attempt.status === "accepted" && (
+                          <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-200">
+                            Accepted
+                          </span>
+                        )}
+                        {attempt.status === "rejected" && (
+                          <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-bold text-red-800 ring-1 ring-red-200">
+                            Rejected
+                          </span>
+                        )}
+                        {attempt.status === "accepted" && attempt.points > 0 && (
+                          <span className="text-xs font-bold text-emerald-600">+{attempt.points} Points</span>
+                        )}
+                      </div>
+
+                      <div className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
+                        <p>Submitted: {isMounted ? formatTableDate(attempt.created_at) : "—"}</p>
+                        <p>
+                          Reviewed:{" "}
+                          {attempt.status === "pending"
+                            ? "Pending review…"
+                            : isMounted
+                              ? formatTableDate(attempt.verified_at)
+                              : "—"}
+                        </p>
+                      </div>
+
+                      <div className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+                        {plagiarized ? (
+                          <span className="font-semibold text-orange-600">⚠ Duplicate submission</span>
+                        ) : (
+                          <span>{attempt.ai_reason || "—"}</span>
+                        )}
+                      </div>
+
+                      {canViewDetails && (
+                        <button
+                          type="button"
+                          onClick={() => void handleViewProof(attempt)}
+                          disabled={loadingAttemptId === attempt.id}
+                          className="mt-3 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-blue-600 transition-all hover:bg-blue-600 hover:text-white disabled:opacity-50"
+                          title="View details"
+                        >
+                          {loadingAttemptId === attempt.id ? (
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          ) : (
+                            <Eye size={18} />
+                          )}
+                        </button>
+                      )}
+                    </article>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-xl border border-[var(--card-border)] bg-white shadow-sm md:block">
               <table className="w-full min-w-[800px] border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-[var(--card-border)] bg-slate-50 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
@@ -447,7 +556,7 @@ export default function SubmissionsClient({
       <AnimatePresence>
         {toastData && (
           <XPToast
-            key="xp-toast"
+            key="points-toast"
             points={toastData.points}
             onComplete={() => setToastData(null)}
           />

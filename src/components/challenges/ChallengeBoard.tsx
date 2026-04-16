@@ -33,8 +33,8 @@ export default function ChallengeBoard({
   const [rejectToastMessage, setRejectToastMessage] = useState<string | null>(null);
 
   useSubmissionPolling(submissions, setSubmissions, {
-    onAccepted: ({ taskId, pointsXp }) => {
-      setToastData({ id: taskId, points: pointsXp });
+    onAccepted: ({ taskId, points }) => {
+      setToastData({ id: taskId, points });
     },
     onRejected: (message) => setRejectToastMessage(message),
     onUpdate: (next) => onSubmissionsUpdate?.(next),
@@ -196,7 +196,7 @@ export default function ChallengeBoard({
       <AnimatePresence>
         {toastData && (
           <XPToast
-            key="xp-toast"
+            key="points-toast"
             points={toastData.points}
             onComplete={() => setToastData(null)}
           />

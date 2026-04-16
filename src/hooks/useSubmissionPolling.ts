@@ -5,7 +5,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { Submission } from "@/types/database";
 
 export type SubmissionPollingOptions = {
-  onAccepted?: (payload: { taskId: number; pointsXp: number }) => void;
+  onAccepted?: (payload: { taskId: number; points: number }) => void;
   onRejected?: (message: string) => void;
   onUpdate?: (next: Submission[]) => void;
 };
@@ -79,7 +79,7 @@ export function useSubmissionPolling(
               if (d.status === "accepted") {
                 optionsRef.current?.onAccepted?.({
                   taskId: newSubs[index].task_id,
-                  pointsXp: d.points * 50,
+                  points: d.points,
                 });
               }
               if (

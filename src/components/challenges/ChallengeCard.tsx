@@ -156,7 +156,7 @@ export default function ChallengeCard({
 
             <div className="mt-auto pt-3 shrink-0">
               <div className="w-full bg-[#f18701] text-white font-black text-xs sm:text-sm text-center py-2 sm:py-2.5 rounded-lg shadow-sm border border-[#f7b801]">
-                +{challenge.points * 50} XP
+                +{challenge.points} Points
               </div>
             </div>
           </div>

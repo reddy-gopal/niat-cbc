@@ -172,7 +172,7 @@ export default function ChallengeCard({
              <div className="relative z-20 flex flex-col h-full">
                <div className="flex justify-between items-start mb-4">
                  <span className="text-red-400 text-[10px] font-bold font-mono border border-red-400/30 px-2 py-0.5 rounded-sm bg-red-950/30">
-                   {challenge.points} XP
+                  {challenge.points} Points
                  </span>
                 {challenge.id === 9 && (
                   <span className="text-zinc-400 text-[10px] font-mono tracking-widest uppercase">

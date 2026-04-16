@@ -146,7 +146,6 @@ export default function SubmissionHistory({ submissions }: SubmissionHistoryProp
           const challenge = CHALLENGES.find((c) => c.id === sub.task_id);
           const title = challenge?.title ?? `Task ${sub.task_id}`;
           const showPoints = sub.status === "accepted" && sub.points > 0;
-          const xp = sub.points * 50;
           const showProof =
             Boolean(sub.file_url) && sub.status !== "not_started";
           const showReason = sub.status === "rejected" && Boolean(sub.ai_reason);
@@ -188,7 +187,7 @@ export default function SubmissionHistory({ submissions }: SubmissionHistoryProp
               </div>
 
               {showPoints && (
-                <p className="mt-2 text-sm font-bold text-emerald-600">+{xp} XP</p>
+                <p className="mt-2 text-sm font-bold text-emerald-600">+{sub.points} Points</p>
               )}
 
               <p className="mt-2 text-xs text-[var(--text-muted)]">
