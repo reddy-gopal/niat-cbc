@@ -9,8 +9,6 @@ type AnthropicResponse = {
 const GLOBAL_FALLBACK_PROMPT =
   'You are verifying student challenge submissions for a bootcamp program called NIAT CBC. Use a strongly student-friendly, benefit-of-the-doubt policy. Default to ACCEPT unless there is clear evidence the submission is not a real attempt. ACCEPT when the response is reasonably related to the challenge topic, even if short, vague, imperfect, emotional, partially incorrect, or missing details. If you are uncertain between accepted and rejected, choose accepted. Do not penalize grammar, spelling, style, brevity, image quality, lighting, composition, or minor ambiguity. For text tasks: any genuine topic-related response should be accepted. For image tasks: accept if the image plausibly matches the scenario. Only REJECT when clearly off-topic, blank/gibberish, spam/copied junk, inappropriate, or clearly not an attempt. Respond ONLY with valid JSON, no other text: {"verdict": "accepted" or "rejected", "reason": "one plain English sentence"}. For accepted verdicts, give an encouraging and specific reason. For rejected verdicts, give a brief kind reason.';
 
-const PROMPT_VERSION = "2026-04-16";
-
 export type VerifySubmissionPhaseLogger = (phase: string, durationMs: number) => void;
 
 export type VerifySubmissionResult =
@@ -87,9 +85,6 @@ export async function verifySubmissionById(
   }
   const promptType = challenge.verificationPrompt
     ? "challenge_specific"
-    : "global_fallback";
-  const promptKey = challenge.verificationPrompt
-    ? `challenge_${challenge.id}_custom`
     : "global_fallback";
 
   if (!challenge.requiresText && !submission.file_url) {
@@ -233,18 +228,40 @@ export async function verifySubmissionById(
 
     const pendingAttempt = await getLatestPendingAttemptId(submission.id as string);
     if (pendingAttempt) {
-      await adminClient
+      const baseAttemptUpdate = {
+        status: parsedVerdict.verdict,
+        ai_reason: parsedVerdict.reason,
+        verified_at: verifiedAt,
+        points: parsedVerdict.verdict === "accepted" ? challenge.points : 0,
+      };
+
+      let { error: attemptUpdateError } = await adminClient
         .from("submission_attempts")
         .update({
-          status: parsedVerdict.verdict,
-          ai_reason: parsedVerdict.reason,
+          ...baseAttemptUpdate,
           prompt_type: promptType,
-          prompt_key: promptKey,
-          prompt_version: PROMPT_VERSION,
-          verified_at: verifiedAt,
-          points: parsedVerdict.verdict === "accepted" ? challenge.points : 0,
         })
         .eq("id", pendingAttempt.id);
+
+      const isMissingPromptTypeColumn =
+        attemptUpdateError?.code === "42703" ||
+        attemptUpdateError?.message?.includes("prompt_type");
+
+      if (attemptUpdateError && isMissingPromptTypeColumn) {
+        const retry = await adminClient
+          .from("submission_attempts")
+          .update(baseAttemptUpdate)
+          .eq("id", pendingAttempt.id);
+        attemptUpdateError = retry.error;
+      }
+
+      if (attemptUpdateError) {
+        console.error("[verify] failed to update submission_attempts row", {
+          submissionId: submission.id,
+          attemptId: pendingAttempt.id,
+          error: attemptUpdateError,
+        });
+      }
     }
 
     onPhase?.("total", Math.round(performance.now() - totalStart));
