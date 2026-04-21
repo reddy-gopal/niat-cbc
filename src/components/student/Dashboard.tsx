@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
-import { CHALLENGES } from "@/lib/challenges";
+import { CHALLENGES, SLOT_MAP } from "@/lib/challenges";
 import type { StudentSession } from "@/types/app";
 import type { Submission, Student } from "@/types/database";
 import ChallengeBoard from "../challenges/ChallengeBoard";
 import GrandFinale from "../challenges/GrandFinale";
+import PuzzleFinaleModal from "./PuzzleFinaleModal";
 import { StudentAppShell } from "./StudentAppShell";
 import { studentMainTopPaddingClass } from "./StudentNavbar";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,6 +34,9 @@ export default function Dashboard({
   const [showGrandFinale, setShowGrandFinale] = useState(false);
   const [isHoveringChart, setIsHoveringChart] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [hasRevealed, setHasRevealed] = useState(false);
+  const [finaleKey, setFinaleKey] = useState(0);
+  const [forceFinale, setForceFinale] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -61,10 +65,35 @@ export default function Dashboard({
     [submissions]
   );
 
-  const completedCount = useMemo(
-    () => submissions.filter((item) => item.status === "accepted").length,
-    [submissions]
-  );
+  const completedCount = useMemo(() => {
+    const validChallengeIds = new Set(CHALLENGES.map((challenge) => challenge.id));
+    const acceptedTaskIds = new Set(
+      submissions
+        .filter(
+          (item) =>
+            item.status === "accepted" &&
+            item.task_id != null &&
+            validChallengeIds.has(item.task_id)
+        )
+        .map((item) => item.task_id)
+    );
+
+    return Math.min(CHALLENGES.length, acceptedTaskIds.size);
+  }, [submissions]);
+
+  const shouldShowFinale = forceFinale && !hasRevealed;
+  const shouldShowRevealedBoard = hasRevealed;
+
+  const handleFinaleComplete = () => {
+    setHasRevealed(true);
+    setForceFinale(false);
+  };
+
+  const devResetFinale = () => {
+    setHasRevealed(false);
+    setForceFinale(true);
+    setFinaleKey((prev) => prev + 1);
+  };
 
   const maxPoints = useMemo(
     () => CHALLENGES.reduce((sum, c) => sum + (c.id === 9 ? (c.points * (c.streakDays || 1)) : c.points), 0),
@@ -253,6 +282,8 @@ export default function Dashboard({
               submissions={submissions}
               setSubmissions={setSubmissions}
               session={sessionWithReferralContext}
+              completedCount={completedCount}
+              hasRevealed={shouldShowRevealedBoard}
             />
           </section>
         </div>
@@ -262,6 +293,24 @@ export default function Dashboard({
           onClose={() => setShowGrandFinale(false)}
           studentName={student.full_name}
         />
+
+        {isMounted && shouldShowFinale && (
+          <PuzzleFinaleModal 
+             key={finaleKey}
+             imageUrl="/api/story-image"
+             slotMap={SLOT_MAP} 
+             onComplete={handleFinaleComplete}
+          />
+        )}
+
+        {process.env.NODE_ENV === 'development' && (
+          <button 
+             onClick={devResetFinale}
+             className="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-md font-bold z-[10000] text-xs shadow-lg hidden sm:block hover:bg-red-700 active:scale-95 transition-all"
+          >
+             Dev Reset Finale
+          </button>
+        )}
       </main>
     </StudentAppShell>
   );

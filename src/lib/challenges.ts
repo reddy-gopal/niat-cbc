@@ -291,3 +291,6 @@ export function isStreakChallenge(challengeId: number): boolean {
   const challenge = CHALLENGES.find((c) => c.id === challengeId);
   return challenge?.streakDays !== undefined && challenge.streakDays > 0;
 }
+
+
+export const SLOT_MAP: number[] = [6, 2, 8, 1, 5, 3, 7, 0, 4];

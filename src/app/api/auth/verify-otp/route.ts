@@ -156,6 +156,7 @@ export async function POST(request: Request) {
       sessionBootcamp = insertedStudent.bootcamp_id;
       sessionRegion = insertedStudent.region_id;
 
+      const now = new Date().toISOString();
       const baseSubmissions = Array.from({ length: 9 }, (_, index) => ({
         student_id: insertedStudent.id,
         bootcamp_id: insertBootcampId,
@@ -165,6 +166,17 @@ export async function POST(request: Request) {
         status: "not_started" as SubmissionStatus,
         points: 0,
         resubmit_count: 0,
+        file_url: null,
+        file_hash: null,
+        ai_reason: null,
+        text_response: null,
+        verification_attempts: 0,
+        last_attempted_at: null,
+        verified_at: null,
+        override_by: null,
+        override_note: null,
+        created_at: now,
+        updated_at: now,
       }));
 
       const submissions = baseSubmissions.flatMap((sub) => {
@@ -183,18 +195,20 @@ export async function POST(request: Request) {
         .insert(submissions);
 
       if (submissionsError) {
-        return NextResponse.json(
-          { success: false, error: "Unable to initialize student challenges." },
-          { status: 500 }
-        );
+        console.error("[verify-otp] initial submissions insert failed", {
+          code: submissionsError.code,
+          message: submissionsError.message,
+          details: submissionsError.details,
+          hint: submissionsError.hint,
+        });
       }
     }
 
-    if (existingStudent) {
+    if (studentId) {
       const { data: existingRows } = await adminClient
         .from("submissions")
         .select("task_id, streak_day")
-        .eq("student_id", existingStudent.id);
+        .eq("student_id", studentId);
 
       const hasTask = (taskId: number) =>
         (existingRows || []).some((r) => r.task_id === taskId);
@@ -210,20 +224,43 @@ export async function POST(request: Request) {
         status: SubmissionStatus;
         points: number;
         resubmit_count: number;
+        file_url: null;
+        file_hash: null;
+        ai_reason: null;
+        text_response: null;
+        verification_attempts: number;
+        last_attempted_at: null;
+        verified_at: null;
+        override_by: null;
+        override_note: null;
+        created_at: string;
+        updated_at: string;
         streak_day?: number;
       }> = [];
+      const now = new Date().toISOString();
 
       for (const taskId of [1, 2, 3, 4, 5, 6, 7, 8]) {
         if (!hasTask(taskId)) {
           missingRows.push({
-            student_id: existingStudent.id,
-            bootcamp_id: existingStudent.bootcamp_id,
-            section_id: existingStudent.section_id,
-            region_id: existingStudent.region_id,
+            student_id: studentId,
+            bootcamp_id: sessionBootcamp,
+            section_id: sessionSection,
+            region_id: sessionRegion,
             task_id: taskId,
             status: "not_started" as SubmissionStatus,
             points: 0,
             resubmit_count: 0,
+            file_url: null,
+            file_hash: null,
+            ai_reason: null,
+            text_response: null,
+            verification_attempts: 0,
+            last_attempted_at: null,
+            verified_at: null,
+            override_by: null,
+            override_note: null,
+            created_at: now,
+            updated_at: now,
           });
         }
       }
@@ -231,21 +268,53 @@ export async function POST(request: Request) {
       for (const day of [1, 2, 3]) {
         if (!hasTask9Day(day)) {
           missingRows.push({
-            student_id: existingStudent.id,
-            bootcamp_id: existingStudent.bootcamp_id,
-            section_id: existingStudent.section_id,
-            region_id: existingStudent.region_id,
+            student_id: studentId,
+            bootcamp_id: sessionBootcamp,
+            section_id: sessionSection,
+            region_id: sessionRegion,
             task_id: 9,
             streak_day: day,
             status: "not_started" as SubmissionStatus,
             points: 0,
             resubmit_count: 0,
+            file_url: null,
+            file_hash: null,
+            ai_reason: null,
+            text_response: null,
+            verification_attempts: 0,
+            last_attempted_at: null,
+            verified_at: null,
+            override_by: null,
+            override_note: null,
+            created_at: now,
+            updated_at: now,
           });
         }
       }
 
       if (missingRows.length > 0) {
-        await adminClient.from("submissions").insert(missingRows);
+        const { error: missingRowsInsertError } = await adminClient
+          .from("submissions")
+          .insert(missingRows);
+        if (missingRowsInsertError) {
+          const isDuplicateInit = missingRowsInsertError.code === "23505";
+          if (!isDuplicateInit) {
+            console.error("[verify-otp] missing submissions insert failed", {
+              code: missingRowsInsertError.code,
+              message: missingRowsInsertError.message,
+              details: missingRowsInsertError.details,
+              hint: missingRowsInsertError.hint,
+            });
+            return NextResponse.json(
+              {
+                success: false,
+                error: "Unable to initialize missing student challenges.",
+                details: missingRowsInsertError.message,
+              },
+              { status: 500 }
+            );
+          }
+        }
       }
     }
 
