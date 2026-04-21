@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
-import { verifyStudentSession } from "@/lib/session";
+import { CHALLENGES } from "@/lib/challenges";
+import { getStudentFromRequest } from "@/lib/api-auth";
 import { getReferralCountForStage } from "@/lib/nw-referral";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
-const CHALLENGE_5_ID = 5;
-const POINTS_PER_REFERRAL = 10;
+const REFERRAL_CHALLENGE_ID =
+  CHALLENGES.find((challenge) => challenge.isReferral)?.id ?? 3;
+const POINTS_PER_REFERRAL = 5;
 const STAGE_CODE = "NIAT_ADMISSION_TEST_FEE";
-
-function getCookieValue(cookieHeader: string | null, key: string): string | null {
-  if (!cookieHeader) return null;
-  const pairs = cookieHeader.split(";").map((item) => item.trim());
-  const match = pairs.find((item) => item.startsWith(`${key}=`));
-  return match ? decodeURIComponent(match.slice(key.length + 1)) : null;
-}
 
 type SubmissionRow = {
   id: string;
@@ -24,12 +19,7 @@ type SubmissionRow = {
 
 export async function POST(request: Request) {
   try {
-    const token = getCookieValue(request.headers.get("cookie"), "cbc_student");
-    if (!token) {
-      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-    }
-
-    const session = await verifyStudentSession(token);
+    const { student: session } = await getStudentFromRequest(request);
     if (!session) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
@@ -73,7 +63,7 @@ export async function POST(request: Request) {
       .from("submissions")
       .select("id, status, points, resubmit_count, created_at")
       .eq("student_id", session.studentId)
-      .eq("task_id", CHALLENGE_5_ID)
+      .eq("task_id", REFERRAL_CHALLENGE_ID)
       .order("created_at", { ascending: false });
 
     if (existingRowsError) {
@@ -111,7 +101,7 @@ export async function POST(request: Request) {
           bootcamp_id: student.bootcamp_id,
           section_id: student.section_id,
           region_id: student.region_id,
-          task_id: CHALLENGE_5_ID,
+          task_id: REFERRAL_CHALLENGE_ID,
           status: "not_started",
           points: 0,
           resubmit_count: 0,
@@ -184,7 +174,7 @@ export async function POST(request: Request) {
       .insert({
         submission_id: targetSubmissionId,
         student_id: session.studentId,
-        task_id: CHALLENGE_5_ID,
+        task_id: REFERRAL_CHALLENGE_ID,
         bootcamp_id: student.bootcamp_id,
         attempt_number: nextResubmitCount,
         status: "accepted",

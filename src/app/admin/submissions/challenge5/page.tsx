@@ -1,11 +1,13 @@
 import Challenge5AwardList from "@/components/admin/Challenge5AwardList";
+import { CHALLENGES } from "@/lib/challenges";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
 export default async function Challenge5AdminPage() {
+  const referralChallenge = CHALLENGES.find((challenge) => challenge.isReferral);
   const { data } = await adminClient
     .from("submissions")
     .select("id, student_id, status, students(full_name), sections(label)")
-    .eq("task_id", 5)
+    .eq("task_id", referralChallenge?.id)
     .in("status", ["not_started", "rejected"])
     .order("created_at", { ascending: false });
 

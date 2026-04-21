@@ -47,25 +47,6 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
   },
   {
     id: 2,
-    title: "Creative Tribe Snap",
-    description: "One creative tribe photo. No boring selfies. Post it and tag everyone.",
-    verificationPrompt: `You are evaluating "Creative Tribe Snap" for NIAT CBC.
-Task: Student submitted a photo with their tribe/group/team.
-
-ACCEPT if the image plausibly shows: people together, a group,
-a team setting, creative work, or any social/collaborative context.
-Accept blurry, dark, cropped, casual, or imperfect photos.
-
-REJECT only if: clearly unrelated image, blank upload, abusive/inappropriate content, or obvious non-attempt.
-
-JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
-    day: "Day 1",
-    points: 1,
-    requiresUpload: true,
-    requiresText: false,
-  },
-  {
-    id: 3,
     title: "You Crossed My Mind",
     description: "Someone will cross your mind today. After the session, open their chat. Write your real words. Not a forward. Just you.",
     verificationPrompt: `You are evaluating "You Crossed My Mind" for NIAT CBC.
@@ -84,46 +65,17 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
     requiresText: false,
   },
   {
-    id: 4,
-    title: "Real Voice Note",
-    description: "90 seconds. One person. No script. No re-record. Hit send on the first one.",
-    verificationPrompt: `You are evaluating "Real Voice Note" for NIAT CBC.
-Task: Student sent a genuine voice note to someone.
-
-ACCEPT if response mentions: any recipient (friend, mom, teacher, etc.)
-OR any rough idea of what they said/conveyed — even very short like
-"sent to mom", "encouraged my friend", "told him I believe in him".
-
-DO NOT require: transcript, proof of sending, or long explanation.
-
-REJECT only if: blank, gibberish, spam, abusive/inappropriate, or clearly unrelated.
-
-Examples:
-✅ "sent to my best friend telling her she's doing great"
-✅ "mom. told her I love her"
-✅ "encouraged him"
-❌ "yes done"
-❌ blank
-
-JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
-    day: "Day 1",
-    points: 5,
-    requiresUpload: false,
-    requiresText: true,
-    placeholder: "Who did you send it to and what did you say? Be honest.",
-  },
-  {
-    id: 5,
+    id: 3,
     title: "Connect Their Dots",
     description: "When the conversation is already real, share your link. Points only when your friend applies.",
     day: "Days 1-3",
-    points: 10,
+    points: 5,
     requiresUpload: false,
     requiresText: false,
     isReferral: true,
   },
   {
-    id: 6,
+    id: 4,
     title: "Caught You Being Great",
     description: "Find someone with a quality you admire. Walk up. Tell them exactly what you saw. Be specific.",
     verificationHint:
@@ -186,7 +138,7 @@ Respond with JSON only:
     placeholder: "Who did you catch being great? What exactly did you see? What did you tell them?",
   },
   {
-    id: 7,
+    id: 5,
     title: "Tribe Time Capsule",
     description: "One sentence to your future self. Sealed. Collected by your tribe leader. Opened one year from today.",
     verificationPrompt: `You are evaluating "Tribe Time Capsule" for NIAT CBC.
@@ -205,69 +157,7 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
     requiresText: false,
   },
   {
-    id: 8,
-    title: "The Story I Almost Didn't Tell",
-    description: "Post the moment you nearly didn't come here. The doubt. The decision. Under 200 words. Make it true.",
-    verificationPrompt: `You are evaluating a student submission for the NIAT CBC challenge "The Story I Almost Didn't Tell".
-
-Challenge intent:
-The student is sharing a real personal doubt, hesitation, fear, or turning point about joining this bootcamp.
-
-ACCEPT if the response includes ANY of the following:
-- doubt, fear, hesitation, nervousness, uncertainty, or pressure
-- a reason they almost did not join
-- a decision, turning point, or attempt to come anyway
-- a brief personal statement about their feelings or situation
-
-Accept even if the response is:
-- very short
-- only 2-3 words if clearly personal and related
-- incomplete
-- emotional, rough, or informal
-
-Examples of acceptable short answers:
-- "scared to join"
-- "family said no"
-- "I hesitated"
-- "low confidence"
-- "almost gave up"
-
-REJECT only if the response is:
-- blank
-- gibberish
-- spam
-- abusive or inappropriate
-- clearly unrelated
-- purely technical content like code, logs, or documentation
-
-Do NOT require:
-- a full essay
-- a beginning-middle-end story structure
-- perfect grammar
-- exact dates or details
-
-Examples:
-✅ "I almost didn't join because I thought I wasn't smart enough"
-✅ "my parents didn't support me. I was scared but I came anyway"
-✅ "had a lot of doubts. still not sure but I'm here trying"
-✅ "scared to join"
-✅ "family said no"
-✅ "I hesitated"
-❌ code snippets or technical changelogs
-❌ "asdfgh"
-❌ ""
-
-Respond with JSON only:
-{"verdict":"accepted"|"rejected","reason":"one short sentence"}`,
-    day: "Day 2",
-    points: 3,
-    requiresUpload: false,
-    requiresText: true,
-    placeholder: "Tell the story. Under 200 words. The doubt, the decision, the moment.",
-    maxWords: 200,
-  },
-  {
-    id: 9,
+    id: 6,
     title: "3-Day Real Streak",
     description: "One real post. Every day. All 3 days. No templates. Just one honest moment each day.",
     verificationPrompt: `You are evaluating "3-Day Real Streak" for NIAT CBC.
@@ -283,14 +173,5 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
     points: 3,
     requiresUpload: true,
     requiresText: false,
-    streakDays: 3,
   },
 ];
-
-export function isStreakChallenge(challengeId: number): boolean {
-  const challenge = CHALLENGES.find((c) => c.id === challengeId);
-  return challenge?.streakDays !== undefined && challenge.streakDays > 0;
-}
-
-
-export const SLOT_MAP: number[] = [6, 2, 8, 1, 5, 3, 7, 0, 4];

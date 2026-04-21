@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
-import { verifyStudentSession } from "@/lib/session";
+import { CHALLENGES } from "@/lib/challenges";
+import { getStudentFromRequest } from "@/lib/api-auth";
 import { adminClient } from "../../../../../utils/supabase/admin";
 import type { SafeAttempt } from "@/types/database";
 
-function getCookieValue(cookieHeader: string | null, key: string): string | null {
-  if (!cookieHeader) return null;
-  const pairs = cookieHeader.split(";").map((item) => item.trim());
-  const match = pairs.find((item) => item.startsWith(`${key}=`));
-  return match ? decodeURIComponent(match.slice(key.length + 1)) : null;
-}
+const VALID_TASK_IDS = CHALLENGES.map((challenge) => challenge.id);
 
 type AttemptRow = {
   id: string;
@@ -30,15 +26,7 @@ type AttemptRow = {
 
 export async function GET(request: Request) {
   try {
-    const token = getCookieValue(request.headers.get("cookie"), "cbc_student");
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: "You are not authorized." },
-        { status: 401 }
-      );
-    }
-
-    const session = await verifyStudentSession(token);
+    const { student: session } = await getStudentFromRequest(request);
     if (!session) {
       return NextResponse.json(
         { success: false, error: "You are not authorized." },
@@ -69,7 +57,7 @@ export async function GET(request: Request) {
 
     if (taskIdParam !== null && taskIdParam !== "") {
       const taskId = Number(taskIdParam);
-      if (Number.isInteger(taskId) && taskId >= 1 && taskId <= 9) {
+      if (Number.isInteger(taskId) && VALID_TASK_IDS.includes(taskId)) {
         query = query.eq("task_id", taskId);
       }
     }

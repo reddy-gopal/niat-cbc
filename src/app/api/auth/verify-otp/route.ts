@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { verifyOtp } from "@/lib/msg91";
+import { CHALLENGES } from "@/lib/challenges";
 import { createSessionCookie, signStudentSession } from "@/lib/session";
 import type { SubmissionStatus } from "@/types/database";
 import { adminClient } from "../../../../../utils/supabase/admin";
@@ -14,6 +15,7 @@ const verifyOtpSchema = z.object({
   regionId: z.string().uuid(),
   inviteCode: z.string().optional(),
 });
+const ACTIVE_TASK_IDS = CHALLENGES.map((challenge) => challenge.id);
 
 export async function POST(request: Request) {
   try {
@@ -157,12 +159,12 @@ export async function POST(request: Request) {
       sessionRegion = insertedStudent.region_id;
 
       const now = new Date().toISOString();
-      const baseSubmissions = Array.from({ length: 9 }, (_, index) => ({
+      const baseSubmissions = ACTIVE_TASK_IDS.map((taskId) => ({
         student_id: insertedStudent.id,
         bootcamp_id: insertBootcampId,
         section_id: insertSectionId,
         region_id: insertRegionId,
-        task_id: index + 1,
+        task_id: taskId,
         status: "not_started" as SubmissionStatus,
         points: 0,
         resubmit_count: 0,
@@ -179,20 +181,9 @@ export async function POST(request: Request) {
         updated_at: now,
       }));
 
-      const submissions = baseSubmissions.flatMap((sub) => {
-        if (sub.task_id === 9) {
-          return [
-            { ...sub, streak_day: 1 },
-            { ...sub, streak_day: 2 },
-            { ...sub, streak_day: 3 },
-          ];
-        }
-        return sub;
-      });
-
       const { error: submissionsError } = await adminClient
         .from("submissions")
-        .insert(submissions);
+        .insert(baseSubmissions);
 
       if (submissionsError) {
         console.error("[verify-otp] initial submissions insert failed", {
@@ -212,8 +203,6 @@ export async function POST(request: Request) {
 
       const hasTask = (taskId: number) =>
         (existingRows || []).some((r) => r.task_id === taskId);
-      const hasTask9Day = (day: number) =>
-        (existingRows || []).some((r) => r.task_id === 9 && r.streak_day === day);
 
       const missingRows: Array<{
         student_id: string;
@@ -239,7 +228,7 @@ export async function POST(request: Request) {
       }> = [];
       const now = new Date().toISOString();
 
-      for (const taskId of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      for (const taskId of ACTIVE_TASK_IDS) {
         if (!hasTask(taskId)) {
           missingRows.push({
             student_id: studentId,
@@ -247,33 +236,6 @@ export async function POST(request: Request) {
             section_id: sessionSection,
             region_id: sessionRegion,
             task_id: taskId,
-            status: "not_started" as SubmissionStatus,
-            points: 0,
-            resubmit_count: 0,
-            file_url: null,
-            file_hash: null,
-            ai_reason: null,
-            text_response: null,
-            verification_attempts: 0,
-            last_attempted_at: null,
-            verified_at: null,
-            override_by: null,
-            override_note: null,
-            created_at: now,
-            updated_at: now,
-          });
-        }
-      }
-
-      for (const day of [1, 2, 3]) {
-        if (!hasTask9Day(day)) {
-          missingRows.push({
-            student_id: studentId,
-            bootcamp_id: sessionBootcamp,
-            section_id: sessionSection,
-            region_id: sessionRegion,
-            task_id: 9,
-            streak_day: day,
             status: "not_started" as SubmissionStatus,
             points: 0,
             resubmit_count: 0,

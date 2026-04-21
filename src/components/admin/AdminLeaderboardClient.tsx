@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
 import { Loader2, RefreshCw, Users, User } from "lucide-react";
+import { CHALLENGES } from "@/lib/challenges";
 
 type Row = {
   id: string;
@@ -56,6 +57,7 @@ export default function AdminLeaderboardClient({
   selectedBootcampId,
   selectedSectionId,
 }: Props) {
+  const totalChallenges = CHALLENGES.length;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [view, setView] = useState<"individual" | "team">("individual");
@@ -242,7 +244,7 @@ export default function AdminLeaderboardClient({
                 <td className="text-gray-600 font-medium">{row.region_name}</td>
                 <td className="font-black text-[var(--primary)]">{row.total_points}</td>
                 <td className="text-center">
-                   <span className="px-2 py-1 bg-green-50 text-green-700 rounded-md font-bold text-xs border border-green-100">{row.completed}/9</span>
+                   <span className="px-2 py-1 bg-green-50 text-green-700 rounded-md font-bold text-xs border border-green-100">{row.completed}/{totalChallenges}</span>
                 </td>
               </tr>
             ))}

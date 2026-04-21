@@ -209,7 +209,7 @@ export default function MissionModal({
               <span className="bg-[#f7b801] text-[#ffffff] font-black px-2 sm:px-3 py-0.5 sm:py-1 rounded shadow-sm text-[10px] sm:text-xs border border-[#f18701]">
                 +{challenge.points} Points
               </span>
-              {challenge.id === 9 && (
+              {challenge.id === 6 && (
                 <span className="bg-[#991b1b] text-[#ffffff] font-bold px-2 sm:px-3 py-0.5 sm:py-1 rounded shadow-sm text-[9px] sm:text-[10px] uppercase border border-[#991b1b] max-w-full">
                   DEADLINE: {challenge.day}
                 </span>

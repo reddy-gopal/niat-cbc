@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CHALLENGES } from "@/lib/challenges";
 import type { LeaderboardEntry, TeamLeaderboardEntry } from "@/types/app";
 import { StudentAppShell } from "./StudentAppShell";
 import { studentMainTopPaddingClass } from "./StudentNavbar";
@@ -32,6 +33,7 @@ export default function Leaderboard({
   firstName,
 }: LeaderboardProps) {
   const [view, setView] = useState<"individual" | "team">("individual");
+  const totalChallenges = CHALLENGES.length;
 
   const entries = view === "individual" ? individualEntries : [];
   const activeTeamEntries = view === "team" ? teamEntries : [];
@@ -164,7 +166,7 @@ export default function Leaderboard({
                         {isCurrent && <span className="text-[8px] bg-[var(--primary)] text-white px-1.5 py-0.5 rounded font-black uppercase">You</span>}
                       </div>
                       <div className="col-span-3 text-right font-black text-[var(--primary)] text-sm">{e.totalPoints}</div>
-                      <div className="col-span-2 text-right text-xs font-bold text-[var(--text-secondary)]">{e.completedChallenges}<span className="text-[10px] text-gray-400">/9</span></div>
+                      <div className="col-span-2 text-right text-xs font-bold text-[var(--text-secondary)]">{e.completedChallenges}<span className="text-[10px] text-gray-400">/{totalChallenges}</span></div>
                     </div>
                   );
                 } else {

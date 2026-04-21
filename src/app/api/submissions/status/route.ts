@@ -1,25 +1,10 @@
 import { NextResponse } from "next/server";
-import { verifyStudentSession } from "@/lib/session";
+import { getStudentFromRequest } from "@/lib/api-auth";
 import { adminClient } from "../../../../../utils/supabase/admin";
-
-function getCookieValue(cookieHeader: string | null, key: string): string | null {
-  if (!cookieHeader) return null;
-  const pairs = cookieHeader.split(";").map((item) => item.trim());
-  const match = pairs.find((item) => item.startsWith(`${key}=`));
-  return match ? decodeURIComponent(match.slice(key.length + 1)) : null;
-}
 
 export async function GET(request: Request) {
   try {
-    const token = getCookieValue(request.headers.get("cookie"), "cbc_student");
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: "You are not authorized." },
-        { status: 401 }
-      );
-    }
-
-    const session = await verifyStudentSession(token);
+    const { student: session } = await getStudentFromRequest(request);
     if (!session) {
       return NextResponse.json(
         { success: false, error: "You are not authorized." },

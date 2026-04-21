@@ -192,6 +192,99 @@ h6 {
   to { width: var(--target-width); }
 }
 
+/* Tribe Crest Specific Animations */
+@keyframes orbitRotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes counterRotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+
+.crest-orbit-ring {
+  animation: orbitRotate 60s linear infinite;
+}
+
+.crest-counter-rotate {
+  animation: counterRotate 60s linear infinite;
+}
+
+@keyframes crestShieldPulse {
+  0%   { stroke-opacity: 0.08; r: 196; }
+  50%  { stroke-opacity: 0.25; r: 202; }
+  100% { stroke-opacity: 0.08; r: 196; }
+}
+
+.crest-shield-pulse {
+  animation: crestShieldPulse 3s ease-in-out infinite;
+}
+
+/* Cinematic Finale Transitions */
+@keyframes finaleOrbitFast {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.finale-orbit {
+  /* Using 290 290 as transform origin for SVG content but for div it's center */
+  transform-origin: center center;
+  animation: finaleOrbitFast 2.8s cubic-bezier(0.5, 0, 0.2, 1) forwards;
+}
+
+.finale-counter {
+  animation: counterRotate 2.8s cubic-bezier(0.5, 0, 0.2, 1) forwards;
+}
+
+@keyframes pulseRedRapid {
+  0%, 100% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.6); }
+  50% { box-shadow: 0 0 60px rgba(220, 38, 38, 1); background-color: rgba(220,38,38, 0.2); }
+}
+.finale-center-pulse {
+  animation: pulseRedRapid 0.2s ease-in-out infinite !important;
+}
+
+@keyframes drawBeam {
+  0% { stroke-dashoffset: 200; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+.finale-beam {
+  stroke-dasharray: 200;
+  stroke-dashoffset: 200;
+  opacity: 0;
+  animation: drawBeam 1s 0.8s ease-out forwards;
+}
+
+@keyframes finaleImplodeNode {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0); opacity: 0; }
+}
+.finale-implode {
+  animation: finaleImplodeNode 0.4s 1.8s forwards ease-in !important;
+}
+
+@keyframes finaleCenterBoom {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+.finale-center-boom {
+  animation: finaleCenterBoom 0.6s 1.8s forwards ease-out !important;
+}
+
+@keyframes finaleShieldExpand {
+  0% { r: 0; stroke-dashoffset: 1256; opacity: 1; stroke-width: 6px; }
+  100% { r: 200; stroke-dashoffset: 0; opacity: 0.6; stroke-width: 2px; }
+}
+.finale-shield-ring {
+  stroke-dasharray: 1256;
+  stroke-dashoffset: 1256;
+  opacity: 0;
+  animation: finaleShieldExpand 0.6s 1.8s forwards ease-out;
+}
+
+
 /* 3D Flip & HUD Utilities */
 .perspective-1000 {
   perspective: 1000px;

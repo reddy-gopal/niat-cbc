@@ -1,28 +1,20 @@
 import { createHash } from "crypto";
 import { waitUntil } from "@vercel/functions";
 import { NextResponse } from "next/server";
-import { verifyStudentSession } from "@/lib/session";
 import { CHALLENGES } from "@/lib/challenges";
+import { getStudentFromRequest } from "@/lib/api-auth";
 import { adminClient } from "../../../../../utils/supabase/admin";
-
-function getCookieValue(cookieHeader: string | null, key: string): string | null {
-  if (!cookieHeader) return null;
-  const pairs = cookieHeader.split(";").map((item) => item.trim());
-  const match = pairs.find((item) => item.startsWith(`${key}=`));
-  return match ? decodeURIComponent(match.slice(key.length + 1)) : null;
-}
 
 const PLAGIARISM_REASON =
   "Submission rejected: this proof image is identical to another student's submission for this challenge. If you believe this is an error, please contact your instructor.";
+const ACTIVE_TASK_IDS = CHALLENGES.map((challenge) => challenge.id);
+const REFERRAL_CHALLENGE_ID = CHALLENGES.find((challenge) => challenge.isReferral)?.id;
+const STREAK_CHALLENGE_ID = 6;
+const STREAK_MAX_ATTEMPTS = 3;
 
 export async function POST(request: Request) {
   try {
-    const token = getCookieValue(request.headers.get("cookie"), "cbc_student");
-    if (!token) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const session = await verifyStudentSession(token);
+    const { student: session } = await getStudentFromRequest(request);
     if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
@@ -32,7 +24,7 @@ export async function POST(request: Request) {
     const file = formData.get("file");
     const textResponse = formData.get("textResponse") as string | null;
 
-    if (!Number.isInteger(taskId) || taskId < 1 || taskId > 9) {
+    if (!Number.isInteger(taskId) || !ACTIVE_TASK_IDS.includes(taskId)) {
       return NextResponse.json(
         { success: false, error: "Invalid task ID." },
         { status: 400 }
@@ -126,65 +118,35 @@ export async function POST(request: Request) {
       status?: string;
     } | null = null;
 
-    if (taskId === 9) {
-      const { data: streakRows, error: streakLookupError } = await adminClient
-        .from("submissions")
-        .select("id, resubmit_count, bootcamp_id, status, streak_day")
-        .eq("student_id", session.studentId)
-        .eq("task_id", 9)
-        .order("streak_day", { ascending: true });
+    const { data: submission, error: submissionLookupError } = await adminClient
+      .from("submissions")
+      .select("id, resubmit_count, bootcamp_id, status")
+      .eq("student_id", session.studentId)
+      .eq("task_id", taskId)
+      .maybeSingle();
 
-      if (streakLookupError) {
-        console.error("Task 9 lookup error:", streakLookupError);
-        return NextResponse.json(
-          { success: false, error: "Unable to lookup submission." },
-          { status: 500 }
-        );
-      }
+    if (submissionLookupError) {
+      console.error("Submission lookup error:", submissionLookupError);
+      return NextResponse.json(
+        { success: false, error: "Unable to lookup submission." },
+        { status: 500 }
+      );
+    }
 
-      const rows = streakRows ?? [];
-      const nextOpen = rows.find((row) => row.status !== "accepted");
-      if (nextOpen) {
-        targetSubmission = {
-          id: nextOpen.id,
-          resubmit_count: nextOpen.resubmit_count,
-          bootcamp_id: nextOpen.bootcamp_id,
-        };
-      } else if (rows.length > 0) {
+    targetSubmission = submission;
+
+    if (targetSubmission && targetSubmission.status === "accepted") {
+      const isReferralChallenge = taskId === REFERRAL_CHALLENGE_ID;
+      const isStreakChallenge = taskId === STREAK_CHALLENGE_ID;
+      const hasStreakAttemptsRemaining =
+        isStreakChallenge && targetSubmission.resubmit_count < STREAK_MAX_ATTEMPTS;
+
+      if (!isReferralChallenge && !hasStreakAttemptsRemaining) {
         return NextResponse.json(
-          { success: false, error: "Challenge 9 streak is already completed." },
+          { success: false, error: "Challenge already completed. Re-submission is not allowed." },
           { status: 400 }
         );
       }
-    } else {
-      const { data: submission, error: submissionLookupError } = await adminClient
-        .from("submissions")
-        .select("id, resubmit_count, bootcamp_id, status")
-        .eq("student_id", session.studentId)
-        .eq("task_id", taskId)
-        .maybeSingle();
-
-      if (submissionLookupError) {
-        console.error("Submission lookup error:", submissionLookupError);
-        return NextResponse.json(
-          { success: false, error: "Unable to lookup submission." },
-          { status: 500 }
-        );
-      }
-
-      targetSubmission = submission;
-    }
-
-    if (
-      targetSubmission &&
-      taskId !== 5 &&
-      taskId !== 9 &&
-      targetSubmission.status === "accepted"
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Challenge already completed. Re-submission is not allowed." },
-        { status: 400 }
-      );
     }
 
     // Self-heal: create missing row if not found
@@ -193,67 +155,30 @@ export async function POST(request: Request) {
         `No submission row found for student=${session.studentId} task=${taskId}. Creating one.`
       );
 
-      if (taskId === 9) {
-        const seedRows = [1, 2, 3].map((day) => ({
+      const { data: inserted, error: insertError } = await adminClient
+        .from("submissions")
+        .insert({
           student_id: session.studentId,
           bootcamp_id: session.bootcampId,
           section_id: session.sectionId,
           region_id: session.regionId,
-          task_id: 9,
-          streak_day: day,
-          status: "not_started" as const,
+          task_id: taskId,
+          status: "not_started",
           points: 0,
           resubmit_count: 0,
-        }));
+        })
+        .select("id, resubmit_count, bootcamp_id")
+        .single();
 
-        const { data: insertedRows, error: insertError } = await adminClient
-          .from("submissions")
-          .insert(seedRows)
-          .select("id, resubmit_count, bootcamp_id, streak_day");
-
-        if (insertError || !insertedRows || insertedRows.length === 0) {
-          console.error("Task 9 insert error:", insertError);
-          return NextResponse.json(
-            { success: false, error: "Unable to initialize submission." },
-            { status: 500 }
-          );
-        }
-
-        const firstStreakRow = [...insertedRows].sort(
-          (a, b) => (a.streak_day ?? 999) - (b.streak_day ?? 999)
-        )[0];
-
-        targetSubmission = {
-          id: firstStreakRow.id,
-          resubmit_count: firstStreakRow.resubmit_count,
-          bootcamp_id: firstStreakRow.bootcamp_id,
-        };
-      } else {
-        const { data: inserted, error: insertError } = await adminClient
-          .from("submissions")
-          .insert({
-            student_id: session.studentId,
-            bootcamp_id: session.bootcampId,
-            section_id: session.sectionId,
-            region_id: session.regionId,
-            task_id: taskId,
-            status: "not_started",
-            points: 0,
-            resubmit_count: 0,
-          })
-          .select("id, resubmit_count, bootcamp_id")
-          .single();
-
-        if (insertError || !inserted) {
-          console.error("Submission insert error:", insertError);
-          return NextResponse.json(
-            { success: false, error: "Unable to initialize submission." },
-            { status: 500 }
-          );
-        }
-
-        targetSubmission = inserted;
+      if (insertError || !inserted) {
+        console.error("Submission insert error:", insertError);
+        return NextResponse.json(
+          { success: false, error: "Unable to initialize submission." },
+          { status: 500 }
+        );
       }
+
+      targetSubmission = inserted;
     }
 
     const now = new Date().toISOString();

@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useEffect } from "react";
-import { CHALLENGES, SLOT_MAP } from "@/lib/challenges";
+import { useMemo, useState } from "react";
+import { CHALLENGES } from "@/lib/challenges";
 import type { StudentSession } from "@/types/app";
 import type { Submission, Student } from "@/types/database";
 import ChallengeBoard from "../challenges/ChallengeBoard";
-import GrandFinale from "../challenges/GrandFinale";
-import PuzzleFinaleModal from "./PuzzleFinaleModal";
 import { StudentAppShell } from "./StudentAppShell";
 import { studentMainTopPaddingClass } from "./StudentNavbar";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,16 +29,7 @@ export default function Dashboard({
   session,
 }: DashboardProps) {
   const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions);
-  const [showGrandFinale, setShowGrandFinale] = useState(false);
   const [isHoveringChart, setIsHoveringChart] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const [hasRevealed, setHasRevealed] = useState(false);
-  const [finaleKey, setFinaleKey] = useState(0);
-  const [forceFinale, setForceFinale] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   const firstName = session.fullName.split(" ")[0] ?? session.fullName;
   const leaderInvite = useMemo(() => {
@@ -51,11 +40,6 @@ export default function Dashboard({
       inviteCode: student.teams.invite_code,
     };
   }, [student.id, student.teams]);
-
-  const submissionByTask = useMemo(
-    () => new Map(submissions.map((item) => [item.task_id, item])),
-    [submissions]
-  );
 
   const totalPoints = useMemo(
     () =>
@@ -81,27 +65,12 @@ export default function Dashboard({
     return Math.min(CHALLENGES.length, acceptedTaskIds.size);
   }, [submissions]);
 
-  const shouldShowFinale = forceFinale && !hasRevealed;
-  const shouldShowRevealedBoard = hasRevealed;
-
-  const handleFinaleComplete = () => {
-    setHasRevealed(true);
-    setForceFinale(false);
-  };
-
-  const devResetFinale = () => {
-    setHasRevealed(false);
-    setForceFinale(true);
-    setFinaleKey((prev) => prev + 1);
-  };
+  const totalChallenges = CHALLENGES.length;
 
   const maxPoints = useMemo(
-    () => CHALLENGES.reduce((sum, c) => sum + (c.id === 9 ? (c.points * (c.streakDays || 1)) : c.points), 0),
+    () => CHALLENGES.reduce((sum, c) => sum + c.points, 0),
     []
   );
-
-  const pointsRemaining = maxPoints - totalPoints;
-
 
   /** Referral link uses names (not UUIDs); merge from loaded student context. */
   const sessionWithReferralContext = useMemo(
@@ -122,9 +91,8 @@ export default function Dashboard({
 
   const getSubTitle = () => {
     if (completedCount === 0) return "🎯 Start your journey. Your first challenge awaits!";
-    if (completedCount < 5) return "🔥 You're gaining momentum! Keep collecting points.";
-    if (completedCount < 9)
-      return `⚡ Great progress! Just ${9 - completedCount} more to unlock the full story.`;
+    if (completedCount < totalChallenges)
+      return `⚡ Great progress! Just ${totalChallenges - completedCount} more to complete all challenges.`;
     return "🏆 LEGEND. You've conquered every challenge in the championship!";
   };
 
@@ -155,7 +123,7 @@ export default function Dashboard({
                  <div className="bg-black/20 backdrop-blur-sm border border-white/10 p-4 rounded-2xl flex flex-col min-w-[120px]">
                     <span className="text-[10px] font-black uppercase text-white/50 tracking-widest mb-1">Status</span>
                     <span className="text-sm font-black uppercase text-white/90 mt-2">
-                       {completedCount === 9 ? "LEGEND" : "EVOLVING"}
+                       {completedCount === totalChallenges ? "LEGEND" : "EVOLVING"}
                     </span>
                  </div>
               </div>
@@ -211,7 +179,7 @@ export default function Dashboard({
                         exit={{ opacity: 0, scale: 0.9, y: -10 }}
                         className="flex flex-col items-center"
                       >
-                         <span className="text-5xl font-heading font-black text-[#f7b801]">{completedCount}/9</span>
+                         <span className="text-5xl font-heading font-black text-[#f7b801]">{completedCount}/{totalChallenges}</span>
                          <span className="block text-[10px] font-black uppercase text-white/50 tracking-[0.2em] mt-2">Challenges Done</span>
                       </motion.div>
                     ) : (
@@ -234,20 +202,6 @@ export default function Dashboard({
 
         <div className="mx-auto max-w-6xl px-4 mt-8 relative z-20">
           
-          {completedCount === 9 && (
-            <div 
-              onClick={() => setShowGrandFinale(true)}
-              className="mb-8 bg-gradient-to-r from-[#991b1b] to-[#1a1a1a] p-8 rounded-[2.5rem] border-4 border-[#f7b801] shadow-[0_0_40px_rgba(247,184,1,0.4)] cursor-pointer hover:scale-[1.01] transition-all group overflow-hidden relative"
-            >
-                <div className="absolute inset-0 bg-[url('/api/story-image')] opacity-20 grayscale blur-sm group-hover:scale-105 transition-transform duration-[15s]" />
-                <div className="relative z-10 flex flex-col items-center justify-center text-center py-4">
-                    <div className="bg-[#f7b801] text-[#991b1b] px-4 py-1 rounded-full text-[10px] font-black uppercase mb-4 tracking-[0.2em] animate-bounce">Showcase Unlocked</div>
-                    <h3 className="text-[#f7b801] font-heading font-black text-3xl sm:text-4xl mb-2 italic tracking-tight uppercase">THE STORY IS COMPLETE</h3>
-                    <p className="text-white/60 text-xs sm:text-sm font-bold uppercase tracking-[0.2em]">You've reached total mastery. Tap to reveal your legacy.</p>
-                </div>
-            </div>
-          )}
-
           <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-3xl border border-[var(--card-border)] bg-white px-6 py-4 shadow-sm">
             <p className="text-sm font-bold text-[var(--text-secondary)]">
               Manage your progress, invite tribe members, and verify your mission outcomes.
@@ -282,35 +236,9 @@ export default function Dashboard({
               submissions={submissions}
               setSubmissions={setSubmissions}
               session={sessionWithReferralContext}
-              completedCount={completedCount}
-              hasRevealed={shouldShowRevealedBoard}
             />
           </section>
         </div>
-
-        <GrandFinale 
-          isOpen={showGrandFinale}
-          onClose={() => setShowGrandFinale(false)}
-          studentName={student.full_name}
-        />
-
-        {isMounted && shouldShowFinale && (
-          <PuzzleFinaleModal 
-             key={finaleKey}
-             imageUrl="/api/story-image"
-             slotMap={SLOT_MAP} 
-             onComplete={handleFinaleComplete}
-          />
-        )}
-
-        {process.env.NODE_ENV === 'development' && (
-          <button 
-             onClick={devResetFinale}
-             className="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-md font-bold z-[10000] text-xs shadow-lg hidden sm:block hover:bg-red-700 active:scale-95 transition-all"
-          >
-             Dev Reset Finale
-          </button>
-        )}
       </main>
     </StudentAppShell>
   );

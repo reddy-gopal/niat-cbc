@@ -8,6 +8,7 @@ import { getReferralCountForStage } from "@/lib/nw-referral";
 import { adminClient } from "../../../../../../utils/supabase/admin";
 
 const schema = z.object({ studentId: z.string().uuid() });
+const REFERRAL_CHALLENGE = CHALLENGES.find((challenge) => challenge.isReferral);
 
 export async function POST(request: Request) {
   try {
@@ -93,8 +94,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const pointsPerReferral =
-      CHALLENGES.find((item) => item.id === 5)?.points ?? 10;
+    const pointsPerReferral = REFERRAL_CHALLENGE?.points ?? 10;
     const pointsToAward = referralResult.referralsCount * pointsPerReferral;
 
     if (pointsToAward === 0) {
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
         bootcamp_id: student.bootcamp_id,
         section_id: student.section_id,
         region_id: student.region_id,
-        task_id: 5,
+        task_id: REFERRAL_CHALLENGE?.id,
         status: "accepted",
         points: pointsToAward,
         ai_reason: `Auto-awarded from NW referral completion count (${referralResult.referralsCount}).`,

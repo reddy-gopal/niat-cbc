@@ -70,12 +70,15 @@ type AttemptsPollResponse = {
   success?: boolean;
   data?: { attempts: SafeAttempt[] };
 };
+const ACTIVE_TASK_IDS = new Set(CHALLENGES.map((challenge) => challenge.id));
 
 export default function SubmissionsClient({
   session,
   initialAttempts,
 }: SubmissionsClientProps) {
-  const [attempts, setAttempts] = useState<SafeAttempt[]>(initialAttempts);
+  const [attempts, setAttempts] = useState<SafeAttempt[]>(
+    initialAttempts.filter((attempt) => ACTIVE_TASK_IDS.has(attempt.task_id))
+  );
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
   const [lightboxSignedUrl, setLightboxSignedUrl] = useState<string | null>(null);
@@ -108,10 +111,13 @@ export default function SubmissionsClient({
         const res = await fetch("/api/submissions/attempts?limit=50", { cache: "no-store" });
         const json = (await res.json()) as AttemptsPollResponse;
         if (!res.ok || !json.success || !json.data?.attempts) return;
-        setAttempts(json.data.attempts);
+        const nextAttempts = json.data.attempts.filter((attempt) =>
+          ACTIVE_TASK_IDS.has(attempt.task_id)
+        );
+        setAttempts(nextAttempts);
 
         const prev = attemptsRef.current;
-        const next = json.data.attempts;
+        const next = nextAttempts;
         for (const row of next) {
           const was = prev.find((p) => p.id === row.id);
           if (!was) continue;
