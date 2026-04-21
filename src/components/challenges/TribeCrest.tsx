@@ -172,7 +172,7 @@ export default function TribeCrest({
     <div className="w-full flex-col items-center">
       <div ref={crestRef} className="w-full flex flex-col items-center">
         {/* Desktop Animated Crest - Fully Responsive base 580x580 */}
-        <div ref={wrapperRef} className="hidden md:block relative w-full max-w-[580px] aspect-square mx-auto">
+        <div ref={wrapperRef} className="relative w-full max-w-[580px] aspect-square mx-auto">
           <div
             className="absolute top-0 left-0"
             style={{
@@ -399,7 +399,7 @@ export default function TribeCrest({
 
         {/* Bottom Text - Desktop */}
         <motion.div
-          className="mt-8 flex flex-col items-center hidden md:flex"
+          className="mt-8 flex flex-col items-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 1.2 }}
@@ -431,85 +431,6 @@ export default function TribeCrest({
           </div>
         </motion.div>
 
-        {/* Mobile Animated Crest (Simplified layout) */}
-        <div className="flex md:hidden flex-col items-center w-full max-w-[380px] p-6 rounded-[20px] bg-[var(--text-dark)] border border-[color-mix(in_srgb,var(--yellow)_30%,transparent)] shadow-[0_0_24px_color-mix(in_srgb,var(--yellow)_15%,transparent)] mx-auto content-center">
-          <div className="text-center mb-6">
-            <h2
-              className="font-bold mb-1"
-              style={{
-                color: "var(--yellow)",
-                fontSize: "28px",
-                letterSpacing: "0.15em",
-                textShadow: "0 0 12px color-mix(in srgb, var(--yellow) 40%, transparent)",
-              }}
-            >
-              NIAT
-            </h2>
-            <p
-              className="uppercase font-semibold tracking-widest text-[#a1a1aa]"
-              style={{ fontSize: "12px" }}
-            >
-              Tribe Crest Unlocked
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            {activeChallenges.map((challenge) => {
-              const stoneColor = getStoneColor(challenge.id);
-              const clickable = isStoneClickable(challenge);
-              return (
-                <motion.button
-                  key={`mobile-stone-${challenge.id}`}
-                  disabled={!clickable}
-                  onClick={() => onStoneClick(challenge)}
-                  className="relative flex items-center justify-center rounded-full mx-auto"
-                  style={{
-                    width: "48px",
-                    height: "48px",
-                    border: `1px solid color-mix(in srgb, ${stoneColor} 40%, transparent)`,
-                    background: "var(--text-dark)",
-                    opacity: clickable ? 1 : 0.6,
-                  }}
-                  whileTap={clickable ? { scale: 0.9 } : undefined}
-                >
-                  <div
-                    className="rounded-full relative"
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      border: `1px solid color-mix(in srgb, ${stoneColor} 60%, transparent)`,
-                      background: `radial-gradient(circle at 35% 35%, color-mix(in srgb, ${stoneColor} 90%, white 10%), color-mix(in srgb, ${stoneColor} 80%, black 20%))`,
-                      boxShadow: `0 0 10px color-mix(in srgb, ${stoneColor} 50%, transparent)`,
-                    }}
-                  >
-                    <div
-                      className="absolute rounded-full pointer-events-none"
-                      style={{
-                        width: "30%",
-                        height: "20%",
-                        top: "18%",
-                        left: "22%",
-                        background: "rgba(255,255,255,0.35)",
-                      }}
-                    />
-                  </div>
-                  <div
-                    className="absolute z-10 flex items-center justify-center rounded-full bg-green-500"
-                    style={{
-                      width: "14px",
-                      height: "14px",
-                      bottom: "-2px",
-                      right: "-2px",
-                      border: "1.5px solid var(--text-dark)",
-                    }}
-                  >
-                    <span className="text-white leading-none text-[8px]">✓</span>
-                  </div>
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
       </div>
       <div className="mt-5 flex flex-col items-center gap-2">
         <div className="flex items-center gap-2">
