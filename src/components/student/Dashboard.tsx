@@ -25,6 +25,9 @@ type DashboardProps = {
   completedChallenges: number;
 };
 
+const ACTIVE_CHALLENGE_IDS = new Set([1, 2, 3, 4, 5, 6]);
+const COMPLETED_STATUSES = new Set(["accepted", "approved"]);
+
 export default function Dashboard({
   student,
   initialSubmissions,
@@ -45,9 +48,21 @@ export default function Dashboard({
     };
   }, [student.id, student.teams]);
 
-  const completedCount = Math.min(CHALLENGES.length, completedChallenges);
+  const totalChallenges = ACTIVE_CHALLENGE_IDS.size;
+  const completedCount = useMemo(() => {
+    const acceptedTaskIds = new Set(
+      submissions
+        .filter(
+          (submission) =>
+            COMPLETED_STATUSES.has(String(submission.status ?? "").trim().toLowerCase()) &&
+            ACTIVE_CHALLENGE_IDS.has(submission.task_id)
+        )
+        .map((submission) => submission.task_id)
+    );
 
-  const totalChallenges = CHALLENGES.length;
+    // Keep attempt-native count as fallback when board rows lag behind async updates.
+    return Math.min(totalChallenges, Math.max(acceptedTaskIds.size, completedChallenges));
+  }, [submissions, completedChallenges, totalChallenges]);
 
   const maxPoints = useMemo(
     () => CHALLENGES.reduce((sum, c) => sum + c.points, 0),
@@ -201,7 +216,7 @@ export default function Dashboard({
                 href="/submissions"
                 className="inline-flex flex-1 sm:flex-none items-center justify-center rounded-xl bg-[var(--primary)] px-6 py-3 text-sm font-black uppercase text-white shadow-md transition hover:brightness-95 active:scale-95"
               >
-                Track Proof
+                Submissions
               </Link>
             </div>
           </div>

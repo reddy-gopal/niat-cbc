@@ -14,6 +14,7 @@ export default function MissionModal({
   session,
   onSubmitSuccess,
   isSubmissionLocked,
+  stoneColor,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -21,6 +22,7 @@ export default function MissionModal({
   session: StudentSession;
   onSubmitSuccess: (payload: { taskId: number; submissionId?: string }) => void;
   isSubmissionLocked: boolean;
+  stoneColor?: string;
 }) {
   const [accepted, setAccepted] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -62,6 +64,12 @@ export default function MissionModal({
   };
 
   if (!challenge || typeof window === "undefined") return null;
+
+  const modalStoneColor = stoneColor ?? "var(--hero-from)";
+  const modalStoneDeep = `color-mix(in srgb, ${modalStoneColor} 55%, black)`;
+  const modalStoneSoft = `color-mix(in srgb, ${modalStoneColor} 18%, white)`;
+  const modalStoneBorder = `color-mix(in srgb, ${modalStoneColor} 82%, white)`;
+  const modalStoneGlow = `color-mix(in srgb, ${modalStoneColor} 45%, transparent)`;
 
   const handleSubmit = async () => {
     if (isSubmissionLocked) {
@@ -168,7 +176,12 @@ export default function MissionModal({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         transition={{ duration: 0.3 }}
-        className="relative w-full min-w-0 max-w-lg max-h-[90vh] bg-[#991b1b] border-[4px] sm:border-[6px] border-[#f7b801] rounded-2xl shadow-[0px_20px_50px_rgba(153,27,27,0.8)] z-10 p-2 overflow-hidden"
+        className="relative w-full min-w-0 max-w-lg max-h-[90vh] border-[4px] sm:border-[6px] rounded-2xl z-10 p-2 overflow-hidden"
+        style={{
+          background: modalStoneDeep,
+          borderColor: modalStoneBorder,
+          boxShadow: `0 20px 50px ${modalStoneGlow}`,
+        }}
       >
         <div
           className="bg-[#ffffff] h-full w-full min-w-0 rounded-xl p-3 sm:p-5 md:p-6 relative flex flex-col items-center overflow-y-auto overflow-x-hidden"
@@ -178,23 +191,28 @@ export default function MissionModal({
             type="button"
             onClick={handleClose}
             disabled={uploadState === "uploading"}
-            className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 text-[#991b1b] font-black text-base sm:text-lg hover:scale-110 transition-transform disabled:opacity-40 disabled:pointer-events-none"
+            className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 font-black text-base sm:text-lg hover:scale-110 transition-transform disabled:opacity-40 disabled:pointer-events-none"
+            style={{ color: modalStoneDeep }}
           >
             ✕
           </button>
 
           {/* Top UNO Oval */}
           <div
-            className="w-[5.25rem] h-12 sm:w-28 sm:h-16 md:w-32 md:h-20 bg-[#f7b801] rounded-[50%] flex items-center justify-center shadow-[inset_0_0_0_4px_#f18701] mb-3 sm:mb-5"
+            className="w-[5.25rem] h-12 sm:w-28 sm:h-16 md:w-32 md:h-20 rounded-[50%] flex items-center justify-center mb-3 sm:mb-5"
             style={{ transform: "rotate(-5deg)" }}
           >
             <div
               className="w-[85%] h-[80%] border-[3px] sm:border-4 border-[#ffffff] rounded-[50%] flex flex-col items-center justify-center p-1 min-w-0"
-              style={{ transform: "rotate(5deg)" }}
+              style={{
+                transform: "rotate(5deg)",
+                background: modalStoneColor,
+                boxShadow: `inset 0 0 0 4px ${modalStoneDeep}`,
+              }}
             >
               <span
                 className="text-[#ffffff] text-xl sm:text-3xl font-black"
-                style={{ textShadow: "2px 2px 0px #f18701" }}
+                style={{ textShadow: `2px 2px 0px ${modalStoneDeep}` }}
               >
                 {formattedId}
               </span>
@@ -202,11 +220,17 @@ export default function MissionModal({
           </div>
 
           <div className="text-center mb-6 sm:mb-8 flex-1 w-full min-w-0 max-w-sm px-0.5">
-            <h2 className="text-[#991b1b] font-heading font-bold text-base sm:text-lg md:text-xl uppercase mb-2 sm:mb-3 drop-shadow-sm break-words [overflow-wrap:anywhere] leading-tight">
+            <h2
+              className="font-heading font-bold text-base sm:text-lg md:text-xl uppercase mb-2 sm:mb-3 drop-shadow-sm break-words [overflow-wrap:anywhere] leading-tight"
+              style={{ color: modalStoneDeep }}
+            >
               {challenge.title}
             </h2>
             <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
-              <span className="bg-[#f7b801] text-[#ffffff] font-black px-2 sm:px-3 py-0.5 sm:py-1 rounded shadow-sm text-[10px] sm:text-xs border border-[#f18701]">
+              <span
+                className="text-[#ffffff] font-black px-2 sm:px-3 py-0.5 sm:py-1 rounded shadow-sm text-[10px] sm:text-xs border"
+                style={{ background: modalStoneColor, borderColor: modalStoneDeep }}
+              >
                 +{challenge.points} Points
               </span>
               {challenge.id === 6 && (
@@ -215,7 +239,14 @@ export default function MissionModal({
                 </span>
               )}
             </div>
-            <p className="text-[#991b1b] font-medium text-[11px] sm:text-xs bg-[#fff8eb] p-2.5 sm:p-3 md:p-4 rounded-xl border border-[#f7b801] shadow-sm tracking-normal sm:tracking-wide leading-relaxed text-center break-words [overflow-wrap:anywhere]">
+            <p
+              className="font-medium text-[11px] sm:text-xs p-2.5 sm:p-3 md:p-4 rounded-xl border shadow-sm tracking-normal sm:tracking-wide leading-relaxed text-center break-words [overflow-wrap:anywhere]"
+              style={{
+                color: modalStoneDeep,
+                background: modalStoneSoft,
+                borderColor: modalStoneBorder,
+              }}
+            >
               {challenge.description}
             </p>
           </div>
@@ -243,6 +274,12 @@ export default function MissionModal({
                   }
                 }}
                 className="w-full bg-[#f7b801] text-[#991b1b] font-black text-xs sm:text-sm md:text-base tracking-[0.05em] sm:tracking-[0.08em] py-2.5 sm:py-3.5 rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-[0_4px_15px_rgba(247,184,1,0.5)] border-2 border-[#f18701]"
+                style={{
+                  background: modalStoneColor,
+                  color: "white",
+                  borderColor: modalStoneDeep,
+                  boxShadow: `0 4px 15px ${modalStoneGlow}`,
+                }}
               >
                 ACCEPT MISSION
               </button>
@@ -293,7 +330,11 @@ export default function MissionModal({
                     void handleClaimChallenge5();
                   }}
                   disabled={claimLoading}
-                  className="w-full bg-[#991b1b] border-[2px] border-[#f7b801] text-[#f7b801] font-black tracking-wide text-xs sm:text-sm py-2.5 rounded-xl hover:bg-[#b91c1c] active:scale-[0.99] transition-all disabled:opacity-60 disabled:pointer-events-none"
+                  className="w-full border-[2px] text-white font-black tracking-wide text-xs sm:text-sm py-2.5 rounded-xl active:scale-[0.99] transition-all disabled:opacity-60 disabled:pointer-events-none"
+                  style={{
+                    background: modalStoneDeep,
+                    borderColor: modalStoneBorder,
+                  }}
                 >
                   {claimLoading
                     ? "CHECKING REFERRALS..."
@@ -322,11 +363,17 @@ export default function MissionModal({
                 {challenge.requiresText ? (
                   <div className="space-y-2">
                     <textarea 
-                      className="w-full min-h-[120px] p-4 rounded-xl border-2 border-[#f7b801] text-xs sm:text-sm text-[#991b1b] focus:outline-none focus:ring-2 focus:ring-[#f7b801]/50 placeholder:text-[#991b1b]/40 bg-[#fff8eb]"
+                      className="w-full min-h-[120px] p-4 rounded-xl border-2 text-xs sm:text-sm focus:outline-none focus:ring-2 placeholder:opacity-60"
                       placeholder={challenge.placeholder}
                       value={textResponse}
                       onChange={(e) => setTextResponse(e.target.value)}
                       disabled={formLocked}
+                      style={{
+                        borderColor: modalStoneBorder,
+                        color: modalStoneDeep,
+                        background: modalStoneSoft,
+                        caretColor: modalStoneDeep,
+                      }}
                     />
                     {challenge.maxWords && (
                       <div className="flex justify-between items-center px-1">
@@ -362,7 +409,12 @@ export default function MissionModal({
                     type="button"
                     onClick={handleSubmit}
                     disabled={formLocked || (challenge.maxWords ? wordCount > challenge.maxWords : false)}
-                    className="w-full bg-[#991b1b] border-[3px] border-[#f7b801] text-[#f7b801] font-black tracking-[0.08em] sm:tracking-widest text-xs sm:text-sm md:text-base py-2.5 sm:py-3.5 rounded-xl hover:bg-[#b91c1c] active:scale-95 transition-all shadow-[0_4px_15px_rgba(153,27,27,0.4)] disabled:opacity-50 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
+                    className="w-full border-[3px] text-white font-black tracking-[0.08em] sm:tracking-widest text-xs sm:text-sm md:text-base py-2.5 sm:py-3.5 rounded-xl active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
+                    style={{
+                      background: modalStoneDeep,
+                      borderColor: modalStoneBorder,
+                      boxShadow: `0 4px 15px ${modalStoneGlow}`,
+                    }}
                   >
                     {uploadState === "uploading" ? (
                       <>

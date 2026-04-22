@@ -282,7 +282,7 @@ export default function TribeCrest({
                 <span
                   style={{
                     color: "var(--yellow)",
-                    fontSize: "32px",
+                    fontSize: "30px",
                     fontWeight: 700,
                     letterSpacing: "0.15em",
                     textShadow: "0 0 12px color-mix(in srgb, var(--yellow) 40%, transparent)",
@@ -292,10 +292,25 @@ export default function TribeCrest({
                 </span>
                 <span
                   style={{
-                    color: "color-mix(in srgb, var(--yellow) 60%, transparent)",
-                    fontSize: "8px",
-                    letterSpacing: "0.3em",
                     marginTop: "4px",
+                    color: "color-mix(in srgb, white 90%, transparent)",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    maxWidth: "100px",
+                    textAlign: "center",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {studentName}
+                </span>
+                <span
+                  style={{
+                    color: "color-mix(in srgb, var(--yellow) 60%, transparent)",
+                    fontSize: "9px",
+                    letterSpacing: "0.3em",
+                    marginTop: "3px",
                   }}
                 >
                   THE TRIBE CREST
@@ -381,10 +396,14 @@ export default function TribeCrest({
                     >
                       <span
                         style={{
-                          fontSize: "9px",
-                          fontWeight: 600,
-                          color: "color-mix(in srgb, white 85%, transparent)",
-                          textShadow: "0 0 6px rgba(0,0,0,0.45)",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          color: "color-mix(in srgb, white 94%, transparent)",
+                          textShadow: "0 0 8px rgba(0,0,0,0.55)",
+                          background: "rgba(5,8,22,0.72)",
+                          border: "1px solid rgba(255,255,255,0.2)",
+                          borderRadius: "999px",
+                          padding: "2px 8px",
                         }}
                       >
                         {SHORT_NAMES[challenge.id] ?? challenge.title}

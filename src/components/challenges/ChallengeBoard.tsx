@@ -42,11 +42,11 @@ const SHORT_NAMES: Record<number, string> = {
 
 const DISPLAY_POINTS: Record<number, number> = {
   1: 1,
-  2: 5,
-  3: 5,
-  4: 3,
+  2: 3,
+  3: 7,
+  4: 2,
   5: 2,
-  6: 3,
+  6: 1,
 };
 
 const STREAK_CHALLENGE_ID = 6;
@@ -181,18 +181,21 @@ export default function ChallengeBoard({
     const color = getStoneColor(challenge.id);
     if (ring === "success") {
       return {
-        border: "2px solid var(--success)",
-        boxShadow: "0 0 8px color-mix(in srgb, var(--success) 40%, transparent)",
+        border: `2px solid color-mix(in srgb, ${color} 92%, transparent)`,
+        boxShadow: `0 0 10px color-mix(in srgb, ${color} 50%, transparent)`,
       };
     }
     if (ring === "review") {
       return {
-        border: "2px solid var(--yellow)",
+        border: `2px solid color-mix(in srgb, ${color} 92%, transparent)`,
         animation: "stonePulse 2s ease-in-out infinite",
       };
     }
     if (ring === "danger") {
-      return { border: "2px solid var(--primary)" };
+      return {
+        border: `2px solid color-mix(in srgb, ${color} 88%, transparent)`,
+        boxShadow: `0 0 8px color-mix(in srgb, ${color} 35%, transparent)`,
+      };
     }
     return {
       border: `2px solid color-mix(in srgb, ${color} 80%, transparent)`,
@@ -325,33 +328,56 @@ export default function ChallengeBoard({
 
   const NodeLabel = ({ id, isCenter }: { id: number; isCenter: boolean }) => (
     <div
-      className="absolute pointer-events-none flex flex-col items-center gap-[2px] whitespace-nowrap text-center"
-      style={{ top: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)" }}
+      className="absolute pointer-events-none flex flex-col items-center gap-1 text-center"
+      style={{
+        top: "calc(100% + 8px)",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: isCenter ? "140px" : "118px",
+      }}
     >
       {isCenter ? (
         <>
-          <span className="text-[12px] font-bold" style={{ color: "var(--text-secondary)" }}>
+          <span
+            className="font-black leading-none"
+            style={{ color: "var(--text-secondary)", fontSize: "15px" }}
+          >
             {SHORT_NAMES[id]}
           </span>
-          <span className="text-[8px] italic" style={{ color: "color-mix(in srgb, var(--primary-hover) 70%, transparent)" }}>
+          <span
+            className="font-bold leading-none"
+            style={{
+              color: "color-mix(in srgb, var(--primary-hover) 70%, transparent)",
+              fontSize: "10px",
+            }}
+          >
             {STONE_META[id]?.label}
           </span>
         </>
       ) : (
         <>
-          <span className="text-[8px] italic" style={{ color: `color-mix(in srgb, ${getStoneColor(id)} 70%, transparent)` }}>
+          <span
+            className="font-bold leading-none"
+            style={{
+              color: `color-mix(in srgb, ${getStoneColor(id)} 70%, transparent)`,
+              fontSize: "10px",
+            }}
+          >
             {STONE_META[id]?.label}
           </span>
-          <span className="text-[10px] font-semibold" style={{ color: "var(--text-secondary)" }}>
+          <span
+            className="font-bold leading-none"
+            style={{ color: "var(--text-secondary)", fontSize: "12px" }}
+          >
             {SHORT_NAMES[id]}
           </span>
         </>
       )}
       <span
-        className="rounded-full px-2 py-0.5 text-[9px] font-bold"
+        className="rounded-full px-2.5 py-0.5 font-bold"
         style={{ background: "var(--hero-from)", color: "var(--bg-base)" }}
       >
-        {DISPLAY_POINTS[id]}pt
+        <span style={{ fontSize: "10px" }}>{DISPLAY_POINTS[id]}pt</span>
       </span>
     </div>
   );
@@ -576,6 +602,7 @@ export default function ChallengeBoard({
         onClose={() => setActiveTaskId(null)}
         onSubmitSuccess={handleSubmitted}
         isSubmissionLocked={activeChallenge ? isSubmissionLocked(activeChallenge) : false}
+        stoneColor={activeChallenge ? getStoneColor(activeChallenge.id) : undefined}
       />
 
       <style jsx global>{`
