@@ -45,6 +45,7 @@ type Props = {
   selectedRegionId: string;
   selectedBootcampId: string;
   selectedSectionId: string;
+  scoringError?: string;
 };
 
 export default function AdminLeaderboardClient({
@@ -56,6 +57,7 @@ export default function AdminLeaderboardClient({
   selectedRegionId,
   selectedBootcampId,
   selectedSectionId,
+  scoringError,
 }: Props) {
   const totalChallenges = CHALLENGES.length;
   const router = useRouter();
@@ -198,6 +200,11 @@ export default function AdminLeaderboardClient({
           </select>
         </div>
       </div>
+      {scoringError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {scoringError}
+        </div>
+      )}
 
       <div className="card p-0 overflow-hidden shadow-xl border-[var(--border)]">
         <table className="w-full text-sm">

@@ -1,6 +1,8 @@
 import AdminLeaderboardClient from "@/components/admin/AdminLeaderboardClient";
 import { adminClient } from "../../../../utils/supabase/admin";
 
+const COMPLETED_ATTEMPT_STATUSES = new Set(["accepted", "approved"]);
+
 type Props = {
   searchParams: Promise<{
     regionId?: string;
@@ -66,36 +68,95 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
     total_points: number;
     completed: number;
   }> = [];
+  let scoringError: string | undefined;
 
   if (selectedRegionId && selectedBootcampId && selectedSectionId) {
-    const { data: students } = await adminClient
+    const { data: students, error: studentsError } = await adminClient
       .from("students")
       .select(
-        "id, full_name, team_id, regions(name), bootcamps(name), sections(label), submissions(points, status)"
+        "id, full_name, team_id, regions(name), bootcamps(name), sections(label)"
       )
       .eq("region_id", selectedRegionId)
       .eq("bootcamp_id", selectedBootcampId)
       .eq("section_id", selectedSectionId);
 
-    const { data: teams } = await adminClient
+    const { data: teams, error: teamsError } = await adminClient
       .from("teams")
       .select("id, name, leader_id")
       .eq("section_id", selectedSectionId);
+
+    const studentIds = (students ?? []).map((student) => student.id as string);
+    const { data: allAttemptsRaw, error: attemptsError } = studentIds.length
+      ? await adminClient
+          .from("submission_attempts")
+          .select("student_id, task_id, points, status")
+          .in("student_id", studentIds)
+          .not("points", "is", null)
+      : { data: [], error: null };
+
+    if (studentsError || teamsError || attemptsError) {
+      const reasons = [studentsError, teamsError, attemptsError]
+        .filter(Boolean)
+        .map((error) => error?.message ?? "Unknown error");
+      scoringError = `Leaderboard scoring data may be incomplete: ${reasons.join(" | ")}`;
+      console.error("[admin/leaderboard] Data fetch failed:", {
+        studentsError,
+        teamsError,
+        attemptsError,
+      });
+    }
+
+    const allAttempts =
+      (allAttemptsRaw as Array<{
+        student_id: string | null;
+        task_id: number | string | null;
+        points: number | string | null;
+        status: string | null;
+      }> | null)?.filter((attempt) =>
+        COMPLETED_ATTEMPT_STATUSES.has(String(attempt.status ?? "").trim().toLowerCase())
+      ) ?? [];
+
+    const scoreMap = new Map<string, { totalPoints: number; completedChallenges: number }>();
+    for (const attempt of allAttempts ?? []) {
+      const studentId = String(attempt.student_id ?? "");
+      if (!studentId) continue;
+      if (!scoreMap.has(studentId)) {
+        scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
+      }
+      const entry = scoreMap.get(studentId)!;
+      entry.totalPoints += Number(attempt.points ?? 0) || 0;
+    }
+
+    const taskMap = new Map<string, Set<number>>();
+    for (const attempt of allAttempts ?? []) {
+      const studentId = String(attempt.student_id ?? "");
+      if (!studentId) continue;
+      if (!taskMap.has(studentId)) taskMap.set(studentId, new Set<number>());
+      const taskId = Number(attempt.task_id);
+      if (Number.isFinite(taskId)) {
+        taskMap.get(studentId)!.add(taskId);
+      }
+    }
+    for (const [studentId, tasks] of taskMap) {
+      if (!scoreMap.has(studentId)) {
+        scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
+      }
+      scoreMap.get(studentId)!.completedChallenges = tasks.size;
+    }
 
     const teamMap = new Map<string, { name: string; totalPoints: number; memberCount: number; members: string[] }>();
     (teams || []).forEach(t => teamMap.set(t.id, { name: t.name, totalPoints: 0, memberCount: 0, members: [] }));
 
     rows = (students ?? [])
       .map((student) => {
-        const submissions = (student.submissions ?? []) as Array<{
-          points: number;
-          status: string;
-        }>;
-        const pts = submissions.reduce((sum, s) => sum + (s.points ?? 0), 0);
+        const score = scoreMap.get(student.id as string) ?? {
+          totalPoints: 0,
+          completedChallenges: 0,
+        };
         
         if (student.team_id && teamMap.has(student.team_id)) {
           const t = teamMap.get(student.team_id)!;
-          t.totalPoints += pts;
+          t.totalPoints += score.totalPoints;
           t.memberCount += 1;
           t.members.push(student.full_name);
         }
@@ -106,8 +167,8 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
           region_name: (student.regions as { name?: string } | null)?.name ?? "",
           bootcamp_name: (student.bootcamps as { name?: string } | null)?.name ?? "",
           section_label: (student.sections as { label?: string } | null)?.label ?? "",
-          total_points: pts,
-          completed: submissions.filter((s) => s.status === "accepted").length,
+          total_points: score.totalPoints,
+          completed: score.completedChallenges,
         };
       })
       .sort((a, b) => b.total_points - a.total_points);
@@ -131,6 +192,7 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
         selectedRegionId={selectedRegionId}
         selectedBootcampId={selectedBootcampId}
         selectedSectionId={selectedSectionId}
+        scoringError={scoringError}
       />
     );
   }
@@ -145,6 +207,7 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
       selectedRegionId={selectedRegionId}
       selectedBootcampId={selectedBootcampId}
       selectedSectionId={selectedSectionId}
+      scoringError={scoringError}
     />
   );
 }

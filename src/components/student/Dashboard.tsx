@@ -19,14 +19,18 @@ type StudentWithContext = Student & {
 
 type DashboardProps = {
   student: StudentWithContext;
-  submissions: Submission[];
+  initialSubmissions: Submission[];
   session: StudentSession;
+  totalPoints: number;
+  completedChallenges: number;
 };
 
 export default function Dashboard({
   student,
-  submissions: initialSubmissions,
+  initialSubmissions,
   session,
+  totalPoints,
+  completedChallenges,
 }: DashboardProps) {
   const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions);
   const [isHoveringChart, setIsHoveringChart] = useState(false);
@@ -41,29 +45,7 @@ export default function Dashboard({
     };
   }, [student.id, student.teams]);
 
-  const totalPoints = useMemo(
-    () =>
-      submissions
-        .filter((item) => item.status === "accepted")
-        .reduce((sum, item) => sum + item.points, 0),
-    [submissions]
-  );
-
-  const completedCount = useMemo(() => {
-    const validChallengeIds = new Set(CHALLENGES.map((challenge) => challenge.id));
-    const acceptedTaskIds = new Set(
-      submissions
-        .filter(
-          (item) =>
-            item.status === "accepted" &&
-            item.task_id != null &&
-            validChallengeIds.has(item.task_id)
-        )
-        .map((item) => item.task_id)
-    );
-
-    return Math.min(CHALLENGES.length, acceptedTaskIds.size);
-  }, [submissions]);
+  const completedCount = Math.min(CHALLENGES.length, completedChallenges);
 
   const totalChallenges = CHALLENGES.length;
 

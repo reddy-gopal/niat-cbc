@@ -120,14 +120,14 @@ export default function ChallengeBoard({
   const hasCompletedSubmission = (rows: Submission[]) =>
     rows.some((row) => COMPLETED_STATUSES.has(String(row.status).toLowerCase()));
 
-  // const allComplete = useMemo(
-  //   () =>
-  //     ACTIVE_CHALLENGE_IDS.every((id) =>
-  //       hasCompletedSubmission(submissionByTask.get(id) ?? [])
-  //     ),
-  //   [submissionByTask]
-  // );
-  const allComplete = true;
+  const allComplete = useMemo(
+    () =>
+      ACTIVE_CHALLENGE_IDS.every((id) =>
+        hasCompletedSubmission(submissionByTask.get(id) ?? [])
+      ),
+    [submissionByTask]
+  );
+  // const allComplete = true;
 
   useEffect(() => {
     if (allComplete && !crestRevealed && !isAnimatingFinale) {

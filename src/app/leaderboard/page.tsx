@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import Leaderboard from "@/components/student/Leaderboard"
 import { getStudentSession } from "@/lib/session";
 import type { LeaderboardEntry } from "@/types/app";
+import { adminClient } from "../../../utils/supabase/admin";
 import { createClient } from "../../../utils/supabase/server";
+
+const COMPLETED_ATTEMPT_STATUSES = new Set(["accepted", "approved"]);
 
 export default async function LeaderboardPage() {
   const session = await getStudentSession();
@@ -14,7 +17,7 @@ export default async function LeaderboardPage() {
 
   const { data: studentsData } = await supabase
     .from("students")
-    .select("id, full_name, team_id, submissions(points, status), sections(label), bootcamps(name)")
+    .select("id, full_name, team_id, sections(label), bootcamps(name)")
     .eq("section_id", session.sectionId);
 
   const { data: teamsData } = await supabase
@@ -22,22 +25,69 @@ export default async function LeaderboardPage() {
     .select("id, name, leader_id")
     .eq("section_id", session.sectionId);
 
+  const studentIds = (studentsData ?? []).map((row) => row.id as string);
+  const { data: allAttemptsRaw, error: attemptsError } = studentIds.length
+    ? await adminClient
+        .from("submission_attempts")
+        .select("student_id, task_id, points, status")
+        .in("student_id", studentIds)
+        .not("points", "is", null)
+    : { data: [], error: null };
+
+  if (attemptsError) {
+    console.error("[leaderboard] Attempts fetch failed:", attemptsError);
+  }
+
+  const allAttempts =
+    (allAttemptsRaw as Array<{
+      student_id: string | null;
+      task_id: number | string | null;
+      points: number | string | null;
+      status: string | null;
+    }> | null)?.filter((attempt) =>
+      COMPLETED_ATTEMPT_STATUSES.has(String(attempt.status ?? "").trim().toLowerCase())
+    ) ?? [];
+
+  const scoreMap = new Map<string, { totalPoints: number; completedChallenges: number }>();
+  for (const attempt of allAttempts ?? []) {
+    const studentId = String(attempt.student_id ?? "");
+    if (!studentId) continue;
+    if (!scoreMap.has(studentId)) {
+      scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
+    }
+    const entry = scoreMap.get(studentId)!;
+    entry.totalPoints += Number(attempt.points ?? 0) || 0;
+  }
+
+  const taskMap = new Map<string, Set<number>>();
+  for (const attempt of allAttempts ?? []) {
+    const studentId = String(attempt.student_id ?? "");
+    if (!studentId) continue;
+    if (!taskMap.has(studentId)) taskMap.set(studentId, new Set<number>());
+    const taskId = Number(attempt.task_id);
+    if (Number.isFinite(taskId)) {
+      taskMap.get(studentId)!.add(taskId);
+    }
+  }
+  for (const [studentId, tasks] of taskMap) {
+    if (!scoreMap.has(studentId)) {
+      scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
+    }
+    scoreMap.get(studentId)!.completedChallenges = tasks.size;
+  }
+
   const entries: LeaderboardEntry[] = (studentsData ?? [])
     .map((row) => {
-      const submissions = (row.submissions ?? []) as Array<{
-        points: number;
-        status: string;
-      }>;
-      const totalPoints = submissions.reduce((sum, sub) => sum + (sub.points ?? 0), 0);
-      const completedChallenges = submissions.filter(
-        (sub) => sub.status === "accepted"
-      ).length;
+      const score = scoreMap.get(row.id as string) ?? {
+        totalPoints: 0,
+        completedChallenges: 0,
+      };
       return {
         rank: 0,
         studentId: row.id as string,
         fullName: row.full_name as string,
-        totalPoints,
-        completedChallenges,
+        totalPoints: score.totalPoints,
+        completedChallenges: score.completedChallenges,
       };
     })
     .sort((a, b) => b.totalPoints - a.totalPoints)
@@ -53,8 +103,8 @@ export default async function LeaderboardPage() {
   (studentsData || []).forEach(s => {
     if (s.team_id && teamMap.has(s.team_id)) {
       const team = teamMap.get(s.team_id)!;
-      const points = (s.submissions || []).reduce((sum: number, sub: any) => sum + (sub.points || 0), 0);
-      team.totalPoints += points;
+      const score = scoreMap.get(s.id as string) ?? { totalPoints: 0, completedChallenges: 0 };
+      team.totalPoints += score.totalPoints;
       team.memberCount += 1;
       team.members.push(s.full_name);
     }

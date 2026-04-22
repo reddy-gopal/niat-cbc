@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ConditionalFooter } from "@/components/ui/ConditionalFooter";
+import { RouteScrollReset } from "@/components/ui/RouteScrollReset";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -41,6 +42,7 @@ export default function RootLayout({
         className="min-h-full flex flex-col bg-[var(--bg-base)] text-[var(--text-base)] antialiased"
       >
         <ToastProvider>
+          <RouteScrollReset />
           {children}
           <ConditionalFooter />
         </ToastProvider>

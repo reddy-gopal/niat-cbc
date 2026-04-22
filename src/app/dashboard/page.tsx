@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getStudentSession } from "@/lib/session";
 import type { Submission, Student } from "@/types/database";
+import { adminClient } from "../../../utils/supabase/admin";
 import { createClient } from "../../../utils/supabase/server";
 
 type StudentWithContext = Student & {
@@ -12,6 +13,7 @@ type StudentWithContext = Student & {
 };
 
 const Dashboard = dynamic(() => import("@/components/student/Dashboard"));
+const COMPLETED_ATTEMPT_STATUSES = new Set(["accepted", "approved"]);
 
 export default async function DashboardPage() {
   const session = await getStudentSession();
@@ -21,7 +23,7 @@ export default async function DashboardPage() {
 
   const supabase = await createClient();
 
-  const [studentResponse, submissionsResponse] = await Promise.all([
+  const [studentResponse, submissionsResponse, scoreResponse] = await Promise.all([
     supabase
       .from("students")
       .select(
@@ -49,6 +51,11 @@ export default async function DashboardPage() {
       )
       .eq("student_id", session.studentId)
       .order("task_id", { ascending: true }),
+    adminClient
+      .from("submission_attempts")
+      .select("points, task_id, status")
+      .eq("student_id", session.studentId)
+      .not("points", "is", null),
   ]);
 
   const student = studentResponse.data as StudentWithContext | null;
@@ -57,12 +64,39 @@ export default async function DashboardPage() {
   }
 
   const submissions = (submissionsResponse.data ?? []) as Submission[];
+  if (scoreResponse.error) {
+    console.error("[dashboard] Score fetch failed:", scoreResponse.error);
+  }
+
+  const attemptScore =
+    (scoreResponse.data as Array<{
+      points: number | string | null;
+      task_id: number | null;
+      status: string | null;
+    }> | null) ?? [];
+  const completedAttemptScore = attemptScore.filter((attempt) =>
+    COMPLETED_ATTEMPT_STATUSES.has(String(attempt.status ?? "").trim().toLowerCase())
+  );
+  const totalPoints = completedAttemptScore.reduce(
+    (sum, attempt) => sum + (Number(attempt.points ?? 0) || 0),
+    0
+  );
+  const completedChallenges = new Set(
+    completedAttemptScore
+      .map((attempt) => {
+        const taskId = Number(attempt.task_id);
+        return Number.isFinite(taskId) ? taskId : null;
+      })
+      .filter((taskId): taskId is number => taskId != null)
+  ).size;
 
   return (
     <Dashboard
       student={student}
-      submissions={submissions}
+      initialSubmissions={submissions}
       session={session}
+      totalPoints={totalPoints}
+      completedChallenges={completedChallenges}
     />
   );
 }
