@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import dynamic from "next/dynamic";
+import { resolveStudentUtmParams } from "@/lib/utils";
 import { getStudentSession } from "@/lib/session";
 import type { Submission, Student } from "@/types/database";
 import { adminClient } from "../../../utils/supabase/admin";
@@ -15,7 +16,18 @@ type StudentWithContext = Student & {
 const Dashboard = dynamic(() => import("@/components/student/Dashboard"));
 const COMPLETED_ATTEMPT_STATUSES = new Set(["accepted", "approved"]);
 
-export default async function DashboardPage() {
+type DashboardPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+const normalizeQueryValue = (value?: string | string[]): string | undefined => {
+  const item = Array.isArray(value) ? value[0] : value;
+  const normalized = item?.trim();
+  return normalized ? normalized : undefined;
+};
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const rawSearchParams = await searchParams;
   const session = await getStudentSession();
   if (!session) {
     redirect("/");
@@ -63,6 +75,33 @@ export default async function DashboardPage() {
     redirect("/invalid");
   }
 
+  const utmParams = resolveStudentUtmParams({
+    utmSource: normalizeQueryValue(rawSearchParams.utm_source),
+    utmMedium: normalizeQueryValue(rawSearchParams.utm_medium),
+    utmCampaign: normalizeQueryValue(rawSearchParams.utm_campaign),
+    bootcampName: student.bootcamps.name,
+    bootcampDate: student.bootcamps.date,
+    regionName: student.regions.name,
+    sectionLabel: student.sections.label,
+  });
+
+  const requiresCanonicalUtm =
+    !normalizeQueryValue(rawSearchParams.utm_source) ||
+    !normalizeQueryValue(rawSearchParams.utm_medium) ||
+    !normalizeQueryValue(rawSearchParams.utm_campaign);
+
+  if (requiresCanonicalUtm) {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(rawSearchParams)) {
+      const first = Array.isArray(value) ? value[0] : value;
+      if (first) query.set(key, first);
+    }
+    query.set("utm_source", utmParams.utmSource);
+    query.set("utm_medium", utmParams.utmMedium);
+    query.set("utm_campaign", utmParams.utmCampaign);
+    redirect(`/dashboard?${query.toString()}`);
+  }
+
   const submissions = (submissionsResponse.data ?? []) as Submission[];
   if (scoreResponse.error) {
     console.error("[dashboard] Score fetch failed:", scoreResponse.error);
@@ -94,7 +133,12 @@ export default async function DashboardPage() {
     <Dashboard
       student={student}
       initialSubmissions={submissions}
-      session={session}
+      session={{
+        ...session,
+        utmSource: utmParams.utmSource,
+        utmMedium: utmParams.utmMedium,
+        utmCampaign: utmParams.utmCampaign,
+      }}
       totalPoints={totalPoints}
       completedChallenges={completedChallenges}
     />

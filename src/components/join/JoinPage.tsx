@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Logo } from "../ui/Logo";
+import { resolveStudentUtmParams } from "@/lib/utils";
 
 type JoinPageProps = {
   sectionId: string;
@@ -18,6 +19,9 @@ type JoinPageProps = {
   inviteCode?: string;
   teamName?: string;
   leaderName?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
 };
 
 type RegisterResponse = {
@@ -47,7 +51,7 @@ type RegisterValues = z.infer<typeof registerSchema>;
 
 const MOTIVATIONAL_LINES = [
   "🏆 Compete. Connect. Conquer.",
-  "🚀 3 Days. 9 Challenges. 1 Champion.",
+  "🚀 3 Days. 6 Challenges. 1 Champion.",
   "🔥 Your section is counting on you."
 ];
 
@@ -62,6 +66,9 @@ export default function JoinPage({
   inviteCode,
   teamName,
   leaderName,
+  utmSource,
+  utmMedium,
+  utmCampaign,
 }: JoinPageProps) {
   const router = useRouter();
   const [step, setStep] = useState<"register" | "verify" | "create_team" | "invite_created">("register");
@@ -110,6 +117,32 @@ export default function JoinPage({
       }),
     [bootcampDate]
   );
+
+  const dashboardUrl = useMemo(() => {
+    const utm = resolveStudentUtmParams({
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      bootcampName,
+      bootcampDate,
+      regionName,
+      sectionLabel,
+    });
+    const query = new URLSearchParams({
+      utm_source: utm.utmSource,
+      utm_medium: utm.utmMedium,
+      utm_campaign: utm.utmCampaign,
+    });
+    return `/dashboard?${query.toString()}`;
+  }, [
+    utmSource,
+    utmMedium,
+    utmCampaign,
+    bootcampName,
+    bootcampDate,
+    regionName,
+    sectionLabel,
+  ]);
 
   useEffect(() => {
     if (step !== "verify" || countdown <= 0) {
@@ -225,6 +258,9 @@ export default function JoinPage({
           bootcampId,
           regionId,
           inviteCode,
+          utmSource,
+          utmMedium,
+          utmCampaign,
         }),
       });
 
@@ -239,7 +275,7 @@ export default function JoinPage({
       if (inviteCode || result.hasTeam) {
         setIsSuccess(true);
         setTimeout(() => {
-          router.push("/dashboard");
+          router.push(dashboardUrl);
         }, 1500);
       } else {
         setStep("create_team");
@@ -550,7 +586,7 @@ export default function JoinPage({
 
               <button
                 type="button"
-                onClick={() => router.push("/dashboard")}
+                onClick={() => router.push(dashboardUrl)}
                 className="btn-primary w-full py-4 text-lg"
               >
                 Go to Dashboard →

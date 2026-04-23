@@ -48,27 +48,77 @@ export function getMobileDisplay(mobile: string): string {
   return `+91 ${first} ${second}`.trim();
 }
 
+type UTMContext = {
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  bootcampName?: string;
+  bootcampDate?: string;
+  regionName?: string;
+  sectionLabel?: string;
+};
+
+function getMonthYearSuffix(bootcampDate?: string): string {
+  if (!bootcampDate) return "";
+  const date = new Date(bootcampDate);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = date.toLocaleString("en-US", { month: "short" }).toLowerCase();
+  const year = String(date.getFullYear());
+  return `${month}-${year}`;
+}
+
+export function buildDefaultUtmSource({
+  bootcampName,
+  bootcampDate,
+  regionName,
+  sectionLabel,
+}: Pick<UTMContext, "bootcampName" | "bootcampDate" | "regionName" | "sectionLabel">): string {
+  const parts = [
+    slugify(bootcampName || "bootcamp"),
+    slugify(regionName || ""),
+    getMonthYearSuffix(bootcampDate),
+    slugify(sectionLabel || "section"),
+  ].filter(Boolean);
+  return parts.join("-");
+}
+
+export function resolveStudentUtmParams(context: UTMContext): {
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+} {
+  return {
+    utmSource:
+      context.utmSource?.trim() ||
+      buildDefaultUtmSource({
+        bootcampName: context.bootcampName,
+        bootcampDate: context.bootcampDate,
+        regionName: context.regionName,
+        sectionLabel: context.sectionLabel,
+      }),
+    utmMedium: context.utmMedium?.trim() || "whatsapp",
+    utmCampaign: context.utmCampaign?.trim() || context.regionName?.trim() || "Telugu",
+  };
+}
+
 export function buildChallenge8ReferralUrl(session: StudentSession): string {
   const url = new URL(
     "https://accounts.ccbp.in/public/register/niat-boot-camp"
   );
 
-  const bootcampSlug = session.bootcampName?.trim()
-    ? slugify(session.bootcampName)
-    : "";
-  const campaignSuffix = bootcampSlug || "bootcamp";
+  const utm = resolveStudentUtmParams({
+    utmSource: session.utmSource,
+    utmMedium: session.utmMedium,
+    utmCampaign: session.utmCampaign,
+    bootcampName: session.bootcampName,
+    bootcampDate: session.bootcampDate,
+    regionName: session.regionName,
+    sectionLabel: session.sectionLabel,
+  });
 
-  const sectionValue =
-    session.sectionLabel?.trim() ||
-    session.sectionId;
-
-  url.searchParams.set("utm_source", "bootcamp");
-  url.searchParams.set("utm_medium", "whatsapp");
-  url.searchParams.set(
-    "utm_campaign",
-    `invite-niat-referral-platform-${campaignSuffix}`
-  );
-  url.searchParams.set("section_id", sectionValue);
+  url.searchParams.set("utm_source", utm.utmSource);
+  url.searchParams.set("utm_medium", utm.utmMedium);
+  url.searchParams.set("utm_campaign", utm.utmCampaign);
 
   return url.toString();
 }

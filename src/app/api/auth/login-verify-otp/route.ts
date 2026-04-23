@@ -52,7 +52,9 @@ export async function POST(request: Request) {
 
     const { data: student, error: studentError } = await adminClient
       .from("students")
-      .select("id, full_name, mobile, section_id, bootcamp_id, region_id")
+      .select(
+        "id, full_name, mobile, section_id, bootcamp_id, region_id, utm_source, utm_medium, utm_campaign"
+      )
       .eq("mobile", parsed.data.mobile)
       .maybeSingle();
 
@@ -74,17 +76,30 @@ export async function POST(request: Request) {
       regionId: student.region_id as string,
       fullName: student.full_name as string,
       mobile: student.mobile as string,
+      utmSource: (student.utm_source as string | null) ?? undefined,
+      utmMedium: (student.utm_medium as string | null) ?? undefined,
+      utmCampaign: (student.utm_campaign as string | null) ?? undefined,
     });
 
     const cookieValue = createSessionCookie(token);
 
-    return new NextResponse(JSON.stringify({ success: true }), {
+    return new NextResponse(
+      JSON.stringify({
+        success: true,
+        data: {
+          utmSource: (student.utm_source as string | null) ?? null,
+          utmMedium: (student.utm_medium as string | null) ?? null,
+          utmCampaign: (student.utm_campaign as string | null) ?? null,
+        },
+      }),
+      {
       status: 200,
       headers: {
         "Content-Type": "application/json",
         "Set-Cookie": cookieValue,
       },
-    });
+      }
+    );
   } catch {
     return NextResponse.json(
       { success: false, error: "Invalid request body." },

@@ -32,8 +32,18 @@ export type StudentSession = {
   fullName: string;
   mobile: string;
   teamId?: string;
+  /** UTM source captured from the join URL, if present. */
+  utmSource?: string;
+  /** UTM medium captured from the join URL, if present. */
+  utmMedium?: string;
+  /** UTM campaign captured from the join URL, if present. */
+  utmCampaign?: string;
   /** Bootcamp display name (for outbound referral URLs). */
   bootcampName?: string;
+  /** Bootcamp date (used to derive default UTM source). */
+  bootcampDate?: string;
+  /** Region display name (used to derive default UTM source/campaign). */
+  regionName?: string;
   /** Section display label, optionally scoped with region (for outbound referral URLs). */
   sectionLabel?: string;
 };

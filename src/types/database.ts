@@ -137,6 +137,9 @@ export type Database = {
           region_id: string;
           team_id: string | null;
           referred_by: string | null;
+          utm_source: string | null;
+          utm_medium: string | null;
+          utm_campaign: string | null;
           created_at: string;
         };
         Insert: {
@@ -148,6 +151,9 @@ export type Database = {
           region_id: string;
           team_id?: string | null;
           referred_by?: string | null;
+          utm_source?: string | null;
+          utm_medium?: string | null;
+          utm_campaign?: string | null;
           created_at?: string;
         };
         Update: {
@@ -159,6 +165,9 @@ export type Database = {
           region_id?: string;
           team_id?: string | null;
           referred_by?: string | null;
+          utm_source?: string | null;
+          utm_medium?: string | null;
+          utm_campaign?: string | null;
           created_at?: string;
         };
       };

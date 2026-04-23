@@ -7,6 +7,16 @@ import { createClient } from "../../../../utils/supabase/server";
 
 type JoinRouteProps = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+  }>;
+};
+
+const normalizeUtmValue = (value?: string): string | undefined => {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
 };
 
 const getSectionBySlug = cache(async (slug: string) => {
@@ -73,8 +83,9 @@ export async function generateMetadata({ params }: JoinRouteProps): Promise<Meta
   };
 }
 
-export default async function JoinSlugPage({ params }: JoinRouteProps) {
+export default async function JoinSlugPage({ params, searchParams }: JoinRouteProps) {
   const { slug } = await params;
+  const resolvedSearchParams = await searchParams;
   const session = await getStudentSession();
 
   if (session) {
@@ -96,6 +107,9 @@ export default async function JoinSlugPage({ params }: JoinRouteProps) {
       bootcampDate={sectionData.bootcamps.date}
       regionId={sectionData.bootcamps.regions.id}
       regionName={sectionData.bootcamps.regions.name}
+      utmSource={normalizeUtmValue(resolvedSearchParams.utm_source)}
+      utmMedium={normalizeUtmValue(resolvedSearchParams.utm_medium)}
+      utmCampaign={normalizeUtmValue(resolvedSearchParams.utm_campaign)}
     />
   );
 }

@@ -74,13 +74,15 @@ export default function Dashboard({
     () => ({
       ...session,
       bootcampName: student.bootcamps?.name,
-      sectionLabel: [student.regions?.name, student.sections?.label]
-        .filter((part): part is string => Boolean(part && part.trim()))
-        .join(" "),
+      bootcampDate: student.bootcamps?.date,
+      regionName: student.regions?.name,
+      sectionLabel: student.sections?.label,
+      utmCampaign: session.utmCampaign ?? student.regions?.name ?? "Telugu",
     }),
     [
       session,
       student.bootcamps?.name,
+      student.bootcamps?.date,
       student.regions?.name,
       student.sections?.label,
     ]

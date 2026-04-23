@@ -14,8 +14,14 @@ const verifyOtpSchema = z.object({
   bootcampId: z.string().uuid(),
   regionId: z.string().uuid(),
   inviteCode: z.string().optional(),
+  utmSource: z.string().trim().min(1).max(120).optional(),
+  utmMedium: z.string().trim().min(1).max(120).optional(),
+  utmCampaign: z.string().trim().min(1).max(120).optional(),
 });
 const ACTIVE_TASK_IDS = CHALLENGES.map((challenge) => challenge.id);
+
+const normalizeOptionalUtm = (value?: string): string | null =>
+  value?.trim() ? value.trim() : null;
 
 export async function POST(request: Request) {
   try {
@@ -60,7 +66,9 @@ export async function POST(request: Request) {
 
     const { data: existingStudent, error: studentLookupError } = await adminClient
       .from("students")
-      .select("id, section_id, bootcamp_id, region_id, full_name, mobile, team_id")
+      .select(
+        "id, section_id, bootcamp_id, region_id, full_name, mobile, team_id, utm_source, utm_medium, utm_campaign"
+      )
       .eq("mobile", parsed.data.mobile)
       .maybeSingle();
 
@@ -77,6 +85,12 @@ export async function POST(request: Request) {
     let sessionSection = existingStudent?.section_id ?? parsed.data.sectionId;
     let sessionBootcamp = existingStudent?.bootcamp_id ?? parsed.data.bootcampId;
     let sessionRegion = existingStudent?.region_id ?? parsed.data.regionId;
+    const parsedUtmSource = normalizeOptionalUtm(parsed.data.utmSource);
+    const parsedUtmMedium = normalizeOptionalUtm(parsed.data.utmMedium);
+    const parsedUtmCampaign = normalizeOptionalUtm(parsed.data.utmCampaign);
+    let sessionUtmSource = existingStudent?.utm_source ?? parsedUtmSource;
+    let sessionUtmMedium = existingStudent?.utm_medium ?? parsedUtmMedium;
+    let sessionUtmCampaign = existingStudent?.utm_campaign ?? parsedUtmCampaign;
 
     if (existingStudent && existingStudent.section_id !== parsed.data.sectionId) {
       return NextResponse.json(
@@ -86,6 +100,30 @@ export async function POST(request: Request) {
         },
         { status: 400 }
       );
+    }
+
+    if (
+      existingStudent &&
+      ((parsedUtmSource && !existingStudent.utm_source) ||
+        (parsedUtmMedium && !existingStudent.utm_medium) ||
+        (parsedUtmCampaign && !existingStudent.utm_campaign))
+    ) {
+      const { data: updatedStudent } = await adminClient
+        .from("students")
+        .update({
+          utm_source: existingStudent.utm_source ?? parsedUtmSource,
+          utm_medium: existingStudent.utm_medium ?? parsedUtmMedium,
+          utm_campaign: existingStudent.utm_campaign ?? parsedUtmCampaign,
+        })
+        .eq("id", existingStudent.id)
+        .select("utm_source, utm_medium, utm_campaign")
+        .maybeSingle();
+
+      if (updatedStudent) {
+        sessionUtmSource = updatedStudent.utm_source;
+        sessionUtmMedium = updatedStudent.utm_medium;
+        sessionUtmCampaign = updatedStudent.utm_campaign;
+      }
     }
 
     let teamIdToAssign: string | null = null;
@@ -140,8 +178,13 @@ export async function POST(request: Request) {
           bootcamp_id: insertBootcampId,
           region_id: insertRegionId,
           team_id: teamIdToAssign,
+          utm_source: parsedUtmSource,
+          utm_medium: parsedUtmMedium,
+          utm_campaign: parsedUtmCampaign,
         })
-        .select("id, section_id, bootcamp_id, region_id, full_name, mobile")
+        .select(
+          "id, section_id, bootcamp_id, region_id, full_name, mobile, utm_source, utm_medium, utm_campaign"
+        )
         .single();
 
       if (insertStudentError || !insertedStudent) {
@@ -157,6 +200,9 @@ export async function POST(request: Request) {
       sessionSection = insertedStudent.section_id;
       sessionBootcamp = insertedStudent.bootcamp_id;
       sessionRegion = insertedStudent.region_id;
+      sessionUtmSource = insertedStudent.utm_source;
+      sessionUtmMedium = insertedStudent.utm_medium;
+      sessionUtmCampaign = insertedStudent.utm_campaign;
 
       const now = new Date().toISOString();
       const baseSubmissions = ACTIVE_TASK_IDS.map((taskId) => ({
@@ -294,6 +340,9 @@ export async function POST(request: Request) {
       regionId: sessionRegion,
       fullName: sessionName,
       mobile: sessionMobile,
+      utmSource: sessionUtmSource ?? undefined,
+      utmMedium: sessionUtmMedium ?? undefined,
+      utmCampaign: sessionUtmCampaign ?? undefined,
     });
 
     const cookieValue = createSessionCookie(token);

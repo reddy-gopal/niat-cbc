@@ -15,6 +15,11 @@ type SendResponse = {
 
 type VerifyResponse = {
   success: boolean;
+  data?: {
+    utmSource?: string | null;
+    utmMedium?: string | null;
+    utmCampaign?: string | null;
+  };
   error?: string;
 };
 
@@ -155,8 +160,13 @@ export default function LoginPage() {
         return;
       }
       setIsSuccess(true);
+      const query = new URLSearchParams();
+      if (result.data?.utmSource) query.set("utm_source", result.data.utmSource);
+      if (result.data?.utmMedium) query.set("utm_medium", result.data.utmMedium);
+      if (result.data?.utmCampaign) query.set("utm_campaign", result.data.utmCampaign);
+      const dashboardUrl = query.size > 0 ? `/dashboard?${query.toString()}` : "/dashboard";
       window.setTimeout(() => {
-        router.push("/dashboard");
+        router.push(dashboardUrl);
         router.refresh();
       }, 800);
     } catch {
