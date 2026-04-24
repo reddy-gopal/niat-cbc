@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { CHALLENGES } from "@/lib/challenges";
 import { getStudentFromRequest } from "@/lib/api-auth";
+import { NW_CHALLENGE5_STAGE_CODE } from "@/lib/env";
 import { getReferralCountForStage } from "@/lib/nw-referral";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
 const REFERRAL_CHALLENGE_ID =
   CHALLENGES.find((challenge) => challenge.isReferral)?.id ?? 3;
 const POINTS_PER_REFERRAL = 5;
-const STAGE_CODE = "NIAT_ADMISSION_TEST_FEE";
 
 type SubmissionRow = {
   id: string;
@@ -37,15 +37,49 @@ export async function POST(request: Request) {
       );
     }
 
-    const referralResult = await getReferralCountForStage(student.mobile, STAGE_CODE);
+    const referralResult = await getReferralCountForStage(
+      student.mobile,
+      NW_CHALLENGE5_STAGE_CODE
+    );
     if (!referralResult.success) {
+      if (
+        referralResult.errorCode === "USER_DOES_NOT_EXISTS_FOR_GIVEN_PHONE_NUMBER" ||
+        referralResult.errorCode === "USER_ASSOCIATION_DOES_NOT_EXISTS"
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Your account is not linked in NW yet. Please contact support or try again later.",
+            code: referralResult.errorCode,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (referralResult.errorCode === "INVALID_JOURNEY_STAGE_CODE") {
+        console.error("[claim-challenge5] Invalid stage code config.", {
+          stageCode: NW_CHALLENGE5_STAGE_CODE,
+          studentId: session.studentId,
+        });
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Referral stage configuration issue. Please contact support.",
+            code: referralResult.errorCode,
+          },
+          { status: 500 }
+        );
+      }
+
+      const status = referralResult.errorCode === "NETWORK_ERROR" ? 503 : 502;
       return NextResponse.json(
         {
           success: false,
           message: referralResult.message,
           code: referralResult.errorCode,
         },
-        { status: 502 }
+        { status }
       );
     }
 
