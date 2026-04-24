@@ -217,27 +217,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const { error: attemptInsertError } = await adminClient
-      .from("submission_attempts")
-      .insert({
-        submission_id: targetSubmissionId,
-        student_id: session.studentId,
-        task_id: REFERRAL_CHALLENGE_ID,
-        bootcamp_id: student.bootcamp_id,
-        attempt_number: nextResubmitCount,
-        status: "accepted",
-        ai_reason: aiReason,
-        points: pointsToAward,
-        verified_at: now,
-      });
-
-    if (attemptInsertError) {
-      return NextResponse.json(
-        { success: false, message: "Unable to record submission attempt." },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json(
       {
         success: true,
