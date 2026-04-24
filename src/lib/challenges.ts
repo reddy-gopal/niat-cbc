@@ -50,15 +50,42 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
     title: "You Crossed My Mind",
     description: "Someone will cross your mind today. After the session, open their chat. Write your real words. Not a forward. Just you.",
     verificationPrompt: `You are evaluating "You Crossed My Mind" for NIAT CBC.
-Task: Student reached out to someone they were thinking about.
+Task: Student reached out personally to someone they were thinking about, with a real heartfelt message.
 
-ACCEPT if image plausibly shows: a chat screenshot, message draft,
-sent message, partial conversation, blurred names, or any outreach evidence.
-Cropped, blurry, or partially visible screenshots are fine.
+STEP 1 — Platform check:
+The image must show a WhatsApp chat window or Instagram DM conversation.
+Look for: green WhatsApp UI, chat bubbles, message input bar, Instagram DM header, timestamps.
+If no recognizable messaging platform UI is visible → REJECT immediately.
 
-REJECT only if: completely unrelated image, blank, abusive/inappropriate content, or obvious non-attempt.
+STEP 2 — Message presence check:
+There must be a visible outgoing message sent by the student (blue/green bubble on right side).
+If only an empty chat or only received messages are visible → REJECT.
 
-JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
+STEP 3 — Content intent check (most important):
+READ the actual message content in the screenshot.
+The message must show genuine personal outreach — the student reaching out to someone they were thinking about.
+
+REJECT if the message is:
+- A casual greeting only ("hi", "hey", "what's up", "hello")
+- A one-word or one-emoji reply
+- A forwarded message (shows "Forwarded" label)
+- A meme, sticker, GIF, or media-only message with no personal text
+- Small talk or a routine conversation with no personal intent
+- AI-generated or copy-pasted motivational text with no personal element
+- Completely unrelated to reaching out to someone they were thinking about
+
+ACCEPT only if the message contains a genuine personal note — something the student actually wrote to connect with that person. It doesn't need to be long, but it must be real and personal.
+
+Examples:
+✅ "Bro I randomly thought of you today, hope you're doing well"
+✅ "I've been meaning to say this — you really helped me during exams and I never thanked you"
+✅ Short personal message showing the student initiated a real conversation
+❌ "hi" alone
+❌ A meme or forwarded quote
+❌ A group chat screenshot
+❌ A random conversation about food/plans with no personal intent
+
+JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what the message actually said and why it was accepted or rejected"}`,
     day: "Day 1",
     points: 3,
     requiresUpload: true,
@@ -142,15 +169,42 @@ Respond with JSON only:
     title: "Tribe Time Capsule",
     description: "One sentence to your future self. Sealed. Collected by your tribe leader. Opened one year from today.",
     verificationPrompt: `You are evaluating "Tribe Time Capsule" for NIAT CBC.
-Task: Student submitted proof of a time capsule moment with their tribe.
+Task: Student posted a personal message to their future self as a WhatsApp Status or Instagram Story.
 
-ACCEPT any plausible photo, screenshot, note, or image that could
-represent a memory, group moment, or future message.
-Accept imperfect, blurry, casual, or low-quality proof.
+STEP 1 — Platform check:
+The image must show WhatsApp Status or Instagram Story UI.
+WhatsApp: "My Status", status preview bar, "Add to Status", or status viewer interface.
+Instagram: Story frame, "Your Story" ring, story creation UI, or story viewer screen.
+If neither platform's status/story UI is visible → REJECT immediately.
 
-REJECT only if: completely unrelated, blank, abusive/inappropriate, or obvious non-attempt.
+STEP 2 — Content presence check:
+There must be readable text in the status/story written by the student.
+If the status/story is only a photo, video, sticker, or meme with no written text → REJECT.
 
-JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
+STEP 3 — Content intent check (most important):
+READ the actual text in the status/story.
+The text must read like a genuine message to their future self — personal, reflective, forward-looking, or meaningful.
+
+REJECT if the text is:
+- A random caption unrelated to a personal message ("good morning", "blessed", "vibe")
+- A motivational quote or copied text (not the student's own words)
+- AI-generated text (overly formal, perfect grammar, generic inspiration)
+- Promotional or business content
+- Completely unrelated to a personal future message
+- A song lyric, joke, or meme text
+
+ACCEPT only if the text reads like something the student genuinely wrote to their future self — it can be short, informal, or imperfect, but it must be personal and intentional.
+
+Examples:
+✅ "Future me — I hope you made it. This day was hard but we kept going."
+✅ "To myself one year from now: don't forget why you started."
+✅ "I want to remember this feeling. Day 1 of something real."
+❌ "good morning everyone 🌞"
+❌ A motivational quote with no personal element
+❌ A food photo with a random caption
+❌ AI-written paragraph that sounds like a template
+
+JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what the content actually said and why it was accepted or rejected"}`,
     day: "Day 2",
     points: 2,
     requiresUpload: true,
@@ -160,15 +214,49 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
     id: 6,
     title: "3-Day Real Streak",
     description: "One real post. Every day. All 3 days. No templates. Just one honest moment each day.",
-    verificationPrompt: `You are evaluating "3-Day Real Streak" for NIAT CBC.
-Task: Student posted consistently for 3 days and submitted proof.
+    verificationPrompt: `You are evaluating one day of "3-Day Real Streak" for NIAT CBC.
+Task: Student posted one honest personal moment as a WhatsApp Status or Instagram Story on this day.
 
-ACCEPT any plausible screenshot, post image, or photo that could
-represent a social post or daily activity — even casual or imperfect.
+STEP 1 — Platform check:
+The image must show WhatsApp Status or Instagram Story UI.
+WhatsApp: "My Status", status bar, "Add to Status", or status viewer UI visible.
+Instagram: Story frame, "Your Story" ring, story creation screen, or story viewer.
+If no recognizable status/story UI is visible → REJECT immediately.
 
-REJECT only if: completely unrelated image, blank, abusive/inappropriate content, or obvious non-attempt.
+STEP 2 — Content presence check:
+The status/story must contain something the student created or wrote — not just a reshared post.
+If a reshare icon is visible, or it is clearly another person's content being reposted → REJECT.
 
-JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
+STEP 3 — Content intent check (most important):
+READ and OBSERVE the actual content in the status/story.
+This challenge requires one honest personal moment per day — something real from their day, not just any random post.
+
+REJECT if the content is:
+- A random aesthetic photo, scenery, food, or meme with no personal context
+- A motivational quote or copied text with no personal element added
+- AI-generated image or text (illustrated, suspiciously polished, no real human feel)
+- A reshared reel, post, or another person's story
+- A promotional or brand post
+- Completely generic with no connection to a real personal moment
+
+ACCEPT if the content shows a real honest moment from the student's day — this can be:
+- A personal reflection written in the story/status
+- A photo of something meaningful from their actual day with a personal caption
+- A candid moment, update, or thought that feels genuinely human and personal
+- Imperfect, casual, or short — as long as it is real
+
+The post does NOT need to be polished. It MUST feel like a real human moment, not a random or generic post.
+
+Examples:
+✅ A selfie with text "Day 2 — tired but showed up anyway"
+✅ A written status: "Had a weird day but grateful for small things"
+✅ A photo of their notes with "grinding today"
+❌ A random sunset photo with no caption
+❌ A motivational quote repost
+❌ An AI-generated illustration
+❌ A food photo with just an emoji
+
+JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what the content actually showed and why it was accepted or rejected"}`,
     day: "Days 1-3",
     points: 1,
     requiresUpload: true,

@@ -50,7 +50,7 @@ const DISPLAY_POINTS: Record<number, number> = {
 };
 
 const STREAK_CHALLENGE_ID = 6;
-const STREAK_MAX_ATTEMPTS = 3;
+const STREAK_TOTAL_DAYS = 3;
 const COMPLETED_STATUSES = new Set(["accepted", "approved"]);
 
 const STONE_META: Record<number, { label: string; color: string }> = {
@@ -154,11 +154,11 @@ export default function ChallengeBoard({
     const rows = submissionByTask.get(challenge.id) ?? [];
     if (challenge.isReferral) return false;
     if (challenge.id === STREAK_CHALLENGE_ID) {
-      const maxResubmitCount = rows.reduce(
-        (max, row) => Math.max(max, row.resubmit_count ?? 0),
+      const maxStreakDay = rows.reduce(
+        (max, row) => Math.max(max, Number(row.streak_day ?? 0)),
         0
       );
-      return maxResubmitCount >= STREAK_MAX_ATTEMPTS;
+      return maxStreakDay >= STREAK_TOTAL_DAYS;
     }
     return hasCompletedSubmission(rows);
   };

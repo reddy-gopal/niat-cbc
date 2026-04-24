@@ -123,6 +123,7 @@ export default async function AdminSubmissionsPage({ searchParams }: Props) {
     student_id: string;
     task_id: number;
     file_url: string | null;
+    text_response: string | null;
     status: string;
     ai_reason: string | null;
     attempt_number: number;
@@ -135,7 +136,7 @@ export default async function AdminSubmissionsPage({ searchParams }: Props) {
   let attemptsQuery = adminClient
     .from("submission_attempts")
     .select(
-      "id,submission_id,student_id,bootcamp_id,task_id,attempt_number,file_url,status,ai_reason,created_at",
+      "id,submission_id,student_id,bootcamp_id,task_id,attempt_number,file_url,text_response,status,ai_reason,created_at",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })
@@ -214,6 +215,7 @@ export default async function AdminSubmissionsPage({ searchParams }: Props) {
       status: row.status,
       task_id: row.task_id,
       file_url: row.file_url,
+      text_response: row.text_response,
       ai_reason: row.ai_reason,
       resubmit_count: row.attempt_number,
       created_at: row.created_at,

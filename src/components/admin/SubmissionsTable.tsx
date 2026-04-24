@@ -11,6 +11,7 @@ type Row = {
   status: string;
   task_id: number;
   file_url: string | null;
+  text_response?: string | null;
   ai_reason: string | null;
   resubmit_count: number;
   created_at: string;
@@ -24,18 +25,19 @@ type Props = {
   signedImageMap: Record<string, string>;
 };
 
-function formatUtcTimestamp(value: string): string {
+function formatIstTimestamp(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const year = date.getUTCFullYear();
-  const hours = String(date.getUTCHours()).padStart(2, "0");
-  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
-
-  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds} UTC`;
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date) + " IST";
 }
 
 export default function SubmissionsTable({ rows, signedImageMap }: Props) {
@@ -123,7 +125,7 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
                 </span>
               </td>
               <td className="max-w-64">{row.ai_reason ?? "-"}</td>
-              <td>{formatUtcTimestamp(row.created_at)}</td>
+              <td>{formatIstTimestamp(row.created_at)}</td>
               <td>
                 <div className="flex items-center gap-2">
                   <button
@@ -176,7 +178,7 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
+              <div className="space-y-3">
                 {selectedImage ? (
                   <div className="relative w-full h-64 md:h-80 rounded-lg overflow-hidden border border-[var(--card-border)]">
                     <Image
@@ -192,6 +194,16 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
                     No image available
                   </div>
                 )}
+                {selectedRow.text_response ? (
+                  <div className="rounded-lg border border-[var(--card-border)] bg-[var(--bg-base)] p-3">
+                    <p className="text-xs font-semibold text-[var(--text-muted)] mb-1">
+                      Text Response
+                    </p>
+                    <p className="text-sm whitespace-pre-wrap break-words text-[var(--text-dark)]">
+                      {selectedRow.text_response}
+                    </p>
+                  </div>
+                ) : null}
               </div>
               <div className="space-y-3">
                 <h3 className="text-lg font-heading font-bold text-[var(--text-dark)]">
@@ -203,7 +215,7 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
                 <p><span className="font-semibold">Status:</span> {selectedRow.status}</p>
                 <p><span className="font-semibold">AI Reason:</span> {selectedRow.ai_reason ?? "-"}</p>
                 <p><span className="font-semibold">Attempts:</span> {selectedRow.resubmit_count}</p>
-                <p><span className="font-semibold">Submitted:</span> {formatUtcTimestamp(selectedRow.created_at)}</p>
+                <p><span className="font-semibold">Submitted:</span> {formatIstTimestamp(selectedRow.created_at)}</p>
 
                 {modalMode === "edit" ? (
                   <div className="space-y-2 pt-2">
