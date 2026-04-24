@@ -214,6 +214,16 @@ export async function POST(request: Request) {
     let streakDayForAttempt: number | null = null;
 
     if (taskId === STREAK_CHALLENGE_ID) {
+      if (nextResubmit > STREAK_TOTAL_DAYS) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "You can submit the 3-Day Real Streak challenge a maximum of 3 times.",
+          },
+          { status: 400 }
+        );
+      }
+
       const { data: bootcampRow } = await adminClient
         .from("bootcamps")
         .select("date")
