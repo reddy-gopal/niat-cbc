@@ -7,7 +7,7 @@ import { adminClient } from "../../../../../utils/supabase/admin";
 
 const REFERRAL_CHALLENGE_ID =
   CHALLENGES.find((challenge) => challenge.isReferral)?.id ?? 3;
-const POINTS_PER_REFERRAL = 5;
+const POINTS_PER_REFERRAL = 7;
 
 type SubmissionRow = {
   id: string;
@@ -42,6 +42,19 @@ export async function POST(request: Request) {
       NW_CHALLENGE5_STAGE_CODE
     );
     if (!referralResult.success) {
+      if (referralResult.errorCode === "FORBIDDEN") {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Referral provider access was denied (403). Please contact support to verify NW API credentials and allowlist.",
+            code: referralResult.errorCode,
+            stageCode: NW_CHALLENGE5_STAGE_CODE,
+          },
+          { status: 403 }
+        );
+      }
+
       if (
         referralResult.errorCode === "USER_DOES_NOT_EXISTS_FOR_GIVEN_PHONE_NUMBER" ||
         referralResult.errorCode === "USER_ASSOCIATION_DOES_NOT_EXISTS"
@@ -78,6 +91,7 @@ export async function POST(request: Request) {
           success: false,
           message: referralResult.message,
           code: referralResult.errorCode,
+          stageCode: NW_CHALLENGE5_STAGE_CODE,
         },
         { status }
       );

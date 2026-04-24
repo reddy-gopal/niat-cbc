@@ -8,6 +8,7 @@ type ReferralErrorCode =
   | "USER_DOES_NOT_EXISTS_FOR_GIVEN_PHONE_NUMBER"
   | "USER_ASSOCIATION_DOES_NOT_EXISTS"
   | "INVALID_JOURNEY_STAGE_CODE"
+  | "FORBIDDEN"
   | "NETWORK_ERROR"
   | "UNKNOWN_ERROR";
 
@@ -33,9 +34,16 @@ type ReferralCountApiError = {
   response?: string;
 };
 
+type ApiErrorLike = {
+  res_status?: string;
+  response?: string;
+  message?: string;
+  error?: string;
+};
+
 function isKnownReferralErrorCode(value: string): value is Exclude<
   ReferralErrorCode,
-  "NETWORK_ERROR" | "UNKNOWN_ERROR"
+  "NETWORK_ERROR" | "UNKNOWN_ERROR" | "FORBIDDEN"
 > {
   return (
     value === "USER_DOES_NOT_EXISTS_FOR_GIVEN_PHONE_NUMBER" ||
@@ -78,6 +86,8 @@ export async function getReferralCountForStage(
       headers: {
         "Content-Type": "application/json",
         "x-api-key": NW_API_KEY,
+        "api-key": NW_API_KEY,
+        Authorization: `Bearer ${NW_API_KEY}`,
       },
       body: JSON.stringify(payload),
     });
@@ -87,23 +97,44 @@ export async function getReferralCountForStage(
       return { success: true, referralsCount: data.referrals_count ?? 0 };
     }
 
-    if (response.status === 400) {
-      const data = (await response.json()) as ReferralCountApiError;
-      const errorCode = data.res_status ?? "UNKNOWN_ERROR";
-      return {
-        success: false,
-        errorCode: isKnownReferralErrorCode(errorCode)
-          ? errorCode
-          : "UNKNOWN_ERROR",
-        message: data.response ?? "Unknown error from NW API",
-      };
+    const rawBody = await response.text();
+    let parsedBody: ApiErrorLike | null = null;
+    try {
+      parsedBody = JSON.parse(rawBody) as ApiErrorLike;
+    } catch {
+      parsedBody = null;
     }
+
+    const rawCode =
+      parsedBody?.res_status ??
+      parsedBody?.error ??
+      parsedBody?.message ??
+      "UNKNOWN_ERROR";
+    const statusDerivedCode: ReferralErrorCode | null =
+      response.status === 403 ? "FORBIDDEN" : null;
+    const errorCode = isKnownReferralErrorCode(rawCode)
+      ? rawCode
+      : statusDerivedCode ?? "UNKNOWN_ERROR";
+    const message =
+      parsedBody?.response ??
+      parsedBody?.message ??
+      rawBody?.trim() ??
+      `Unexpected HTTP status: ${response.status}`;
+
+    console.error("[nw-referral] Upstream NW API error", {
+      status: response.status,
+      errorCode,
+      message,
+      phoneNumber,
+      stageCode,
+    });
 
     return {
       success: false,
-      errorCode: "UNKNOWN_ERROR",
-      message: `Unexpected HTTP status: ${response.status}`,
+      errorCode,
+      message,
     };
+
   } catch (error) {
     console.error("[nw-referral] Network error calling referral count API:", {
       error,
