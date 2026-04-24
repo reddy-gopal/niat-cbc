@@ -283,6 +283,9 @@ export default function MissionModal({
                 type="button"
                 onClick={() => {
                   setAccepted(true);
+                  if (challenge.isReferral) {
+                    window.open(referralUrl, "_blank", "noopener,noreferrer");
+                  }
                 }}
                 className="w-full bg-[#f7b801] text-[#991b1b] font-black text-xs sm:text-sm md:text-base tracking-[0.05em] sm:tracking-[0.08em] py-2.5 sm:py-3.5 rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-[0_4px_15px_rgba(247,184,1,0.5)] border-2 border-[#f18701]"
                 style={{
