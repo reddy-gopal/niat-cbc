@@ -1,5 +1,6 @@
 import Link from "next/link";
 import SubmissionsTable from "@/components/admin/SubmissionsTable";
+import ReverifyPendingButton from "@/components/admin/ReverifyPendingButton";
 import { adminClient } from "../../../../utils/supabase/admin";
 
 type Props = {
@@ -246,11 +247,14 @@ export default async function AdminSubmissionsPage({ searchParams }: Props) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h1 className="text-2xl font-bold">Submissions</h1>
-        <Link href="/admin/submissions/challenge5" className="btn-outline">
-          Challenge 5 - Connect Their Dots Manual Awards
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <ReverifyPendingButton />
+          <Link href="/admin/submissions/challenge5" className="btn-outline">
+            Challenge 5 - Connect Their Dots Manual Awards
+          </Link>
+        </div>
       </div>
       <form
         method="GET"
@@ -345,11 +349,22 @@ export default async function AdminSubmissionsPage({ searchParams }: Props) {
           </Link>
         </div>
       </form>
+      {params.status || params.taskId ? (
+        <div className="mb-4 rounded-md border border-[var(--border)] bg-white/60 px-3 py-2 text-sm">
+          Showing filtered results
+          {params.status ? ` · Status: ${params.status}` : ""}
+          {params.taskId ? ` · Task: ${params.taskId}` : ""}
+          {" · "}
+          <Link href="/admin/submissions" className="underline">
+            Clear filters
+          </Link>
+        </div>
+      ) : null}
       <SubmissionsTable
         rows={normalizedRows}
         signedImageMap={signedMap}
       />
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
         {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
           <Link
             key={p}

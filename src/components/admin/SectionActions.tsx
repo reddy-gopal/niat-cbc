@@ -75,10 +75,10 @@ export default function SectionActions({
     <div className="mt-3 flex flex-wrap gap-2 items-center">
       {joinUrl ? (
         <>
-          <button className="btn-outline !py-2 !px-3" onClick={copyUrl}>
+          <button className="btn-outline !py-2 !px-3 w-full sm:w-auto" onClick={copyUrl}>
             Copy URL
           </button>
-          <button className="btn-outline !py-2 !px-3" onClick={downloadQr}>
+          <button className="btn-outline !py-2 !px-3 w-full sm:w-auto" onClick={downloadQr}>
             Download QR
           </button>
         </>
@@ -87,12 +87,12 @@ export default function SectionActions({
       {bootcampId ? (
         <>
           <input
-            className="input-field !w-28 !py-2"
+            className="input-field !w-full sm:!w-28 !py-2"
             placeholder="Label (A)"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
-          <button className="btn-primary !py-2 !px-3" onClick={addSection}>
+          <button className="btn-primary !py-2 !px-3 w-full sm:w-auto" onClick={addSection}>
             Add Section
           </button>
         </>

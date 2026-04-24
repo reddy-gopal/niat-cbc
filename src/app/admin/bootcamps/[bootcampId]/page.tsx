@@ -24,7 +24,7 @@ export default async function BootcampDetailPage({ params }: Props) {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">{bootcamp.name}</h1>
           <p className="text-[var(--text-muted)]">
@@ -39,8 +39,8 @@ export default async function BootcampDetailPage({ params }: Props) {
           const joinUrl = `${siteUrl}/join/${section.slug}`;
           return (
             <div key={section.id} className="card p-4">
-              <div className="flex flex-wrap justify-between gap-4">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
+                <div className="min-w-0">
                   <h2 className="font-semibold">Section {section.label}</h2>
                   <p className="text-sm text-[var(--text-muted)]">Slug: {section.slug}</p>
                   <p className="text-sm mt-2 break-all">{joinUrl}</p>
@@ -48,7 +48,7 @@ export default async function BootcampDetailPage({ params }: Props) {
                     Students: {(section.students as unknown[] | null)?.length ?? 0}
                   </p>
                 </div>
-                <div id={`section-qr-${section.id}`} className="bg-white p-2 rounded">
+                <div id={`section-qr-${section.id}`} className="bg-white p-2 rounded w-fit">
                   <QRCode value={joinUrl} size={120} />
                 </div>
               </div>

@@ -6,6 +6,7 @@ import UploadZone from "./UploadZone";
 import { buildChallenge8ReferralUrl } from "@/lib/utils";
 
 type UploadState = "idle" | "uploading" | "received";
+const REFERRAL_STATS_URL = "https://nxtrewards.ccbp.in/";
 
 export default function MissionModal({
   isOpen,
@@ -35,6 +36,7 @@ export default function MissionModal({
     kind: "success" | "info" | "error";
     text: string;
   } | null>(null);
+  const [copyLabel, setCopyLabel] = useState("COPY");
 
   const referralUrl = useMemo(
     () => buildChallenge8ReferralUrl(session),
@@ -56,6 +58,7 @@ export default function MissionModal({
       setUploadState("idle");
       setClaimLoading(false);
       setClaimMessage(null);
+      setCopyLabel("COPY");
     }
   }, [isOpen]);
 
@@ -155,6 +158,17 @@ export default function MissionModal({
       });
     } finally {
       setClaimLoading(false);
+    }
+  };
+
+  const handleCopyReferralLink = async () => {
+    try {
+      await navigator.clipboard.writeText(referralUrl);
+      setCopyLabel("COPIED");
+      window.setTimeout(() => setCopyLabel("COPY"), 1200);
+    } catch {
+      setCopyLabel("FAILED");
+      window.setTimeout(() => setCopyLabel("COPY"), 1200);
     }
   };
 
@@ -269,9 +283,6 @@ export default function MissionModal({
                 type="button"
                 onClick={() => {
                   setAccepted(true);
-                  if (challenge.isReferral) {
-                    window.open(referralUrl, "_blank", "noopener,noreferrer");
-                  }
                 }}
                 className="w-full bg-[#f7b801] text-[#991b1b] font-black text-xs sm:text-sm md:text-base tracking-[0.05em] sm:tracking-[0.08em] py-2.5 sm:py-3.5 rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-[0_4px_15px_rgba(247,184,1,0.5)] border-2 border-[#f18701]"
                 style={{
@@ -304,7 +315,7 @@ export default function MissionModal({
               <div className="space-y-4">
                 <div className="bg-orange-50 border-2 border-dashed border-orange-200 p-4 rounded-xl">
                   <p className="text-[10px] uppercase font-bold text-orange-800 mb-2 tracking-wider">
-                    Community Form Opened In New Tab
+                    Onboarding Form 
                   </p>
                   <div className="flex gap-2">
                     <input
@@ -316,11 +327,9 @@ export default function MissionModal({
                     <button
                       type="button"
                       className="bg-orange-500 text-white px-4 py-2 rounded text-xs font-bold hover:bg-orange-600 transition-colors"
-                      onClick={() => {
-                        window.open(referralUrl, "_blank", "noopener,noreferrer");
-                      }}
+                      onClick={handleCopyReferralLink}
                     >
-                      OPEN
+                      {copyLabel}
                     </button>
                   </div>
                 </div>
@@ -340,6 +349,27 @@ export default function MissionModal({
                     ? "CHECKING REFERRALS..."
                     : "Check My Referrals & Claim Points"}
                 </button>
+                <div className="bg-orange-50 border-2 border-dashed border-orange-200 p-4 rounded-xl">
+                  <p className="text-[10px] uppercase font-bold text-orange-800 mb-2 tracking-wider">
+                    Referral Portal
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={REFERRAL_STATS_URL}
+                      className="flex-1 bg-white border border-orange-200 px-3 py-2 rounded text-xs text-orange-900 outline-none"
+                    />
+                    <a
+                      href={REFERRAL_STATS_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-orange-500 text-white px-4 py-2 rounded text-xs font-bold hover:bg-orange-600 transition-colors inline-flex items-center"
+                    >
+                      OPEN
+                    </a>
+                  </div>
+                </div>
                 {claimMessage ? (
                   <div
                     className={`rounded-lg border px-3 py-2 text-xs font-medium ${

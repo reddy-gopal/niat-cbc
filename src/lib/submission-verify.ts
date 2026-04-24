@@ -206,15 +206,23 @@ export async function verifySubmissionById(
         .eq("id", submission.student_id)
         .maybeSingle();
 
-      await adminClient.rpc("accept_submission_and_award_points", {
+      const { error: acceptError } = await adminClient.rpc("accept_submission_and_award_points", {
         p_submission_id: submission.id,
         p_points: challenge.points,
         p_ai_reason: parsedVerdict.reason,
         p_verified_at: verifiedAt,
         p_team_id: student?.team_id ?? null,
       });
+
+      if (acceptError) {
+        console.error("[verify] accept_submission_and_award_points failed", {
+          submissionId: submission.id,
+          error: acceptError,
+        });
+        throw new Error("Failed to accept submission and award points.");
+      }
     } else {
-      await adminClient
+      const { error: rejectError } = await adminClient
         .from("submissions")
         .update({
           status: "rejected",
@@ -224,6 +232,14 @@ export async function verifySubmissionById(
           updated_at: verifiedAt,
         })
         .eq("id", submission.id);
+
+      if (rejectError) {
+        console.error("[verify] failed to mark submission rejected", {
+          submissionId: submission.id,
+          error: rejectError,
+        });
+        throw new Error("Failed to update rejected submission.");
+      }
     }
 
     const pendingAttempt = await getLatestPendingAttemptId(submission.id as string);
@@ -256,11 +272,25 @@ export async function verifySubmissionById(
       }
 
       if (attemptUpdateError) {
-        console.error("[verify] failed to update submission_attempts row", {
+        const syncAllPending = await adminClient
+          .from("submission_attempts")
+          .update(baseAttemptUpdate)
+          .eq("submission_id", submission.id)
+          .eq("status", "pending")
+          .is("verified_at", null);
+
+        if (!syncAllPending.error) {
+          attemptUpdateError = null;
+        }
+      }
+
+      if (attemptUpdateError) {
+        console.error("[verify] failed to sync submission_attempts row(s)", {
           submissionId: submission.id,
           attemptId: pendingAttempt.id,
           error: attemptUpdateError,
         });
+        throw new Error("Failed to update submission attempt status.");
       }
     }
 

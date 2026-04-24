@@ -16,6 +16,9 @@ export default async function Challenge5AdminPage() {
       <h1 className="text-2xl font-bold mb-4">
         Challenge 5 - Connect Their Dots Manual Awards
       </h1>
+      <p className="text-sm text-[var(--text-muted)] mb-4">
+        Use this page on any device to award pending referral points manually.
+      </p>
       <Challenge5AwardList rows={(data ?? []) as never[]} />
     </div>
   );

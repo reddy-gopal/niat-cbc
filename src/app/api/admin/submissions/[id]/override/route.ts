@@ -41,6 +41,7 @@ export async function POST(request: Request, { params }: Props) {
     const newPoints = parsed.data.verdict === "accepted" ? challenge?.points ?? 0 : 0;
     const oldPoints = submission.points ?? 0;
 
+    const now = new Date().toISOString();
     const { error } = await adminClient
       .from("submissions")
       .update({
@@ -48,7 +49,8 @@ export async function POST(request: Request, { params }: Props) {
         points: newPoints,
         override_by: admin.id,
         override_note: parsed.data.note,
-        updated_at: new Date().toISOString(),
+        verified_at: now,
+        updated_at: now,
       })
       .eq("id", id);
 
@@ -104,6 +106,37 @@ export async function POST(request: Request, { params }: Props) {
             },
           });
         }
+      }
+    }
+
+    const { data: latestAttempt } = await adminClient
+      .from("submission_attempts")
+      .select("id")
+      .eq("submission_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestAttempt?.id) {
+      const manualReason = parsed.data.note.trim()
+        ? `Manual override: ${parsed.data.note.trim()}`
+        : `Manually marked as ${parsed.data.verdict}.`;
+
+      const { error: attemptSyncError } = await adminClient
+        .from("submission_attempts")
+        .update({
+          status: parsed.data.verdict,
+          points: newPoints,
+          ai_reason: manualReason,
+          verified_at: now,
+        })
+        .eq("id", latestAttempt.id);
+
+      if (attemptSyncError) {
+        return NextResponse.json(
+          { success: false, error: "Submission updated, but latest attempt sync failed." },
+          { status: 500 }
+        );
       }
     }
 

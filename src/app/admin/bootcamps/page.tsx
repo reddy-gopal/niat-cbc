@@ -31,7 +31,7 @@ export default async function AdminBootcampsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h1 className="text-2xl font-bold">Bootcamps</h1>
         <BootcampsClient />
       </div>
@@ -43,14 +43,29 @@ export default async function AdminBootcampsPage() {
               {items.map((bootcamp) => (
                 <div
                   key={bootcamp.id}
-                  className="grid grid-cols-1 md:grid-cols-6 gap-2 border border-[var(--border)] rounded-md px-3 py-2"
+                  className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-2 border border-[var(--border)] rounded-md px-3 py-3"
                 >
-                  <div>{bootcamp.name}</div>
-                  <div>{bootcamp.date}</div>
-                  <div>{region}</div>
-                  <div>Sections: {bootcamp.sections?.length ?? 0}</div>
-                  <div>Students: {bootcamp.students?.length ?? 0}</div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-[var(--text-muted)] xl:hidden">Name</p>
+                    <p className="truncate">{bootcamp.name}</p>
+                  </div>
                   <div>
+                    <p className="text-xs text-[var(--text-muted)] xl:hidden">Date</p>
+                    <p>{bootcamp.date}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)] xl:hidden">Region</p>
+                    <p>{region}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)] xl:hidden">Sections</p>
+                    <p>Sections: {bootcamp.sections?.length ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)] xl:hidden">Students</p>
+                    <p>Students: {bootcamp.students?.length ?? 0}</p>
+                  </div>
+                  <div className="xl:justify-self-end">
                     <BootcampRowActions
                       bootcampId={bootcamp.id}
                       name={bootcamp.name}

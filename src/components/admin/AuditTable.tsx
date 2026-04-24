@@ -27,8 +27,8 @@ export default function AuditTable({
   const pages = Math.max(1, Math.ceil(total / 50));
 
   return (
-    <div className="card p-4 overflow-auto">
-      <table className="w-full text-sm">
+    <div className="card p-3 sm:p-4 overflow-x-auto">
+      <table className="w-full min-w-[860px] text-sm">
         <thead>
           <tr className="text-left border-b border-[var(--border)] text-[var(--text-muted)]">
             <th className="py-2">Timestamp</th>
@@ -68,7 +68,7 @@ export default function AuditTable({
           ))}
         </tbody>
       </table>
-      <div className="flex gap-2 mt-4">
+      <div className="flex flex-wrap gap-2 mt-4">
         {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
           <Link
             key={p}

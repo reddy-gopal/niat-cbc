@@ -31,6 +31,11 @@ export async function POST(_: Request, { params }: Props) {
       .update({
         resubmit_count: 0,
         status: "not_started",
+        points: 0,
+        ai_reason: null,
+        verified_at: null,
+        verification_attempts: 0,
+        last_attempted_at: null,
         updated_at: now,
       })
       .eq("id", id);

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  X,
+  Menu,
   FileCheck,
   LayoutDashboard,
   MapPin,
@@ -30,6 +32,7 @@ export default function AdminShell({ adminEmail, children }: AdminShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -39,7 +42,32 @@ export default function AdminShell({ adminEmail, children }: AdminShellProps) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-tint)] text-[var(--text-base)]">
-      <aside className="fixed left-0 top-0 h-screen w-[240px] bg-[var(--hero-from)] text-white p-4 flex flex-col shadow-xl">
+      <header className="md:hidden sticky top-0 z-40 bg-[var(--hero-from)] text-white border-b border-white/10 px-4 py-3 flex items-center justify-between">
+        <Logo size="md" />
+        <button
+          type="button"
+          className="inline-flex items-center justify-center rounded-md border border-white/20 p-2"
+          onClick={() => setMobileNavOpen((open) => !open)}
+          aria-label={mobileNavOpen ? "Close navigation menu" : "Open navigation menu"}
+        >
+          {mobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </header>
+
+      {mobileNavOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          aria-label="Close menu overlay"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        className={`fixed left-0 top-0 z-40 h-screen w-[240px] bg-[var(--hero-from)] text-white p-4 flex flex-col shadow-xl transition-transform ${
+          mobileNavOpen ? "translate-x-0" : "-translate-x-full"
+        } md:translate-x-0`}
+      >
         <div className="flex items-center mb-8">
           <Logo size="lg" />
         </div>
@@ -51,6 +79,7 @@ export default function AdminShell({ adminEmail, children }: AdminShellProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setMobileNavOpen(false)}
                 className={`flex items-center gap-3 rounded-md px-4 py-3 text-sm transition-all border-l-4 ${
                   active
                     ? "border-l-[var(--yellow)] bg-white/10 text-white font-semibold"
@@ -71,7 +100,7 @@ export default function AdminShell({ adminEmail, children }: AdminShellProps) {
           </button>
         </div>
       </aside>
-      <main className="ml-[240px] p-6">{children}</main>
+      <main className="p-4 md:ml-[240px] md:p-6">{children}</main>
     </div>
   );
 }

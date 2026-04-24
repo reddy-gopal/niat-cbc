@@ -116,21 +116,21 @@ export default function AdminLeaderboardClient({
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-6 gap-4">
         <h1 className="text-2xl font-bold bg-gradient-to-r from-[var(--primary)] to-[var(--hero-to)] bg-clip-text text-transparent">
           Section standings
         </h1>
-        <div className="flex items-center gap-2">
-          <div className="bg-white p-1 rounded-lg border border-[var(--border)] shadow-sm flex mr-2">
+        <div className="flex w-full lg:w-auto flex-wrap items-center gap-2">
+          <div className="bg-white p-1 rounded-lg border border-[var(--border)] shadow-sm flex mr-0 lg:mr-2 w-full sm:w-auto">
              <button 
                 onClick={() => setView("individual")}
-                className={`p-2 rounded-md transition-all flex items-center gap-2 text-xs font-bold ${view === "individual" ? 'bg-[var(--primary)] text-white shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                className={`p-2 rounded-md transition-all flex-1 sm:flex-none justify-center flex items-center gap-2 text-xs font-bold ${view === "individual" ? 'bg-[var(--primary)] text-white shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
              >
                 <User size={14} /> Individual
              </button>
              <button 
                 onClick={() => setView("team")}
-                className={`p-2 rounded-md transition-all flex items-center gap-2 text-xs font-bold ${view === "team" ? 'bg-[var(--primary)] text-white shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
+                className={`p-2 rounded-md transition-all flex-1 sm:flex-none justify-center flex items-center gap-2 text-xs font-bold ${view === "team" ? 'bg-[var(--primary)] text-white shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}
              >
                 <Users size={14} /> Tribe
              </button>
@@ -206,8 +206,8 @@ export default function AdminLeaderboardClient({
         </div>
       )}
 
-      <div className="card p-0 overflow-hidden shadow-xl border-[var(--border)]">
-        <table className="w-full text-sm">
+      <div className="card p-0 overflow-x-auto shadow-xl border-[var(--border)]">
+        <table className="w-full min-w-[700px] text-sm">
           <thead>
             <tr className="text-left bg-gray-50 border-b border-[var(--border)] text-[var(--text-muted)] font-bold uppercase tracking-wider text-[10px]">
               {view === "individual" ? (

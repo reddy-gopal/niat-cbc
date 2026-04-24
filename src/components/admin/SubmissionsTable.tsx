@@ -64,8 +64,8 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
   }, [selectedRow]);
 
   return (
-    <div className="card p-4 overflow-auto">
-      <table className="w-full text-sm">
+    <div className="card p-3 sm:p-4 overflow-x-auto">
+      <table className="w-full min-w-[720px] text-sm">
         <thead>
           <tr className="text-left text-[var(--text-muted)] border-b border-[var(--border)]">
             <th>Challenge</th>
@@ -165,14 +165,14 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
 
       {selectedRow ? (
         <div
-          className="fixed inset-0 bg-black/70 z-50 grid place-items-center p-6"
+          className="fixed inset-0 bg-black/70 z-50 grid place-items-center p-3 sm:p-6"
           onClick={() => {
             setSelectedRow(null);
             setSelectedImage(null);
           }}
         >
           <div
-            className="w-full max-w-3xl card p-5"
+            className="w-full max-w-3xl card p-4 sm:p-5 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -216,7 +216,7 @@ export default function SubmissionsTable({ rows, signedImageMap }: Props) {
                         setNote((prev) => ({ ...prev, [selectedRow.id]: e.target.value }))
                       }
                     />
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         suppressHydrationWarning
                         className="btn-primary !py-2 !px-3 inline-flex items-center gap-1"
