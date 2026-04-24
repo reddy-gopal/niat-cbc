@@ -42,6 +42,10 @@ export default function MissionModal({
     () => buildChallenge8ReferralUrl(session),
     [session]
   );
+  const referralFirstOpenKey = useMemo(
+    () => `cbc:referral-form-opened:${session.studentId}:${challenge?.id ?? "unknown"}`,
+    [session.studentId, challenge?.id]
+  );
 
   const wordCount = useMemo(() => {
     if (!textResponse.trim()) return 0;
@@ -172,6 +176,22 @@ export default function MissionModal({
     }
   };
 
+  const handleAcceptMission = () => {
+    setAccepted(true);
+    if (!challenge?.isReferral) return;
+
+    try {
+      const openedOnce = window.localStorage.getItem(referralFirstOpenKey);
+      if (!openedOnce) {
+        window.localStorage.setItem(referralFirstOpenKey, "1");
+        window.open(referralUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      // If localStorage is blocked, keep old behavior to avoid blocking user flow.
+      window.open(referralUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
   const formattedId = String(challenge.id).padStart(2, "0");
   const formLocked = uploadState === "uploading" || uploadState === "received";
 
@@ -281,12 +301,7 @@ export default function MissionModal({
             ) : !accepted ? (
               <button
                 type="button"
-                onClick={() => {
-                  setAccepted(true);
-                  if (challenge.isReferral) {
-                    window.open(referralUrl, "_blank", "noopener,noreferrer");
-                  }
-                }}
+                onClick={handleAcceptMission}
                 className="w-full bg-[#f7b801] text-[#991b1b] font-black text-xs sm:text-sm md:text-base tracking-[0.05em] sm:tracking-[0.08em] py-2.5 sm:py-3.5 rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-[0_4px_15px_rgba(247,184,1,0.5)] border-2 border-[#f18701]"
                 style={{
                   background: modalStoneColor,
