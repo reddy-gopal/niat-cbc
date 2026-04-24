@@ -49,7 +49,16 @@ export async function getReferralCountForStage(
   stageCode: string,
   countryCode?: string
 ): Promise<ReferralCountResult> {
-  const url = `${NW_BASE_URL}/api/nw_user_journey/user/referrals/stage_completions/count/get/v1/`;
+  if (!Number.isFinite(NW_CLIENT_KEY_DETAILS_ID)) {
+    return {
+      success: false,
+      errorCode: "UNKNOWN_ERROR",
+      message: "Invalid NW client key configuration.",
+    };
+  }
+
+  const baseUrl = NW_BASE_URL.replace(/\/+$/, "");
+  const url = `${baseUrl}/api/nw_user_journey/user/referrals/stage_completions/count/get/v1/`;
 
   const innerData = {
       phone_number: phoneNumber,

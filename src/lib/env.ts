@@ -57,9 +57,7 @@ function getEnv(): Record<EnvKey | OptionalEnvKey, string> {
     NW_API_KEY: process.env.NW_API_KEY!,
     NW_CLIENT_KEY_DETAILS_ID: process.env.NW_CLIENT_KEY_DETAILS_ID!,
     NW_CHALLENGE5_STAGE_CODE: process.env.NW_CHALLENGE5_STAGE_CODE!,
-    NW_BASE_URL:
-      process.env.NW_BASE_URL ??
-      "https://nw-payouts-backend-gamma.earlywave.in",
+    NW_BASE_URL: "https://nw-payouts-backend-prod-apis.ccbp.in",
   };
 }
 
