@@ -130,6 +130,7 @@ export default function MissionModal({
         message?: string;
         referralCount?: number;
         pointsAwarded?: number;
+        status?: "accepted" | "rejected";
       };
 
       if (!response.ok || !result.success) {
@@ -143,6 +144,14 @@ export default function MissionModal({
         setClaimMessage({
           kind: "error",
           text: result.message ?? "Unable to claim points right now. Please try again.",
+        });
+        return;
+      }
+
+      if ((result.pointsAwarded ?? 0) === 0 || result.status === "rejected") {
+        setClaimMessage({
+          kind: "info",
+          text: "No referrals verified yet. Challenge is currently marked as rejected.",
         });
         return;
       }

@@ -98,14 +98,8 @@ export async function POST(request: Request) {
     }
 
     const referralCount = referralResult.referralsCount;
-    if (referralCount === 0) {
-      return NextResponse.json(
-        { success: false, message: "No referrals found yet." },
-        { status: 200 }
-      );
-    }
-
     const pointsToAward = referralCount * POINTS_PER_REFERRAL;
+    const nextStatus = pointsToAward > 0 ? "accepted" : "rejected";
 
     const { data: existingRows, error: existingRowsError } = await adminClient
       .from("submissions")
@@ -123,16 +117,11 @@ export async function POST(request: Request) {
 
     const rows = (existingRows ?? []) as SubmissionRow[];
     const targetRow =
+      rows.find((row) => row.status === "accepted") ??
+      rows.find((row) => row.status === "rejected") ??
       rows.find((row) => row.status === "not_started") ??
       rows[0] ??
       null;
-
-    if (targetRow?.status === "accepted" && targetRow.points === pointsToAward) {
-      return NextResponse.json(
-        { success: false, message: "Already awarded." },
-        { status: 200 }
-      );
-    }
 
     const now = new Date().toISOString();
     const aiReason = `${referralCount} referral(s) verified by NW`;
@@ -170,7 +159,7 @@ export async function POST(request: Request) {
     const { error: submissionUpdateError } = await adminClient
       .from("submissions")
       .update({
-        status: "accepted",
+        status: nextStatus,
         points: pointsToAward,
         ai_reason: aiReason,
         verified_at: now,
@@ -217,67 +206,16 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: latestAttempt, error: latestAttemptError } = await adminClient
-      .from("submission_attempts")
-      .select("id")
-      .eq("submission_id", targetSubmissionId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (latestAttemptError) {
-      return NextResponse.json(
-        { success: false, message: "Unable to load submission attempt." },
-        { status: 500 }
-      );
-    }
-
-    if (latestAttempt?.id) {
-      const { error: attemptUpdateError } = await adminClient
-        .from("submission_attempts")
-        .update({
-          status: "accepted",
-          ai_reason: aiReason,
-          points: pointsToAward,
-          verified_at: now,
-          attempt_number: nextResubmitCount,
-        })
-        .eq("id", latestAttempt.id);
-
-      if (attemptUpdateError) {
-        return NextResponse.json(
-          { success: false, message: "Unable to update submission attempt." },
-          { status: 500 }
-        );
-      }
-    } else {
-      const { error: attemptInsertError } = await adminClient
-        .from("submission_attempts")
-        .insert({
-          submission_id: targetSubmissionId,
-          student_id: session.studentId,
-          task_id: REFERRAL_CHALLENGE_ID,
-          bootcamp_id: student.bootcamp_id,
-          attempt_number: nextResubmitCount,
-          status: "accepted",
-          ai_reason: aiReason,
-          points: pointsToAward,
-          verified_at: now,
-        });
-
-      if (attemptInsertError) {
-        return NextResponse.json(
-          { success: false, message: "Unable to record submission attempt." },
-          { status: 500 }
-        );
-      }
-    }
-
     return NextResponse.json(
       {
         success: true,
         referralCount,
         pointsAwarded: pointsToAward,
+        status: nextStatus,
+        message:
+          pointsToAward > 0
+            ? "Referral points awarded."
+            : "No referrals found. Challenge marked as rejected.",
       },
       { status: 200 }
     );

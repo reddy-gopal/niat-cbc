@@ -50,6 +50,7 @@ const DISPLAY_POINTS: Record<number, number> = {
 };
 
 const STREAK_CHALLENGE_ID = 6;
+const REFERRAL_CHALLENGE_ID = 3;
 const STREAK_TOTAL_DAYS = 3;
 const COMPLETED_STATUSES = new Set(["accepted", "approved"]);
 
@@ -120,11 +121,35 @@ export default function ChallengeBoard({
   const hasCompletedSubmission = (rows: Submission[]) =>
     rows.some((row) => COMPLETED_STATUSES.has(String(row.status).toLowerCase()));
 
+  const isChallengeComplete = (challengeId: number) => {
+    const rows = submissionByTask.get(challengeId) ?? [];
+    if (challengeId === REFERRAL_CHALLENGE_ID) {
+      const latestReferralRow = rows
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at ?? b.created_at).getTime() -
+            new Date(a.updated_at ?? a.created_at).getTime()
+        )[0];
+      if (!latestReferralRow) return false;
+      return COMPLETED_STATUSES.has(String(latestReferralRow.status).toLowerCase());
+    }
+    if (challengeId === STREAK_CHALLENGE_ID) {
+      const maxAcceptedStreakCount = rows.reduce(
+        (max, row) =>
+          COMPLETED_STATUSES.has(String(row.status).toLowerCase())
+            ? Math.max(max, Number(row.streak_day ?? 0))
+            : max,
+        0
+      );
+      return maxAcceptedStreakCount >= STREAK_TOTAL_DAYS;
+    }
+    return hasCompletedSubmission(rows);
+  };
+
   const allComplete = useMemo(
     () =>
-      ACTIVE_CHALLENGE_IDS.every((id) =>
-        hasCompletedSubmission(submissionByTask.get(id) ?? [])
-      ),
+      ACTIVE_CHALLENGE_IDS.every((id) => isChallengeComplete(id)),
     [submissionByTask]
   );
   // const allComplete = true;

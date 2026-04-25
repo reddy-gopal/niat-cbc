@@ -6,6 +6,7 @@ import { adminClient } from "../../../utils/supabase/admin";
 import { createClient } from "../../../utils/supabase/server";
 
 const COMPLETED_ATTEMPT_STATUSES = new Set(["accepted", "approved"]);
+const REFERRAL_CHALLENGE_ID = 3;
 
 export default async function LeaderboardPage() {
   const session = await getStudentSession();
@@ -33,20 +34,40 @@ export default async function LeaderboardPage() {
         .in("student_id", studentIds)
         .not("points", "is", null)
     : { data: [], error: null };
+  const { data: referralSubmissionsRaw, error: referralSubmissionsError } = studentIds.length
+    ? await adminClient
+        .from("submissions")
+        .select("student_id, task_id, points, status, created_at, updated_at")
+        .in("student_id", studentIds)
+        .eq("task_id", REFERRAL_CHALLENGE_ID)
+    : { data: [], error: null };
 
-  if (attemptsError) {
-    console.error("[leaderboard] Attempts fetch failed:", attemptsError);
+  if (attemptsError || referralSubmissionsError) {
+    console.error("[leaderboard] Score fetch failed:", {
+      attemptsError,
+      referralSubmissionsError,
+    });
   }
 
   const allAttempts =
-    (allAttemptsRaw as Array<{
+    ((allAttemptsRaw as Array<{
       student_id: string | null;
       task_id: number | string | null;
       points: number | string | null;
       status: string | null;
-    }> | null)?.filter((attempt) =>
+    }> | null) ?? [])
+      .filter((attempt) => Number(attempt.task_id) !== REFERRAL_CHALLENGE_ID)
+      .filter((attempt) =>
       COMPLETED_ATTEMPT_STATUSES.has(String(attempt.status ?? "").trim().toLowerCase())
-    ) ?? [];
+    );
+  const referralSubmissions = ((referralSubmissionsRaw as Array<{
+    student_id: string | null;
+    task_id: number | string | null;
+    points: number | string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    status: string | null;
+  }> | null) ?? []);
 
   const scoreMap = new Map<string, { totalPoints: number; completedChallenges: number }>();
   for (const attempt of allAttempts ?? []) {
@@ -74,6 +95,32 @@ export default async function LeaderboardPage() {
       scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
     }
     scoreMap.get(studentId)!.completedChallenges = tasks.size;
+  }
+  const latestReferralByStudent = new Map<string, (typeof referralSubmissions)[number]>();
+  for (const row of referralSubmissions) {
+    const studentId = String(row.student_id ?? "");
+    if (!studentId) continue;
+    const prev = latestReferralByStudent.get(studentId);
+    if (!prev) {
+      latestReferralByStudent.set(studentId, row);
+      continue;
+    }
+    const prevTime = new Date(prev.updated_at ?? prev.created_at ?? 0).getTime();
+    const rowTime = new Date(row.updated_at ?? row.created_at ?? 0).getTime();
+    if (rowTime >= prevTime) {
+      latestReferralByStudent.set(studentId, row);
+    }
+  }
+  for (const [studentId, row] of latestReferralByStudent) {
+    if (!COMPLETED_ATTEMPT_STATUSES.has(String(row.status ?? "").trim().toLowerCase())) {
+      continue;
+    }
+    if (!scoreMap.has(studentId)) {
+      scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
+    }
+    const entry = scoreMap.get(studentId)!;
+    entry.totalPoints += Number(row.points ?? 0) || 0;
+    entry.completedChallenges += 1;
   }
 
   const entries: LeaderboardEntry[] = (studentsData ?? [])

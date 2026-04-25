@@ -15,6 +15,7 @@ type StudentWithContext = Student & {
 
 const Dashboard = dynamic(() => import("@/components/student/Dashboard"));
 const COMPLETED_ATTEMPT_STATUSES = new Set(["accepted", "approved"]);
+const REFERRAL_CHALLENGE_ID = 3;
 
 type DashboardPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -116,18 +117,49 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const completedAttemptScore = attemptScore.filter((attempt) =>
     COMPLETED_ATTEMPT_STATUSES.has(String(attempt.status ?? "").trim().toLowerCase())
   );
-  const totalPoints = completedAttemptScore.reduce(
+  const nonReferralAttemptScore = completedAttemptScore.filter(
+    (attempt) => Number(attempt.task_id) !== REFERRAL_CHALLENGE_ID
+  );
+  const referralSubmissionRows = submissions.filter(
+    (row) => row.task_id === REFERRAL_CHALLENGE_ID
+  );
+  const latestReferralSubmission = referralSubmissionRows
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at ?? b.created_at).getTime() -
+        new Date(a.updated_at ?? a.created_at).getTime()
+    )[0];
+  const referralSubmissionPoints =
+    latestReferralSubmission &&
+    COMPLETED_ATTEMPT_STATUSES.has(
+      String(latestReferralSubmission.status ?? "").trim().toLowerCase()
+    )
+      ? Number(latestReferralSubmission.points ?? 0) || 0
+      : 0;
+
+  const totalPoints = nonReferralAttemptScore.reduce(
     (sum, attempt) => sum + (Number(attempt.points ?? 0) || 0),
     0
-  );
-  const completedChallenges = new Set(
-    completedAttemptScore
+  ) + referralSubmissionPoints;
+
+  const completedChallengeSet = new Set(
+    nonReferralAttemptScore
       .map((attempt) => {
         const taskId = Number(attempt.task_id);
         return Number.isFinite(taskId) ? taskId : null;
       })
       .filter((taskId): taskId is number => taskId != null)
-  ).size;
+  );
+  if (
+    latestReferralSubmission &&
+    COMPLETED_ATTEMPT_STATUSES.has(
+      String(latestReferralSubmission.status ?? "").trim().toLowerCase()
+    )
+  ) {
+    completedChallengeSet.add(REFERRAL_CHALLENGE_ID);
+  }
+  const completedChallenges = completedChallengeSet.size;
 
   return (
     <Dashboard
