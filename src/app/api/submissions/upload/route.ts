@@ -11,31 +11,9 @@ const ACTIVE_TASK_IDS = CHALLENGES.map((challenge) => challenge.id);
 const REFERRAL_CHALLENGE_ID = CHALLENGES.find((challenge) => challenge.isReferral)?.id;
 const STREAK_CHALLENGE_ID = 6;
 const STREAK_TOTAL_DAYS = 3;
-const STREAK_TIMEZONE = "Asia/Kolkata";
+const TEAM_SUBMISSION_CHALLENGE_IDS = new Set([5]);
 const DUPLICATE_FILE_REASON =
   "Submission rejected: this exact file was already uploaded by you for this challenge. Please upload a different proof image.";
-
-function getDateKeyInTimeZone(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function toUtcMidnight(dateKey: string): number {
-  return new Date(`${dateKey}T00:00:00.000Z`).getTime();
-}
-
-function getCurrentStreakDay(bootcampDateRaw: string, now: Date = new Date()): number {
-  const bootcampDateKey = bootcampDateRaw.slice(0, 10);
-  const todayKey = getDateKeyInTimeZone(now, STREAK_TIMEZONE);
-  const elapsedDays = Math.floor(
-    (toUtcMidnight(todayKey) - toUtcMidnight(bootcampDateKey)) / (24 * 60 * 60 * 1000)
-  );
-  return elapsedDays + 1;
-}
 
 export async function POST(request: Request) {
   try {
@@ -107,18 +85,20 @@ export async function POST(request: Request) {
       uploadBytes = new Uint8Array(buffer);
       uploadContentType = file.type;
 
-      const { data: duplicateRow } = await adminClient
-        .from("submissions")
-        .select("id, student_id")
-        .eq("file_hash", hash)
-        .eq("task_id", taskId)
-        .eq("bootcamp_id", session.bootcampId)
-        .neq("student_id", session.studentId)
-        .neq("status", "not_started")
-        .limit(1)
-        .maybeSingle();
+      if (!TEAM_SUBMISSION_CHALLENGE_IDS.has(taskId)) {
+        const { data: duplicateRow } = await adminClient
+          .from("submissions")
+          .select("id, student_id")
+          .eq("file_hash", hash)
+          .eq("task_id", taskId)
+          .eq("bootcamp_id", session.bootcampId)
+          .neq("student_id", session.studentId)
+          .neq("status", "not_started")
+          .limit(1)
+          .maybeSingle();
 
-      isPlagiarism = Boolean(duplicateRow);
+        isPlagiarism = Boolean(duplicateRow);
+      }
 
       const { data: duplicateSelfAttempt } = await adminClient
         .from("submission_attempts")
@@ -129,7 +109,7 @@ export async function POST(request: Request) {
         .limit(1)
         .maybeSingle();
 
-      if (duplicateSelfAttempt) {
+      if (duplicateSelfAttempt && !TEAM_SUBMISSION_CHALLENGE_IDS.has(taskId)) {
         return NextResponse.json(
           { success: false, error: DUPLICATE_FILE_REASON },
           { status: 400 }
@@ -177,6 +157,16 @@ export async function POST(request: Request) {
       }
     }
 
+    if (
+      taskId === STREAK_CHALLENGE_ID &&
+      Number(targetSubmission?.streak_day ?? 0) >= STREAK_TOTAL_DAYS
+    ) {
+      return NextResponse.json(
+        { success: false, error: "3-Day Real Streak is complete. Maximum 3 accepted uploads reached." },
+        { status: 400 }
+      );
+    }
+
     // Self-heal: create missing row if not found
     if (!targetSubmission) {
       console.warn(
@@ -211,59 +201,6 @@ export async function POST(request: Request) {
 
     const now = new Date().toISOString();
     const nextResubmit = targetSubmission.resubmit_count + 1;
-    let streakDayForAttempt: number | null = null;
-
-    if (taskId === STREAK_CHALLENGE_ID) {
-      if (nextResubmit > STREAK_TOTAL_DAYS) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "You can submit the 3-Day Real Streak challenge a maximum of 3 times.",
-          },
-          { status: 400 }
-        );
-      }
-
-      const { data: bootcampRow } = await adminClient
-        .from("bootcamps")
-        .select("date")
-        .eq("id", session.bootcampId)
-        .maybeSingle();
-
-      const bootcampDate = (bootcampRow?.date as string | undefined) ?? "";
-      if (!bootcampDate) {
-        return NextResponse.json(
-          { success: false, error: "Unable to validate streak schedule right now." },
-          { status: 500 }
-        );
-      }
-
-      const currentStreakDay = getCurrentStreakDay(bootcampDate, new Date());
-      const latestRecordedDay = Number(targetSubmission.streak_day ?? 0);
-
-      if (currentStreakDay < 1) {
-        return NextResponse.json(
-          { success: false, error: "The 3-Day Real Streak challenge has not started yet." },
-          { status: 400 }
-        );
-      }
-
-      if (currentStreakDay > STREAK_TOTAL_DAYS) {
-        return NextResponse.json(
-          { success: false, error: "The 3-Day Real Streak submission window has ended." },
-          { status: 400 }
-        );
-      }
-
-      if (latestRecordedDay >= currentStreakDay) {
-        return NextResponse.json(
-          { success: false, error: "You already submitted for today's streak. Upload opens again at 00:00." },
-          { status: 400 }
-        );
-      }
-
-      streakDayForAttempt = currentStreakDay;
-    }
 
     if (uploadBytes && uploadContentType) {
       const extension = uploadContentType === "image/png" ? "png" : "jpg";
@@ -295,7 +232,6 @@ export async function POST(request: Request) {
           text_response: textResponse,
           ai_reason: PLAGIARISM_REASON,
           resubmit_count: nextResubmit,
-          ...(streakDayForAttempt !== null && { streak_day: streakDayForAttempt }),
           verification_attempts: 3,
           last_attempted_at: now,
           verified_at: now,
@@ -358,7 +294,6 @@ export async function POST(request: Request) {
         ...(hash !== null && { file_hash: hash }),
         text_response: textResponse,
         resubmit_count: nextResubmit,
-        ...(streakDayForAttempt !== null && { streak_day: streakDayForAttempt }),
         ai_reason: null,
         verification_attempts: 0,
         last_attempted_at: null,

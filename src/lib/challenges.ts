@@ -167,44 +167,46 @@ Respond with JSON only:
   {
     id: 5,
     title: "Tribe Time Capsule",
-    description: "One sentence to your future self. Sealed. Collected by your tribe leader. Opened one year from today.",
+    description: "One sentence to your future self. Sealed. Collected by your tribe leader. Opened one year from today. Any proof format is allowed.",
     verificationPrompt: `You are evaluating "Tribe Time Capsule" for NIAT CBC.
-Task: Student posted a personal message to their future self as a WhatsApp Status or Instagram Story.
 
-STEP 1 — Platform check:
-The image must show WhatsApp Status or Instagram Story UI.
-WhatsApp: "My Status", status preview bar, "Add to Status", or status viewer interface.
-Instagram: Story frame, "Your Story" ring, story creation UI, or story viewer screen.
-If neither platform's status/story UI is visible → REJECT immediately.
+Task: Students wrote personal messages to their future selves on paper, folded and sealed them. The tribe leader collected ALL folded papers from their group and submitted a photo of the collected batch.
 
-STEP 2 — Content presence check:
-There must be readable text in the status/story written by the student.
-If the status/story is only a photo, video, sticker, or meme with no written text → REJECT.
+UNDERSTAND THE FORMAT FIRST:
+This is a TRIBE COLLECTION submission — not an individual student photo.
+Valid submissions look like:
+- Multiple folded papers collected together (held, stacked, spread out)
+- A pile or bundle of folded/sealed notes from the whole tribe
+- Folded papers with names written on the outside, grouped together
+- A single folded paper if the tribe has only one member present
+The messages INSIDE are intentionally hidden/sealed — that is the point of the task.
 
-STEP 3 — Content intent check (most important):
-READ the actual text in the status/story.
-The text must read like a genuine message to their future self — personal, reflective, forward-looking, or meaningful.
+STEP 1 — Is there physical proof of collected folded notes?
+Look for: multiple folded papers, a stack of sealed notes, papers with names on outside.
+If the image shows NO paper or notes at all → REJECT.
 
-REJECT if the text is:
-- A random caption unrelated to a personal message ("good morning", "blessed", "vibe")
-- A motivational quote or copied text (not the student's own words)
-- AI-generated text (overly formal, perfect grammar, generic inspiration)
-- Promotional or business content
-- Completely unrelated to a personal future message
-- A song lyric, joke, or meme text
+STEP 2 — Does it look like a genuine collected batch?
+Papers should appear folded/sealed, not blank or empty.
+A random unrelated photo with no papers → REJECT.
+A single blank unfolded paper with nothing on it → REJECT.
 
-ACCEPT only if the text reads like something the student genuinely wrote to their future self — it can be short, informal, or imperfect, but it must be personal and intentional.
+STEP 3 — If any text IS visible on the papers, apply a light check:
+Names or labels on the outside of folded papers → perfectly valid, ACCEPT.
+If a message happens to be open and readable — it should look personal, not a meme or random caption.
 
-Examples:
-✅ "Future me — I hope you made it. This day was hard but we kept going."
-✅ "To myself one year from now: don't forget why you started."
-✅ "I want to remember this feeling. Day 1 of something real."
-❌ "good morning everyone 🌞"
-❌ A motivational quote with no personal element
-❌ A food photo with a random caption
-❌ AI-written paragraph that sounds like a template
+ACCEPT if:
+✅ Multiple folded papers collected together
+✅ A stack or pile of sealed notes held or placed by tribe leader
+✅ Papers with student names written on the outside
+✅ Even a single folded paper if it clearly looks sealed and intentional
+✅ Papers being handed over or arranged for collection
 
-JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what the content actually said and why it was accepted or rejected"}`,
+REJECT if:
+❌ No paper or written notes visible anywhere in the image
+❌ Completely unrelated photo (food, selfie, random scene)
+❌ Blank unfolded papers with nothing written or folded
+
+JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what was visible in the image and why it was accepted or rejected"}`,
     day: "Day 2",
     points: 2,
     requiresUpload: true,

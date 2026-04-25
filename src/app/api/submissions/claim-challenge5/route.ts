@@ -217,6 +217,62 @@ export async function POST(request: Request) {
       }
     }
 
+    const { data: latestAttempt, error: latestAttemptError } = await adminClient
+      .from("submission_attempts")
+      .select("id")
+      .eq("submission_id", targetSubmissionId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestAttemptError) {
+      return NextResponse.json(
+        { success: false, message: "Unable to load submission attempt." },
+        { status: 500 }
+      );
+    }
+
+    if (latestAttempt?.id) {
+      const { error: attemptUpdateError } = await adminClient
+        .from("submission_attempts")
+        .update({
+          status: "accepted",
+          ai_reason: aiReason,
+          points: pointsToAward,
+          verified_at: now,
+          attempt_number: nextResubmitCount,
+        })
+        .eq("id", latestAttempt.id);
+
+      if (attemptUpdateError) {
+        return NextResponse.json(
+          { success: false, message: "Unable to update submission attempt." },
+          { status: 500 }
+        );
+      }
+    } else {
+      const { error: attemptInsertError } = await adminClient
+        .from("submission_attempts")
+        .insert({
+          submission_id: targetSubmissionId,
+          student_id: session.studentId,
+          task_id: REFERRAL_CHALLENGE_ID,
+          bootcamp_id: student.bootcamp_id,
+          attempt_number: nextResubmitCount,
+          status: "accepted",
+          ai_reason: aiReason,
+          points: pointsToAward,
+          verified_at: now,
+        });
+
+      if (attemptInsertError) {
+        return NextResponse.json(
+          { success: false, message: "Unable to record submission attempt." },
+          { status: 500 }
+        );
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
