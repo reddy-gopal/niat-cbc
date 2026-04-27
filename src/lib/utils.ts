@@ -67,6 +67,23 @@ function getMonthYearSuffix(bootcampDate?: string): string {
   return `${month}-${year}`;
 }
 
+function getBootcampNumber(bootcampName?: string): string {
+  if (!bootcampName) return "";
+  const match = bootcampName.match(/\d+/);
+  return match?.[0] ?? bootcampName.trim();
+}
+
+function buildDefaultUtmCampaign({
+  bootcampName,
+  regionName,
+  sectionLabel,
+}: Pick<UTMContext, "bootcampName" | "regionName" | "sectionLabel">): string {
+  const region = regionName?.trim() ?? "";
+  const bootcampNumber = getBootcampNumber(bootcampName);
+  const section = sectionLabel?.trim() ?? "";
+  return `${region}-${bootcampNumber}-${section}`;
+}
+
 export function buildDefaultUtmSource({
   bootcampName,
   bootcampDate,
@@ -97,7 +114,11 @@ export function resolveStudentUtmParams(context: UTMContext): {
         sectionLabel: context.sectionLabel,
       }),
     utmMedium: context.utmMedium?.trim() || "whatsapp",
-    utmCampaign: context.utmCampaign?.trim() || context.regionName?.trim() || "Telugu",
+    utmCampaign: buildDefaultUtmCampaign({
+      bootcampName: context.bootcampName,
+      regionName: context.regionName,
+      sectionLabel: context.sectionLabel,
+    }),
   };
 }
 
