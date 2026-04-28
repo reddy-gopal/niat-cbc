@@ -111,7 +111,7 @@ export default function InvitePageClient({
             <div className="space-y-3">
               {members.map((member, i) => (
                 <div 
-                  key={i} 
+                  key={`${member.fullName}-${member.joinedAt}`}
                   className="flex items-center justify-between p-4 bg-white border border-[var(--card-border)] rounded-xl shadow-sm transition-all hover:border-[var(--primary)]/30 group"
                   style={{ animationDelay: `${i * 0.1}s` }}
                 >

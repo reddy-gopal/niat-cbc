@@ -1,16 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { AnimatePresence } from "framer-motion";
+import type { Challenge } from "@/types/app";
 import type { StudentSession } from "@/types/app";
 import type { SafeAttempt } from "@/types/database";
 import { CHALLENGES } from "@/lib/challenges";
-import ProofLightbox from "@/components/challenges/ProofLightbox";
-import XPToast from "@/components/challenges/XPToast";
-import RejectToast from "@/components/challenges/RejectToast";
 import { StudentAppShell } from "@/components/student/StudentAppShell";
 import { studentMainTopPaddingClass } from "@/components/student/StudentNavbar";
 import { Eye } from "lucide-react";
+
+const ProofLightbox = dynamic(() => import("@/components/challenges/ProofLightbox"), {
+  ssr: false,
+  loading: () => <div className="sr-only">Loading proof details…</div>,
+});
+const XPToast = dynamic(() => import("@/components/challenges/XPToast"), { ssr: false });
+const RejectToast = dynamic(() => import("@/components/challenges/RejectToast"), {
+  ssr: false,
+});
 
 type SubmissionsClientProps = {
   session: StudentSession;
@@ -102,6 +110,10 @@ export default function SubmissionsClient({
     () => attempts.some((a) => a.status === "pending"),
     [attempts]
   );
+  const challengeById = useMemo(
+    () => new Map<number, Challenge>(CHALLENGES.map((challenge) => [challenge.id, challenge])),
+    []
+  );
 
   useEffect(() => {
     if (!hasPending) return;
@@ -173,7 +185,7 @@ export default function SubmissionsClient({
   );
 
   const handleViewProof = async (attempt: SafeAttempt) => {
-    const challenge = CHALLENGES.find((c) => c.id === attempt.task_id);
+    const challenge = challengeById.get(attempt.task_id);
     const hasTextResponse = Boolean(attempt.text_response?.trim());
     const expectsImage = Boolean(challenge?.requiresUpload);
     const expectsText = Boolean(challenge?.requiresText);
@@ -294,7 +306,7 @@ export default function SubmissionsClient({
                 </div>
               ) : (
                 filtered.map((attempt) => {
-                  const challenge = CHALLENGES.find((c) => c.id === attempt.task_id);
+                  const challenge = challengeById.get(attempt.task_id);
                   const title = challenge?.title ?? `Task ${attempt.task_id}`;
                   const day = challenge?.day ?? "";
                   const hasTextResponse = Boolean(attempt.text_response?.trim());
@@ -419,7 +431,7 @@ export default function SubmissionsClient({
                     </tr>
                   ) : (
                     filtered.map((attempt, i) => {
-                      const challenge = CHALLENGES.find((c) => c.id === attempt.task_id);
+                      const challenge = challengeById.get(attempt.task_id);
                       const title = challenge?.title ?? `Task ${attempt.task_id}`;
                       const day = challenge?.day ?? "";
                       const hasTextResponse = Boolean(attempt.text_response?.trim());

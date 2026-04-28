@@ -50,7 +50,12 @@ export async function GET(request: Request) {
           verifiedAt: submission.verified_at,
         },
       },
-      { status: 200 }
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "private, no-store, max-age=0",
+        },
+      }
     );
   } catch {
     return NextResponse.json(

@@ -5,7 +5,9 @@ const STORY_SOURCE_URL =
 
 export async function GET() {
   try {
-    const upstream = await fetch(STORY_SOURCE_URL, { cache: "no-store" });
+    const upstream = await fetch(STORY_SOURCE_URL, {
+      next: { revalidate: 3600 },
+    });
     if (!upstream.ok) {
       return NextResponse.json(
         { success: false, error: "Unable to load story image." },
@@ -20,7 +22,8 @@ export async function GET() {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "private, no-store, max-age=0",
+        "Cache-Control":
+          "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
       },
     });
   } catch {

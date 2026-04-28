@@ -111,6 +111,7 @@ export async function verifySubmissionById(
     return { ok: false, status: 500, error: "Failed to update submission attempt." };
   }
 
+  let signedImageUrl: string | null = null;
   let base64Image: string | null = null;
   if (!challenge.requiresText && submission.file_url) {
     const { data: signedData, error: signedError } = await adminClient.storage
@@ -124,11 +125,16 @@ export async function verifySubmissionById(
       return { ok: false, status: 500, error: "Unable to read submission file." };
     }
 
-    const segmentImage = performance.now();
+    signedImageUrl = signedData.signedUrl;
+
+    // Fallback for environments/providers that require base64 image input.
+    if (process.env.ANTHROPIC_IMAGE_SOURCE_MODE === "base64") {
+      const segmentImage = performance.now();
     const imageResponse = await fetch(signedData.signedUrl);
-    const imageBuffer = await imageResponse.arrayBuffer();
-    base64Image = Buffer.from(imageBuffer).toString("base64");
-    logSegment("imageDownload", segmentImage);
+      const imageBuffer = await imageResponse.arrayBuffer();
+      base64Image = Buffer.from(imageBuffer).toString("base64");
+      logSegment("imageDownload", segmentImage);
+    }
   } else {
     logSegment("dbFetch", segmentDb);
   }
@@ -166,7 +172,15 @@ export async function verifySubmissionById(
                       ? `This is an image-only submission. Evaluate using the system prompt only.`
                       : `Challenge: ${challenge.title}. Challenge description: ${challenge.description}.${challenge.verificationHint ? ` Verification hint: ${challenge.verificationHint}` : ""} This is an image-only challenge. Apply the system prompt exactly. Accept if the image plausibly shows a related attempt, even if it is blurry, dark, cropped, partial, casual, or imperfect. Reject only if it is blank/corrupt, abusive/inappropriate, clearly unrelated, or an obvious non-attempt.`,
                   },
-                  base64Image
+                  signedImageUrl
+                    ? {
+                        type: "image",
+                        source: {
+                          type: "url",
+                          url: signedImageUrl,
+                        },
+                      }
+                    : base64Image
                     ? {
                         type: "image",
                         source: {

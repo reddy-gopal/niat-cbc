@@ -59,7 +59,12 @@ export async function GET(request: Request, { params }: RouteParams) {
         success: true,
         data: { signedUrl: data.signedUrl },
       },
-      { status: 200 }
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      }
     );
   } catch {
     return NextResponse.json(

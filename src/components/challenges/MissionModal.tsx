@@ -53,7 +53,18 @@ export default function MissionModal({
   }, [textResponse]);
 
   useEffect(() => {
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
+
+  useEffect(() => {
     if (!isOpen) {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
       setAccepted(false);
       setSelectedFile(null);
       setPreview(null);
@@ -447,7 +458,12 @@ export default function MissionModal({
                   <UploadZone
                     onFileSelect={(f) => {
                       setSelectedFile(f);
-                      setPreview(URL.createObjectURL(f));
+                      setPreview((prev) => {
+                        if (prev) {
+                          URL.revokeObjectURL(prev);
+                        }
+                        return URL.createObjectURL(f);
+                      });
                       setError(null);
                     }}
                     preview={preview}

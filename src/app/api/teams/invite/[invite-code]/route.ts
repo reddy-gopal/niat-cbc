@@ -77,19 +77,26 @@ export async function GET(
       member_count: (t.members as unknown as [{ count: number }])[0].count,
     }));
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        team_id: team.id,
-        team_name: team.name,
-        leader_name: leader?.full_name ?? "Unknown",
-        section_id: team.section_id,
-        bootcamp_id: team.bootcamp_id,
-        region_id: regionId ?? null,
-        members: (members || []).map(m => m.full_name),
-        leaderboard: formattedLeaderboard,
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          team_id: team.id,
+          team_name: team.name,
+          leader_name: leader?.full_name ?? "Unknown",
+          section_id: team.section_id,
+          bootcamp_id: team.bootcamp_id,
+          region_id: regionId ?? null,
+          members: (members || []).map((m) => m.full_name),
+          leaderboard: formattedLeaderboard,
+        },
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch {
     return NextResponse.json(
       { success: false, error: "Server error" },

@@ -1,15 +1,19 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { memo, useMemo, useState, useEffect, useRef } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Challenge, StudentSession } from "@/types/app";
 import type { Submission } from "@/types/database";
 import { useSubmissionPolling } from "@/hooks/useSubmissionPolling";
-import MissionModal from "./MissionModal";
-import XPToast from "./XPToast";
-import RejectToast from "./RejectToast";
-import TribeCrest from "./TribeCrest";
+const MissionModal = dynamic(() => import("./MissionModal"), {
+  ssr: false,
+  loading: () => <div className="sr-only">Loading mission modal…</div>,
+});
+const XPToast = dynamic(() => import("./XPToast"), { ssr: false });
+const RejectToast = dynamic(() => import("./RejectToast"), { ssr: false });
+const TribeCrest = dynamic(() => import("./TribeCrest"));
 
 const ACTIVE_CHALLENGE_IDS = [1, 2, 3, 4, 5, 6];
 
@@ -62,6 +66,95 @@ const STONE_META: Record<number, { label: string; color: string }> = {
   5: { label: "Soul Stone", color: "var(--orange)" },
   6: { label: "Time Stone", color: "var(--success)" },
 };
+
+const FacetHighlight = memo(function FacetHighlight() {
+  return (
+    <div
+      className="absolute rounded-full pointer-events-none"
+      style={{
+        width: "30%",
+        height: "20%",
+        top: "18%",
+        left: "22%",
+        background: "rgba(255,255,255,0.35)",
+      }}
+    />
+  );
+});
+
+type NodeLabelProps = {
+  id: number;
+  isCenter: boolean;
+  shortName: string;
+  stoneLabel: string;
+  stoneColor: string;
+  displayPoints: number;
+};
+
+const NodeLabel = memo(function NodeLabel({
+  id,
+  isCenter,
+  shortName,
+  stoneLabel,
+  stoneColor,
+  displayPoints,
+}: NodeLabelProps) {
+  return (
+    <div
+      className="absolute pointer-events-none flex flex-col items-center gap-1 text-center"
+      style={{
+        top: "calc(100% + 8px)",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: isCenter ? "140px" : "118px",
+      }}
+    >
+      {isCenter ? (
+        <>
+          <span
+            className="font-black leading-none"
+            style={{ color: "var(--text-secondary)", fontSize: "15px" }}
+          >
+            {shortName}
+          </span>
+          <span
+            className="font-bold leading-none"
+            style={{
+              color: "color-mix(in srgb, var(--primary-hover) 70%, transparent)",
+              fontSize: "10px",
+            }}
+          >
+            {stoneLabel}
+          </span>
+        </>
+      ) : (
+        <>
+          <span
+            className="font-bold leading-none"
+            style={{
+              color: `color-mix(in srgb, ${stoneColor} 70%, transparent)`,
+              fontSize: "10px",
+            }}
+          >
+            {stoneLabel}
+          </span>
+          <span
+            className="font-bold leading-none"
+            style={{ color: "var(--text-secondary)", fontSize: "12px" }}
+          >
+            {shortName}
+          </span>
+        </>
+      )}
+      <span
+        className="rounded-full px-2.5 py-0.5 font-bold"
+        style={{ background: "var(--hero-from)", color: "var(--bg-base)" }}
+      >
+        <span style={{ fontSize: "10px" }}>{displayPoints}pt</span>
+      </span>
+    </div>
+  );
+});
 
 export default function ChallengeBoard({
   challenges,
@@ -344,69 +437,6 @@ export default function ChallengeBoard({
     setActiveTaskId(null);
   };
 
-  const FacetHighlight = () => (
-    <div
-      className="absolute rounded-full pointer-events-none"
-      style={{ width: "30%", height: "20%", top: "18%", left: "22%", background: "rgba(255,255,255,0.35)" }}
-    />
-  );
-
-  const NodeLabel = ({ id, isCenter }: { id: number; isCenter: boolean }) => (
-    <div
-      className="absolute pointer-events-none flex flex-col items-center gap-1 text-center"
-      style={{
-        top: "calc(100% + 8px)",
-        left: "50%",
-        transform: "translateX(-50%)",
-        width: isCenter ? "140px" : "118px",
-      }}
-    >
-      {isCenter ? (
-        <>
-          <span
-            className="font-black leading-none"
-            style={{ color: "var(--text-secondary)", fontSize: "15px" }}
-          >
-            {SHORT_NAMES[id]}
-          </span>
-          <span
-            className="font-bold leading-none"
-            style={{
-              color: "color-mix(in srgb, var(--primary-hover) 70%, transparent)",
-              fontSize: "10px",
-            }}
-          >
-            {STONE_META[id]?.label}
-          </span>
-        </>
-      ) : (
-        <>
-          <span
-            className="font-bold leading-none"
-            style={{
-              color: `color-mix(in srgb, ${getStoneColor(id)} 70%, transparent)`,
-              fontSize: "10px",
-            }}
-          >
-            {STONE_META[id]?.label}
-          </span>
-          <span
-            className="font-bold leading-none"
-            style={{ color: "var(--text-secondary)", fontSize: "12px" }}
-          >
-            {SHORT_NAMES[id]}
-          </span>
-        </>
-      )}
-      <span
-        className="rounded-full px-2.5 py-0.5 font-bold"
-        style={{ background: "var(--hero-from)", color: "var(--bg-base)" }}
-      >
-        <span style={{ fontSize: "10px" }}>{DISPLAY_POINTS[id]}pt</span>
-      </span>
-    </div>
-  );
-
   return (
     <div className="w-full max-w-4xl mx-auto py-8 relative z-10">
       <AnimatePresence>
@@ -531,7 +561,14 @@ export default function ChallengeBoard({
                         <FacetHighlight />
                       </motion.div>
                     </div>
-                    <NodeLabel id={centerChallenge.id} isCenter={true} />
+                    <NodeLabel
+                      id={centerChallenge.id}
+                      isCenter={true}
+                      shortName={SHORT_NAMES[centerChallenge.id] ?? `Challenge ${centerChallenge.id}`}
+                      stoneLabel={STONE_META[centerChallenge.id]?.label ?? "Stone"}
+                      stoneColor={getStoneColor(centerChallenge.id)}
+                      displayPoints={DISPLAY_POINTS[centerChallenge.id] ?? 0}
+                    />
                   </motion.button>
                 );
               })()}
@@ -601,7 +638,14 @@ export default function ChallengeBoard({
                             <FacetHighlight />
                           </motion.div>
                         </div>
-                        <NodeLabel id={challenge.id} isCenter={false} />
+                        <NodeLabel
+                          id={challenge.id}
+                          isCenter={false}
+                          shortName={SHORT_NAMES[challenge.id] ?? `Challenge ${challenge.id}`}
+                          stoneLabel={STONE_META[challenge.id]?.label ?? "Stone"}
+                          stoneColor={getStoneColor(challenge.id)}
+                          displayPoints={DISPLAY_POINTS[challenge.id] ?? 0}
+                        />
                       </motion.button>
                     </div>
                   );
