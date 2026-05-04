@@ -3,7 +3,9 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Challenge, StudentSession } from "@/types/app";
 import UploadZone from "./UploadZone";
+import DailyPostChallenge from "./DailyPostChallenge";
 import { buildChallenge8ReferralUrl } from "@/lib/utils";
+import type { Submission } from "@/types/database";
 
 type UploadState = "idle" | "uploading" | "received";
 const REFERRAL_STATS_URL = "https://nxtrewards.ccbp.in/";
@@ -16,11 +18,13 @@ export default function MissionModal({
   onSubmitSuccess,
   isSubmissionLocked,
   stoneColor,
+  submissions,
 }: {
   isOpen: boolean;
   onClose: () => void;
   challenge: Challenge | null;
   session: StudentSession;
+  submissions: Submission[];
   onSubmitSuccess: (payload: { taskId: number; submissionId?: string }) => void;
   isSubmissionLocked: boolean;
   stoneColor?: string;
@@ -426,6 +430,12 @@ export default function MissionModal({
                   </p>
                 )}
               </div>
+            ) : challenge.id === 6 ? (
+              <DailyPostChallenge
+                submissions={submissions}
+                onSuccess={onSubmitSuccess}
+                stoneColor={modalStoneColor}
+              />
             ) : (
               <div className="space-y-4 animate-in fade-in">
                 {challenge.requiresText ? (

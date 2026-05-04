@@ -9,8 +9,6 @@ const PLAGIARISM_REASON =
   "Submission rejected: this proof image is identical to another student's submission for this challenge. If you believe this is an error, please contact your instructor.";
 const ACTIVE_TASK_IDS = CHALLENGES.map((challenge) => challenge.id);
 const REFERRAL_CHALLENGE_ID = CHALLENGES.find((challenge) => challenge.isReferral)?.id;
-const STREAK_CHALLENGE_ID = 6;
-const STREAK_TOTAL_DAYS = 3;
 const TEAM_SUBMISSION_CHALLENGE_IDS = new Set([5]);
 const DUPLICATE_FILE_REASON =
   "Submission rejected: this exact file was already uploaded by you for this challenge. Please upload a different proof image.";
@@ -145,11 +143,8 @@ export async function POST(request: Request) {
 
     if (targetSubmission && targetSubmission.status === "accepted") {
       const isReferralChallenge = taskId === REFERRAL_CHALLENGE_ID;
-      const isStreakChallenge = taskId === STREAK_CHALLENGE_ID;
-      const hasStreakDaysRemaining =
-        isStreakChallenge && Number(targetSubmission.streak_day ?? 0) < STREAK_TOTAL_DAYS;
 
-      if (!isReferralChallenge && !hasStreakDaysRemaining) {
+      if (!isReferralChallenge) {
         return NextResponse.json(
           { success: false, error: "Challenge already completed. Re-submission is not allowed." },
           { status: 400 }
@@ -157,15 +152,6 @@ export async function POST(request: Request) {
       }
     }
 
-    if (
-      taskId === STREAK_CHALLENGE_ID &&
-      Number(targetSubmission?.streak_day ?? 0) >= STREAK_TOTAL_DAYS
-    ) {
-      return NextResponse.json(
-        { success: false, error: "3-Day Real Streak is complete. Maximum 3 accepted uploads reached." },
-        { status: 400 }
-      );
-    }
 
     // Self-heal: create missing row if not found
     if (!targetSubmission) {

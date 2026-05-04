@@ -41,7 +41,7 @@ const SHORT_NAMES: Record<number, string> = {
   3: "Connect Dots",
   4: "Caught Great",
   5: "Time Capsule",
-  6: "Real Streak",
+  6: "Insta Post",
 };
 
 const DISPLAY_POINTS: Record<number, number> = {
@@ -50,12 +50,11 @@ const DISPLAY_POINTS: Record<number, number> = {
   3: 7,
   4: 2,
   5: 2,
-  6: 1,
+  6: 2,
 };
 
 const STREAK_CHALLENGE_ID = 6;
 const REFERRAL_CHALLENGE_ID = 3;
-const STREAK_TOTAL_DAYS = 3;
 const COMPLETED_STATUSES = new Set(["accepted", "approved"]);
 
 const STONE_META: Record<number, { label: string; color: string }> = {
@@ -98,7 +97,8 @@ const NodeLabel = memo(function NodeLabel({
   stoneLabel,
   stoneColor,
   displayPoints,
-}: NodeLabelProps) {
+  coolMessage,
+}: NodeLabelProps & { coolMessage?: string | null }) {
   return (
     <div
       className="absolute pointer-events-none flex flex-col items-center gap-1 text-center"
@@ -109,6 +109,19 @@ const NodeLabel = memo(function NodeLabel({
         width: isCenter ? "140px" : "118px",
       }}
     >
+      <AnimatePresence>
+        {coolMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 5, scale: 0.8 }}
+            className="absolute bottom-full mb-4 px-3 py-1.5 rounded-lg bg-black/90 text-[10px] font-bold text-white whitespace-nowrap shadow-xl border border-white/10 z-50 pointer-events-none"
+          >
+            {coolMessage}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-black/90" />
+          </motion.div>
+        )}
+      </AnimatePresence>
       {isCenter ? (
         <>
           <span
@@ -169,6 +182,7 @@ export default function ChallengeBoard({
   const [crestRevealed, setCrestRevealed] = useState(false);
   const [isAnimatingFinale, setIsAnimatingFinale] = useState(false);
   const [wheelScale, setWheelScale] = useState(1);
+  const [hoveredTaskId, setHoveredTaskId] = useState<number | null>(null);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -228,14 +242,17 @@ export default function ChallengeBoard({
       return COMPLETED_STATUSES.has(String(latestReferralRow.status).toLowerCase());
     }
     if (challengeId === STREAK_CHALLENGE_ID) {
-      const maxAcceptedStreakCount = rows.reduce(
-        (max, row) =>
-          COMPLETED_STATUSES.has(String(row.status).toLowerCase())
-            ? Math.max(max, Number(row.streak_day ?? 0))
-            : max,
-        0
-      );
-      return maxAcceptedStreakCount >= STREAK_TOTAL_DAYS;
+      const latest = rows
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at ?? b.created_at).getTime() -
+            new Date(a.updated_at ?? a.created_at).getTime()
+        )[0];
+      if (!latest || !latest.verified_at) return false;
+      const isApproved = COMPLETED_STATUSES.has(String(latest.status).toLowerCase());
+      const isToday = new Date(latest.verified_at).toDateString() === new Date().toDateString();
+      return isApproved && isToday;
     }
     return hasCompletedSubmission(rows);
   };
@@ -272,11 +289,7 @@ export default function ChallengeBoard({
     const rows = submissionByTask.get(challenge.id) ?? [];
     if (challenge.isReferral) return false;
     if (challenge.id === STREAK_CHALLENGE_ID) {
-      const maxStreakDay = rows.reduce(
-        (max, row) => Math.max(max, Number(row.streak_day ?? 0)),
-        0
-      );
-      return maxStreakDay >= STREAK_TOTAL_DAYS;
+      return isChallengeComplete(STREAK_CHALLENGE_ID);
     }
     return hasCompletedSubmission(rows);
   };
@@ -285,6 +298,9 @@ export default function ChallengeBoard({
     const rows = submissionByTask.get(challenge.id) ?? [];
     if (rows.length === 0) return "default";
     const statuses = rows.map((r) => String(r.status).toLowerCase());
+    if (challenge.id === STREAK_CHALLENGE_ID) {
+      return isChallengeComplete(STREAK_CHALLENGE_ID) ? "success" : "default";
+    }
     if (statuses.some((s) => s === "approved" || s === "accepted")) return "success";
     if (statuses.some((s) => s === "under_review" || s === "verifying")) return "review";
     if (statuses.some((s) => s === "rejected")) return "danger";
@@ -556,6 +572,8 @@ export default function ChallengeBoard({
                         }}
                         initial="rest"
                         whileHover={isSubmissionLocked(centerChallenge) ? "rest" : "hover"}
+                        onMouseEnter={() => setHoveredTaskId(centerChallenge.id)}
+                        onMouseLeave={() => setHoveredTaskId(null)}
                         transition={{ duration: 0.2 }}
                       >
                         <FacetHighlight />
@@ -568,6 +586,7 @@ export default function ChallengeBoard({
                       stoneLabel={STONE_META[centerChallenge.id]?.label ?? "Stone"}
                       stoneColor={getStoneColor(centerChallenge.id)}
                       displayPoints={DISPLAY_POINTS[centerChallenge.id] ?? 0}
+                      coolMessage={hoveredTaskId === centerChallenge.id ? "Your referral link is live! 🚀" : null}
                     />
                   </motion.button>
                 );
@@ -615,6 +634,8 @@ export default function ChallengeBoard({
                         whileHover={locked ? { scale: 1 } : { scale: 1.12 }}
                         whileTap={locked ? { scale: 1 } : { scale: 1.03 }}
                         onClick={() => openChallenge(challenge)}
+                        onMouseEnter={() => setHoveredTaskId(challenge.id)}
+                        onMouseLeave={() => setHoveredTaskId(null)}
                         className={`relative flex w-full h-full items-center justify-center pointer-events-auto ${isAnimatingFinale ? "finale-implode" : ""}`}
                         style={{
                           borderRadius: "999px",
@@ -645,6 +666,7 @@ export default function ChallengeBoard({
                           stoneLabel={STONE_META[challenge.id]?.label ?? "Stone"}
                           stoneColor={getStoneColor(challenge.id)}
                           displayPoints={DISPLAY_POINTS[challenge.id] ?? 0}
+                          coolMessage={hoveredTaskId === challenge.id && challenge.id === 6 && locked ? "Recharging for tomorrow... ⚡" : null}
                         />
                       </motion.button>
                     </div>
@@ -668,6 +690,7 @@ export default function ChallengeBoard({
         isOpen={Boolean(activeTaskId)}
         challenge={activeChallenge}
         session={session}
+        submissions={submissions}
         onClose={() => setActiveTaskId(null)}
         onSubmitSuccess={handleSubmitted}
         isSubmissionLocked={activeChallenge ? isSubmissionLocked(activeChallenge) : false}

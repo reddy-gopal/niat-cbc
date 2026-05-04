@@ -214,53 +214,10 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing wh
   },
   {
     id: 6,
-    title: "3-Day Real Streak",
-    description: "One real post. Every day. All 3 days. No templates. Just one honest moment each day.",
-    verificationPrompt: `You are evaluating one day of "3-Day Real Streak" for NIAT CBC.
-Task: Student posted one honest personal moment as a WhatsApp Status or Instagram Story on this day.
-
-STEP 1 — Platform check:
-The image must show WhatsApp Status or Instagram Story UI.
-WhatsApp: "My Status", status bar, "Add to Status", or status viewer UI visible.
-Instagram: Story frame, "Your Story" ring, story creation screen, or story viewer.
-If no recognizable status/story UI is visible → REJECT immediately.
-
-STEP 2 — Content presence check:
-The status/story must contain something the student created or wrote — not just a reshared post.
-If a reshare icon is visible, or it is clearly another person's content being reposted → REJECT.
-
-STEP 3 — Content intent check (most important):
-READ and OBSERVE the actual content in the status/story.
-This challenge requires one honest personal moment per day — something real from their day, not just any random post.
-
-REJECT if the content is:
-- A random aesthetic photo, scenery, food, or meme with no personal context
-- A motivational quote or copied text with no personal element added
-- AI-generated image or text (illustrated, suspiciously polished, no real human feel)
-- A reshared reel, post, or another person's story
-- A promotional or brand post
-- Completely generic with no connection to a real personal moment
-
-ACCEPT if the content shows a real honest moment from the student's day — this can be:
-- A personal reflection written in the story/status
-- A photo of something meaningful from their actual day with a personal caption
-- A candid moment, update, or thought that feels genuinely human and personal
-- Imperfect, casual, or short — as long as it is real
-
-The post does NOT need to be polished. It MUST feel like a real human moment, not a random or generic post.
-
-Examples:
-✅ A selfie with text "Day 2 — tired but showed up anyway"
-✅ A written status: "Had a weird day but grateful for small things"
-✅ A photo of their notes with "grinding today"
-❌ A random sunset photo with no caption
-❌ A motivational quote repost
-❌ An AI-generated illustration
-❌ A food photo with just an emoji
-
-JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what the content actually showed and why it was accepted or rejected"}`,
-    day: "Days 1-3",
-    points: 1,
+    title: "Daily Insta Post",
+    description: "Upload a screenshot of your Instagram post tagging #niatbootcamp2026",
+    day: "Daily",
+    points: 2,
     requiresUpload: true,
     requiresText: false,
   },

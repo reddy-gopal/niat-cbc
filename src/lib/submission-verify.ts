@@ -5,8 +5,7 @@ import { adminClient } from "../../utils/supabase/admin";
 type AnthropicResponse = {
   content?: Array<{ type: string; text?: string }>;
 };
-const STREAK_CHALLENGE_ID = 6;
-const STREAK_TOTAL_ACCEPTS = 3;
+
 
 const GLOBAL_FALLBACK_PROMPT =
   'You are verifying student challenge submissions for a bootcamp program called NIAT CBC. Use a strongly student-friendly, benefit-of-the-doubt policy. Default to ACCEPT unless there is clear evidence the submission is not a real attempt. ACCEPT when the response is reasonably related to the challenge topic, even if short, vague, imperfect, emotional, partially incorrect, or missing details. If you are uncertain between accepted and rejected, choose accepted. Do not penalize grammar, spelling, style, brevity, image quality, lighting, composition, or minor ambiguity. For text tasks: any genuine topic-related response should be accepted. For image tasks: accept if the image plausibly matches the scenario. Only REJECT when clearly off-topic, blank/gibberish, spam/copied junk, inappropriate, or clearly not an attempt. Respond ONLY with valid JSON, no other text: {"verdict": "accepted" or "rejected", "reason": "one plain English sentence"}. For accepted verdicts, give an encouraging and specific reason. For rejected verdicts, give a brief kind reason.';
@@ -222,93 +221,22 @@ export async function verifySubmissionById(
         .eq("id", submission.student_id)
         .maybeSingle();
 
-      if (submission.task_id === STREAK_CHALLENGE_ID) {
-        const acceptedCount = Number(submission.streak_day ?? 0);
-        if (acceptedCount >= STREAK_TOTAL_ACCEPTS) {
-          parsedVerdict.verdict = "rejected";
-          parsedVerdict.reason =
-            "3-Day Real Streak is already complete with 3 accepted proofs.";
-        } else {
-          const nextAcceptedCount = acceptedCount + 1;
-          const submissionUpdate = adminClient
-            .from("submissions")
-            .update({
-              status: "accepted",
-              points: challenge.points,
-              ai_reason: parsedVerdict.reason,
-              verified_at: verifiedAt,
-              updated_at: verifiedAt,
-              streak_day: nextAcceptedCount,
-            })
-            .eq("id", submission.id);
+      const { error: acceptError } = await adminClient.rpc("accept_submission_and_award_points", {
+        p_submission_id: submission.id,
+        p_points: challenge.points,
+        p_ai_reason: parsedVerdict.reason,
+        p_verified_at: verifiedAt,
+        p_team_id: student?.team_id ?? null,
+      });
 
-          const { data: acceptedSubmission, error: acceptError } =
-            acceptedCount === 0 && submission.streak_day == null
-              ? await submissionUpdate.is("streak_day", null).select("id").maybeSingle()
-              : await submissionUpdate.eq("streak_day", acceptedCount).select("id").maybeSingle();
-
-          if (acceptError || !acceptedSubmission) {
-            parsedVerdict.verdict = "rejected";
-            parsedVerdict.reason =
-              "3-Day Real Streak is already complete with 3 accepted proofs.";
-          } else if (student?.team_id) {
-            const { data: teamData, error: teamReadError } = await adminClient
-              .from("teams")
-              .select("total_points")
-              .eq("id", student.team_id)
-              .maybeSingle();
-
-            if (teamReadError || !teamData) {
-              throw new Error("Failed to load team points for streak acceptance.");
-            }
-
-            const { error: teamUpdateError } = await adminClient
-              .from("teams")
-              .update({
-                total_points: teamData.total_points + challenge.points,
-                last_point_at: verifiedAt,
-              })
-              .eq("id", student.team_id);
-
-            if (teamUpdateError) {
-              throw new Error("Failed to update team points for streak acceptance.");
-            }
-          }
-        }
-      } else {
-        const { error: acceptError } = await adminClient.rpc("accept_submission_and_award_points", {
-          p_submission_id: submission.id,
-          p_points: challenge.points,
-          p_ai_reason: parsedVerdict.reason,
-          p_verified_at: verifiedAt,
-          p_team_id: student?.team_id ?? null,
+      if (acceptError) {
+        console.error("[verify] accept_submission_and_award_points failed", {
+          submissionId: submission.id,
+          error: acceptError,
         });
-
-        if (acceptError) {
-          console.error("[verify] accept_submission_and_award_points failed", {
-            submissionId: submission.id,
-            error: acceptError,
-          });
-          throw new Error("Failed to accept submission and award points.");
-        }
+        throw new Error("Failed to accept submission and award points.");
       }
 
-      if (parsedVerdict.verdict === "rejected") {
-        const { error: rejectAfterCapError } = await adminClient
-          .from("submissions")
-          .update({
-            status: "rejected",
-            points: 0,
-            ai_reason: parsedVerdict.reason,
-            verified_at: verifiedAt,
-            updated_at: verifiedAt,
-          })
-          .eq("id", submission.id);
-
-        if (rejectAfterCapError) {
-          throw new Error("Failed to update streak submission after limit check.");
-        }
-      }
     } else {
       const { error: rejectError } = await adminClient
         .from("submissions")
