@@ -170,41 +170,44 @@ Respond with JSON only:
     description: "One sentence to your future self. Sealed. Collected by your tribe leader. Opened one year from today. Any proof format is allowed.",
     verificationPrompt: `You are evaluating "Tribe Time Capsule" for NIAT CBC.
 
-Task: Students wrote personal messages to their future selves on paper, folded and sealed them. The tribe leader collected ALL folded papers from their group and submitted a photo of the collected batch.
+Task: Students wrote personal messages to their future selves on paper, folded or kept them as-is, and the tribe leader collected ALL papers from their group and submitted a photo of the collected batch.
 
 UNDERSTAND THE FORMAT FIRST:
 This is a TRIBE COLLECTION submission — not an individual student photo.
 Valid submissions look like:
-- Multiple folded papers collected together (held, stacked, spread out)
-- A pile or bundle of folded/sealed notes from the whole tribe
-- Folded papers with names written on the outside, grouped together
-- A single folded paper if the tribe has only one member present
-The messages INSIDE are intentionally hidden/sealed — that is the point of the task.
+- Multiple papers collected together (held, stacked, spread out, or loosely arranged)
+- Papers may be folded, half-folded, or flat — all are valid
+- Papers with names, labels, or messages visible on the outside
+- A bundle or pile of notes from the whole tribe
+- Papers being held together or laid out as a group
+- Handwritten notes, index cards, torn notebook pages, sticky notes — all valid formats
+The messages may be partially or fully visible — that is acceptable.
 
-STEP 1 — Is there physical proof of collected folded notes?
-Look for: multiple folded papers, a stack of sealed notes, papers with names on outside.
+STEP 1 — Is there physical proof of collected papers/notes?
+Look for: any papers, cards, or written notes grouped together.
 If the image shows NO paper or notes at all → REJECT.
 
 STEP 2 — Does it look like a genuine collected batch?
-Papers should appear folded/sealed, not blank or empty.
-A random unrelated photo with no papers → REJECT.
-A single blank unfolded paper with nothing on it → REJECT.
+There should be more than one piece of paper, OR a single paper clearly representing a one-member tribe.
+A completely random unrelated photo with no papers → REJECT.
 
-STEP 3 — If any text IS visible on the papers, apply a light check:
-Names or labels on the outside of folded papers → perfectly valid, ACCEPT.
-If a message happens to be open and readable — it should look personal, not a meme or random caption.
+STEP 3 — Light content check if text is visible:
+Names, sentences, or personal notes on the papers → perfectly valid, ACCEPT.
+If messages are readable, they should look like genuine personal sentences — not memes, printed ads, or random unrelated captions.
+Partially written, short sentences, or even just names on papers → ACCEPT.
 
 ACCEPT if:
-✅ Multiple folded papers collected together
-✅ A stack or pile of sealed notes held or placed by tribe leader
-✅ Papers with student names written on the outside
-✅ Even a single folded paper if it clearly looks sealed and intentional
-✅ Papers being handed over or arranged for collection
+✅ Multiple papers/cards/notes collected or grouped together
+✅ Papers with names or sentences written on them (folded or unfolded)
+✅ A stack, pile, or loose arrangement of handwritten notes
+✅ Papers being held together or laid out by the tribe leader
+✅ Index cards, notebook pages, torn paper — any physical writing surface
+✅ Even a single paper if it clearly appears intentional and complete
 
 REJECT if:
 ❌ No paper or written notes visible anywhere in the image
-❌ Completely unrelated photo (food, selfie, random scene)
-❌ Blank unfolded papers with nothing written or folded
+❌ Completely unrelated photo (selfie only, food, random scene with no papers)
+❌ Completely blank papers with absolutely nothing written on them
 
 JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what was visible in the image and why it was accepted or rejected"}`,
     day: "Day 2",
