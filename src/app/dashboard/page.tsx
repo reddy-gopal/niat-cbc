@@ -44,6 +44,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         id,
         full_name,
         mobile,
+        total_points,
         section_id,
         bootcamp_id,
         region_id,
@@ -71,7 +72,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .not("points", "is", null),
   ]);
 
-  const student = studentResponse.data as StudentWithContext | null;
+  const student = studentResponse.data as (StudentWithContext & { total_points: number }) | null;
   if (!student || !student.sections || !student.bootcamps || !student.regions) {
     redirect("/invalid");
   }
@@ -130,18 +131,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         new Date(b.updated_at ?? b.created_at).getTime() -
         new Date(a.updated_at ?? a.created_at).getTime()
     )[0];
-  const referralSubmissionPoints =
-    latestReferralSubmission &&
-    COMPLETED_ATTEMPT_STATUSES.has(
-      String(latestReferralSubmission.status ?? "").trim().toLowerCase()
-    )
-      ? Number(latestReferralSubmission.points ?? 0) || 0
-      : 0;
 
-  const totalPoints = nonReferralAttemptScore.reduce(
-    (sum, attempt) => sum + (Number(attempt.points ?? 0) || 0),
-    0
-  ) + referralSubmissionPoints;
+  const totalPoints = student.total_points ?? 0;
 
   const completedChallengeSet = new Set(
     nonReferralAttemptScore
@@ -174,5 +165,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       totalPoints={totalPoints}
       completedChallenges={completedChallenges}
     />
+
   );
 }

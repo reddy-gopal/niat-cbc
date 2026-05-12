@@ -18,7 +18,7 @@ export default async function LeaderboardPage() {
 
   const { data: studentsData } = await supabase
     .from("students")
-    .select("id, full_name, team_id, sections(label), bootcamps(name)")
+    .select("id, full_name, team_id, total_points, sections(label), bootcamps(name)")
     .eq("section_id", session.sectionId);
 
   const { data: teamsData } = await supabase
@@ -69,16 +69,7 @@ export default async function LeaderboardPage() {
     status: string | null;
   }> | null) ?? []);
 
-  const scoreMap = new Map<string, { totalPoints: number; completedChallenges: number }>();
-  for (const attempt of allAttempts ?? []) {
-    const studentId = String(attempt.student_id ?? "");
-    if (!studentId) continue;
-    if (!scoreMap.has(studentId)) {
-      scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
-    }
-    const entry = scoreMap.get(studentId)!;
-    entry.totalPoints += Number(attempt.points ?? 0) || 0;
-  }
+  const completedChallengesMap = new Map<string, number>();
 
   const taskMap = new Map<string, Set<number>>();
   for (const attempt of allAttempts ?? []) {
@@ -91,11 +82,9 @@ export default async function LeaderboardPage() {
     }
   }
   for (const [studentId, tasks] of taskMap) {
-    if (!scoreMap.has(studentId)) {
-      scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
-    }
-    scoreMap.get(studentId)!.completedChallenges = tasks.size;
+    completedChallengesMap.set(studentId, tasks.size);
   }
+
   const latestReferralByStudent = new Map<string, (typeof referralSubmissions)[number]>();
   for (const row of referralSubmissions) {
     const studentId = String(row.student_id ?? "");
@@ -111,34 +100,29 @@ export default async function LeaderboardPage() {
       latestReferralByStudent.set(studentId, row);
     }
   }
+
   for (const [studentId, row] of latestReferralByStudent) {
     if (!COMPLETED_ATTEMPT_STATUSES.has(String(row.status ?? "").trim().toLowerCase())) {
       continue;
     }
-    if (!scoreMap.has(studentId)) {
-      scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
-    }
-    const entry = scoreMap.get(studentId)!;
-    entry.totalPoints += Number(row.points ?? 0) || 0;
-    entry.completedChallenges += 1;
+    completedChallengesMap.set(studentId, (completedChallengesMap.get(studentId) || 0) + 1);
   }
 
   const entries: LeaderboardEntry[] = (studentsData ?? [])
     .map((row) => {
-      const score = scoreMap.get(row.id as string) ?? {
-        totalPoints: 0,
-        completedChallenges: 0,
-      };
+      const completedChallenges = completedChallengesMap.get(row.id as string) ?? 0;
+      const totalPoints = (row as any).total_points ?? 0;
       return {
         rank: 0,
         studentId: row.id as string,
         fullName: row.full_name as string,
-        totalPoints: score.totalPoints,
-        completedChallenges: score.completedChallenges,
+        totalPoints: totalPoints,
+        completedChallenges: completedChallenges,
       };
     })
     .sort((a, b) => b.totalPoints - a.totalPoints)
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
+
 
   // Calculate Team Entries
   const teamMap = new Map<string, { totalPoints: number; memberCount: number; members: string[]; leaderId: string; name: string }>();
@@ -150,12 +134,12 @@ export default async function LeaderboardPage() {
   (studentsData || []).forEach(s => {
     if (s.team_id && teamMap.has(s.team_id)) {
       const team = teamMap.get(s.team_id)!;
-      const score = scoreMap.get(s.id as string) ?? { totalPoints: 0, completedChallenges: 0 };
-      team.totalPoints += score.totalPoints;
+      team.totalPoints += (s as any).total_points ?? 0;
       team.memberCount += 1;
       team.members.push(s.full_name);
     }
   });
+
 
   const teamEntries = Array.from(teamMap.entries())
     .map(([id, data]) => ({

@@ -75,7 +75,7 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
     const { data: students, error: studentsError } = await adminClient
       .from("students")
       .select(
-        "id, full_name, team_id, regions(name), bootcamps(name), sections(label)"
+        "id, full_name, team_id, total_points, regions(name), bootcamps(name), sections(label)"
       )
       .eq("region_id", selectedRegionId)
       .eq("bootcamp_id", selectedBootcampId)
@@ -135,16 +135,7 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
       status: string | null;
     }> | null) ?? []);
 
-    const scoreMap = new Map<string, { totalPoints: number; completedChallenges: number }>();
-    for (const attempt of allAttempts ?? []) {
-      const studentId = String(attempt.student_id ?? "");
-      if (!studentId) continue;
-      if (!scoreMap.has(studentId)) {
-        scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
-      }
-      const entry = scoreMap.get(studentId)!;
-      entry.totalPoints += Number(attempt.points ?? 0) || 0;
-    }
+    const completedChallengesMap = new Map<string, number>();
 
     const taskMap = new Map<string, Set<number>>();
     for (const attempt of allAttempts ?? []) {
@@ -157,11 +148,9 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
       }
     }
     for (const [studentId, tasks] of taskMap) {
-      if (!scoreMap.has(studentId)) {
-        scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
-      }
-      scoreMap.get(studentId)!.completedChallenges = tasks.size;
+      completedChallengesMap.set(studentId, tasks.size);
     }
+
     const latestReferralByStudent = new Map<string, (typeof referralSubmissions)[number]>();
     for (const row of referralSubmissions) {
       const studentId = String(row.student_id ?? "");
@@ -181,12 +170,7 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
       if (!COMPLETED_ATTEMPT_STATUSES.has(String(row.status ?? "").trim().toLowerCase())) {
         continue;
       }
-      if (!scoreMap.has(studentId)) {
-        scoreMap.set(studentId, { totalPoints: 0, completedChallenges: 0 });
-      }
-      const entry = scoreMap.get(studentId)!;
-      entry.totalPoints += Number(row.points ?? 0) || 0;
-      entry.completedChallenges += 1;
+      completedChallengesMap.set(studentId, (completedChallengesMap.get(studentId) || 0) + 1);
     }
 
     const teamMap = new Map<string, { name: string; totalPoints: number; memberCount: number; members: string[] }>();
@@ -194,14 +178,12 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
 
     rows = (students ?? [])
       .map((student) => {
-        const score = scoreMap.get(student.id as string) ?? {
-          totalPoints: 0,
-          completedChallenges: 0,
-        };
+        const completedChallenges = completedChallengesMap.get(student.id as string) ?? 0;
+        const totalPoints = (student as any).total_points ?? 0;
         
         if (student.team_id && teamMap.has(student.team_id)) {
           const t = teamMap.get(student.team_id)!;
-          t.totalPoints += score.totalPoints;
+          t.totalPoints += totalPoints;
           t.memberCount += 1;
           t.members.push(student.full_name);
         }
@@ -212,8 +194,8 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
           region_name: (student.regions as { name?: string } | null)?.name ?? "",
           bootcamp_name: (student.bootcamps as { name?: string } | null)?.name ?? "",
           section_label: (student.sections as { label?: string } | null)?.label ?? "",
-          total_points: score.totalPoints,
-          completed: score.completedChallenges,
+          total_points: totalPoints,
+          completed: completedChallenges,
         };
       })
       .sort((a, b) => b.total_points - a.total_points);
@@ -226,6 +208,7 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
       member_count: data.memberCount,
       members: data.members.sort()
     })).sort((a, b) => b.average_points - a.average_points);
+
 
     return (
       <AdminLeaderboardClient
