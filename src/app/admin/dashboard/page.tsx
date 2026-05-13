@@ -20,13 +20,13 @@ export default async function AdminDashboardPage() {
       .gt("created_at", oneDayAgo.toISOString())
       .neq("status", "not_started"),
     adminClient
-      .from("submissions")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "accepted"),
+      .from("student_challenge_status")
+      .select("student_id", { count: "exact", head: true })
+      .eq("is_completed", true),
     adminClient
-      .from("submissions")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["accepted", "rejected"]),
+      .from("student_challenge_status")
+      .select("student_id", { count: "exact", head: true })
+      .neq("latest_status", "not_started"),
     adminClient.from("regions").select("id, name"),
     adminClient.from("students").select("region_id"),
   ]);

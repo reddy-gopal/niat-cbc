@@ -87,90 +87,32 @@ export default async function AdminLeaderboardPage({ searchParams }: Props) {
       .eq("section_id", selectedSectionId);
 
     const studentIds = (students ?? []).map((student) => student.id as string);
-    const { data: allAttemptsRaw, error: attemptsError } = studentIds.length
+    const { data: challengeStatusData, error: statusError } = studentIds.length
       ? await adminClient
-          .from("submission_attempts")
-          .select("student_id, task_id, points, status")
+          .from("student_challenge_status")
+          .select("student_id, task_id, is_completed, points_earned")
           .in("student_id", studentIds)
-          .not("points", "is", null)
-      : { data: [], error: null };
-    const { data: referralSubmissionsRaw, error: referralSubmissionsError } = studentIds.length
-      ? await adminClient
-          .from("submissions")
-          .select("student_id, task_id, points, status, created_at, updated_at")
-          .in("student_id", studentIds)
-          .eq("task_id", REFERRAL_CHALLENGE_ID)
       : { data: [], error: null };
 
-    if (studentsError || teamsError || attemptsError || referralSubmissionsError) {
-      const reasons = [studentsError, teamsError, attemptsError, referralSubmissionsError]
+    if (studentsError || teamsError || statusError) {
+      const reasons = [studentsError, teamsError, statusError]
         .filter(Boolean)
         .map((error) => error?.message ?? "Unknown error");
       scoringError = `Leaderboard scoring data may be incomplete: ${reasons.join(" | ")}`;
       console.error("[admin/leaderboard] Data fetch failed:", {
         studentsError,
         teamsError,
-        attemptsError,
-        referralSubmissionsError,
+        statusError,
       });
     }
 
-    const allAttempts =
-      ((allAttemptsRaw as Array<{
-        student_id: string | null;
-        task_id: number | string | null;
-        points: number | string | null;
-        status: string | null;
-      }> | null) ?? [])
-        .filter((attempt) => Number(attempt.task_id) !== REFERRAL_CHALLENGE_ID)
-        .filter((attempt) =>
-        COMPLETED_ATTEMPT_STATUSES.has(String(attempt.status ?? "").trim().toLowerCase())
-      );
-    const referralSubmissions = ((referralSubmissionsRaw as Array<{
-      student_id: string | null;
-      task_id: number | string | null;
-      points: number | string | null;
-      created_at?: string | null;
-      updated_at?: string | null;
-      status: string | null;
-    }> | null) ?? []);
-
     const completedChallengesMap = new Map<string, number>();
 
-    const taskMap = new Map<string, Set<number>>();
-    for (const attempt of allAttempts ?? []) {
-      const studentId = String(attempt.student_id ?? "");
-      if (!studentId) continue;
-      if (!taskMap.has(studentId)) taskMap.set(studentId, new Set<number>());
-      const taskId = Number(attempt.task_id);
-      if (Number.isFinite(taskId)) {
-        taskMap.get(studentId)!.add(taskId);
+    for (const status of (challengeStatusData ?? [])) {
+      if (status.is_completed) {
+        const studentId = status.student_id;
+        completedChallengesMap.set(studentId, (completedChallengesMap.get(studentId) || 0) + 1);
       }
-    }
-    for (const [studentId, tasks] of taskMap) {
-      completedChallengesMap.set(studentId, tasks.size);
-    }
-
-    const latestReferralByStudent = new Map<string, (typeof referralSubmissions)[number]>();
-    for (const row of referralSubmissions) {
-      const studentId = String(row.student_id ?? "");
-      if (!studentId) continue;
-      const prev = latestReferralByStudent.get(studentId);
-      if (!prev) {
-        latestReferralByStudent.set(studentId, row);
-        continue;
-      }
-      const prevTime = new Date(prev.updated_at ?? prev.created_at ?? 0).getTime();
-      const rowTime = new Date(row.updated_at ?? row.created_at ?? 0).getTime();
-      if (rowTime >= prevTime) {
-        latestReferralByStudent.set(studentId, row);
-      }
-    }
-    for (const [studentId, row] of latestReferralByStudent) {
-      if (!COMPLETED_ATTEMPT_STATUSES.has(String(row.status ?? "").trim().toLowerCase())) {
-        continue;
-      }
-      completedChallengesMap.set(studentId, (completedChallengesMap.get(studentId) || 0) + 1);
     }
 
     const teamMap = new Map<string, { name: string; totalPoints: number; memberCount: number; members: string[] }>();
