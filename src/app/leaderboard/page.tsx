@@ -4,9 +4,7 @@ import { getStudentSession } from "@/lib/session";
 import type { LeaderboardEntry } from "@/types/app";
 import { adminClient } from "../../../utils/supabase/admin";
 import { createClient } from "../../../utils/supabase/server";
-
-const COMPLETED_ATTEMPT_STATUSES = new Set(["accepted", "approved"]);
-const REFERRAL_CHALLENGE_ID = 3;
+import type { StudentChallengeStatus } from "@/types/database";
 
 export default async function LeaderboardPage() {
   const session = await getStudentSession();
@@ -18,94 +16,37 @@ export default async function LeaderboardPage() {
 
   const { data: studentsData } = await supabase
     .from("students")
-    .select("id, full_name, team_id, total_points, sections(label), bootcamps(name)")
-    .eq("section_id", session.sectionId);
+    .select("id, full_name, team_id, total_points, sections(label), bootcamps(name), updated_at")
+    .eq("section_id", session.sectionId)
+    .eq("bootcamp_id", session.bootcampId);
 
   const { data: teamsData } = await supabase
     .from("teams")
-    .select("id, name, leader_id")
-    .eq("section_id", session.sectionId);
+    .select("id, name, leader_id, total_points")
+    .eq("section_id", session.sectionId)
+    .eq("bootcamp_id", session.bootcampId);
 
   const studentIds = (studentsData ?? []).map((row) => row.id as string);
-  const { data: allAttemptsRaw, error: attemptsError } = studentIds.length
+  
+  const { data: allStatusesRaw, error: statusesError } = studentIds.length
     ? await adminClient
-        .from("submission_attempts")
-        .select("student_id, task_id, points, status")
+        .from("student_challenge_status")
+        .select("*")
         .in("student_id", studentIds)
-        .not("points", "is", null)
-    : { data: [], error: null };
-  const { data: referralSubmissionsRaw, error: referralSubmissionsError } = studentIds.length
-    ? await adminClient
-        .from("submissions")
-        .select("student_id, task_id, points, status, created_at, updated_at")
-        .in("student_id", studentIds)
-        .eq("task_id", REFERRAL_CHALLENGE_ID)
     : { data: [], error: null };
 
-  if (attemptsError || referralSubmissionsError) {
-    console.error("[leaderboard] Score fetch failed:", {
-      attemptsError,
-      referralSubmissionsError,
-    });
+  if (statusesError) {
+    console.error("[leaderboard] Challenge status fetch failed:", statusesError);
   }
 
-  const allAttempts =
-    ((allAttemptsRaw as Array<{
-      student_id: string | null;
-      task_id: number | string | null;
-      points: number | string | null;
-      status: string | null;
-    }> | null) ?? [])
-      .filter((attempt) => Number(attempt.task_id) !== REFERRAL_CHALLENGE_ID)
-      .filter((attempt) =>
-      COMPLETED_ATTEMPT_STATUSES.has(String(attempt.status ?? "").trim().toLowerCase())
-    );
-  const referralSubmissions = ((referralSubmissionsRaw as Array<{
-    student_id: string | null;
-    task_id: number | string | null;
-    points: number | string | null;
-    created_at?: string | null;
-    updated_at?: string | null;
-    status: string | null;
-  }> | null) ?? []);
-
+  const allStatuses = (allStatusesRaw ?? []) as StudentChallengeStatus[];
   const completedChallengesMap = new Map<string, number>();
 
-  const taskMap = new Map<string, Set<number>>();
-  for (const attempt of allAttempts ?? []) {
-    const studentId = String(attempt.student_id ?? "");
-    if (!studentId) continue;
-    if (!taskMap.has(studentId)) taskMap.set(studentId, new Set<number>());
-    const taskId = Number(attempt.task_id);
-    if (Number.isFinite(taskId)) {
-      taskMap.get(studentId)!.add(taskId);
+  for (const status of allStatuses) {
+    if (status.is_completed) {
+      const studentId = status.student_id;
+      completedChallengesMap.set(studentId, (completedChallengesMap.get(studentId) || 0) + 1);
     }
-  }
-  for (const [studentId, tasks] of taskMap) {
-    completedChallengesMap.set(studentId, tasks.size);
-  }
-
-  const latestReferralByStudent = new Map<string, (typeof referralSubmissions)[number]>();
-  for (const row of referralSubmissions) {
-    const studentId = String(row.student_id ?? "");
-    if (!studentId) continue;
-    const prev = latestReferralByStudent.get(studentId);
-    if (!prev) {
-      latestReferralByStudent.set(studentId, row);
-      continue;
-    }
-    const prevTime = new Date(prev.updated_at ?? prev.created_at ?? 0).getTime();
-    const rowTime = new Date(row.updated_at ?? row.created_at ?? 0).getTime();
-    if (rowTime >= prevTime) {
-      latestReferralByStudent.set(studentId, row);
-    }
-  }
-
-  for (const [studentId, row] of latestReferralByStudent) {
-    if (!COMPLETED_ATTEMPT_STATUSES.has(String(row.status ?? "").trim().toLowerCase())) {
-      continue;
-    }
-    completedChallengesMap.set(studentId, (completedChallengesMap.get(studentId) || 0) + 1);
   }
 
   const entries: LeaderboardEntry[] = (studentsData ?? [])
@@ -118,40 +59,38 @@ export default async function LeaderboardPage() {
         fullName: row.full_name as string,
         totalPoints: totalPoints,
         completedChallenges: completedChallenges,
+        updatedAt: row.updated_at,
       };
     })
-    .sort((a, b) => b.totalPoints - a.totalPoints)
+    // Sort by points (DESC), then by updatedAt (DESC - most recent first) for tie-breaking
+    .sort((a, b) => {
+      if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+    })
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
+  // --- AUDIT FIX: Use teams.total_points directly ---
+  const teamEntries = (teamsData || [])
+    .map((t) => {
+      const members = (studentsData || [])
+        .filter((s) => s.team_id === t.id)
+        .map((s) => s.full_name as string)
+        .sort();
+      
+      const memberCount = members.length;
+      const totalPoints = t.total_points ?? 0;
 
-  // Calculate Team Entries
-  const teamMap = new Map<string, { totalPoints: number; memberCount: number; members: string[]; leaderId: string; name: string }>();
-  
-  (teamsData || []).forEach(t => {
-    teamMap.set(t.id, { totalPoints: 0, memberCount: 0, members: [], leaderId: t.leader_id, name: t.name });
-  });
-
-  (studentsData || []).forEach(s => {
-    if (s.team_id && teamMap.has(s.team_id)) {
-      const team = teamMap.get(s.team_id)!;
-      team.totalPoints += (s as any).total_points ?? 0;
-      team.memberCount += 1;
-      team.members.push(s.full_name);
-    }
-  });
-
-
-  const teamEntries = Array.from(teamMap.entries())
-    .map(([id, data]) => ({
-      rank: 0,
-      teamId: id,
-      name: data.name,
-      leaderName: "", // We can identify this from members list or another fetch, but using member display instead.
-      totalPoints: data.totalPoints,
-      memberCount: data.memberCount,
-      members: data.members.sort(),
-      averagePoints: data.memberCount > 0 ? data.totalPoints / data.memberCount : 0,
-    }))
+      return {
+        rank: 0,
+        teamId: t.id,
+        name: t.name,
+        leaderName: "",
+        totalPoints: totalPoints,
+        memberCount: memberCount,
+        members: members,
+        averagePoints: memberCount > 0 ? totalPoints / memberCount : 0,
+      };
+    })
     .filter(t => t.memberCount > 0)
     .sort((a, b) => b.averagePoints - a.averagePoints)
     .map((entry, index) => ({ ...entry, rank: index + 1 }));

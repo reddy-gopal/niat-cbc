@@ -366,7 +366,20 @@ export type Database = {
         };
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      student_challenge_status: {
+        Row: {
+          student_id: string;
+          task_id: number;
+          bootcamp_id: string;
+          attempts_used: number;
+          is_completed: boolean;
+          points_earned: number;
+          latest_status: SubmissionStatus;
+          completed_at: string | null;
+        };
+      };
+    };
     Functions: Record<string, never>;
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
@@ -380,6 +393,7 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Student = Database["public"]["Tables"]["students"]["Row"];
 export type Team = Database["public"]["Tables"]["teams"]["Row"];
 export type Submission = Database["public"]["Tables"]["submissions"]["Row"];
+export type StudentChallengeStatus = Database["public"]["Views"]["student_challenge_status"]["Row"];
 export type SubmissionAttemptRow = Database["public"]["Tables"]["submission_attempts"]["Row"];
 
 /** Application shape for a single upload attempt (matches `submission_attempts` row semantics). */

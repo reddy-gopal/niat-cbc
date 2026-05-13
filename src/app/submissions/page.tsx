@@ -2,27 +2,8 @@ import { redirect } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getStudentSession } from "@/lib/session";
 import { adminClient } from "../../../utils/supabase/admin";
-import type { SafeAttempt } from "@/types/database";
 
-const SubmissionsClient = dynamic(() => import("@/components/submissions/SubmissionsClient"));
-
-type AttemptRow = {
-  id: string;
-  submission_id: string;
-  student_id: string;
-  task_id: number;
-  bootcamp_id: string;
-  attempt_number: number;
-  status: string;
-  ai_reason: string | null;
-  points: number;
-  verified_at: string | null;
-  created_at: string;
-  file_url: string | null;
-  text_response: string | null;
-  verification_attempts: number;
-  last_attempted_at: string | null;
-};
+import SubmissionsClient from "@/components/submissions/SubmissionsClient";
 
 export default async function SubmissionsPage() {
   const session = await getStudentSession();
@@ -30,32 +11,57 @@ export default async function SubmissionsPage() {
     redirect("/");
   }
 
-  const { data: rows, error } = await adminClient
+  const supabase = adminClient;
+  
+  // 1. Fetch submission attempts for all tasks except task 3
+  const { data: attempts, error: attemptsError } = await supabase
     .from("submission_attempts")
-    .select(
-      "id, submission_id, student_id, task_id, bootcamp_id, attempt_number, status, ai_reason, points, verified_at, created_at, file_url, text_response, verification_attempts, last_attempted_at"
-    )
+    .select("*")
     .eq("student_id", session.studentId)
     .order("created_at", { ascending: false });
 
-  const rawRows = (error ? [] : (rows ?? [])) as AttemptRow[];
-  const safeAttempts: SafeAttempt[] = rawRows.map((a) => ({
-    id: a.id,
-    submission_id: a.submission_id,
-    student_id: a.student_id,
-    task_id: a.task_id,
-    bootcamp_id: a.bootcamp_id,
-    attempt_number: a.attempt_number,
-    status: a.status as SafeAttempt["status"],
-    ai_reason: a.ai_reason,
-    points: a.points,
-    verified_at: a.verified_at,
-    created_at: a.created_at,
-    text_response: a.text_response,
-    verification_attempts: a.verification_attempts,
-    last_attempted_at: a.last_attempted_at,
-    hasProof: Boolean(a.file_url),
-  }));
+  // 2. Fetch submissions for referral task (task_id=3)
+  const { data: referrals, error: referralsError } = await supabase
+    .from("submissions")
+    .select("*")
+    .eq("student_id", session.studentId)
+    .eq("task_id", 3)
+    .eq("bootcamp_id", session.bootcampId)
+    .order("created_at", { ascending: false });
 
-  return <SubmissionsClient session={session} initialAttempts={safeAttempts} />;
+  if (attemptsError || referralsError) {
+    console.error("[submissions] data fetch failed:", { attemptsError, referralsError });
+  }
+
+  // Combine and sort by date
+  const allAttempts = [
+    ...(attempts ?? []),
+    ...(referrals ?? []),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  // Fetch signed URLs for all images
+  const imagePaths = allAttempts
+    .map((a) => a.file_url)
+    .filter((url): url is string => Boolean(url));
+  
+  const signedUrls: Record<string, string> = {};
+  if (imagePaths.length > 0) {
+    const { data: signedData } = await adminClient.storage
+      .from("submissions")
+      .createSignedUrls(imagePaths, 3600);
+    
+    signedData?.forEach((item) => {
+      if (item.path && item.signedUrl) {
+        signedUrls[item.path] = item.signedUrl;
+      }
+    });
+  }
+
+  return (
+    <SubmissionsClient 
+      session={session} 
+      initialAttempts={allAttempts as any[]} 
+      initialSignedUrls={signedUrls}
+    />
+  );
 }

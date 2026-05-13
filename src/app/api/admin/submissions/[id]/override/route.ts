@@ -40,6 +40,7 @@ export async function POST(request: Request, { params }: Props) {
     const challenge = CHALLENGES.find((c) => c.id === submission.task_id);
     const newPoints = parsed.data.verdict === "accepted" ? challenge?.points ?? 0 : 0;
     const oldPoints = submission.points ?? 0;
+    const delta = newPoints - oldPoints;
 
     const now = new Date().toISOString();
     const { error } = await adminClient
@@ -61,92 +62,17 @@ export async function POST(request: Request, { params }: Props) {
       );
     }
 
-    const delta = newPoints - oldPoints;
-    if (delta !== 0) {
-      const { data: student } = await adminClient
-        .from("students")
-        .select("team_id")
-        .eq("id", submission.student_id)
-        .maybeSingle();
-
-      if (student?.team_id) {
-        const { data: team } = await adminClient
-          .from("teams")
-          .select("id, total_points")
-          .eq("id", student.team_id)
-          .maybeSingle();
-
-        if (team) {
-          const now = new Date().toISOString();
-          const { error: teamUpdateError } = await adminClient
-            .from("teams")
-            .update({
-              total_points: Math.max(0, team.total_points + delta),
-              last_point_at: now,
-            })
-            .eq("id", team.id);
-
-          if (teamUpdateError) {
-            return NextResponse.json(
-              { success: false, error: "Unable to reconcile team points right now." },
-              { status: 500 }
-            );
-          }
-
-          await logAudit({
-            adminId: admin.id,
-            action: "override_points_reconciled",
-            entity: "teams",
-            entityId: team.id,
-            metadata: {
-              delta,
-              old_points: oldPoints,
-              new_points: newPoints,
-              submission_id: id,
-            },
-          });
-        }
-      }
-    }
-
-    const { data: latestAttempt } = await adminClient
-      .from("submission_attempts")
-      .select("id")
-      .eq("submission_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (latestAttempt?.id) {
-      const manualReason = parsed.data.note.trim()
-        ? `Manual override: ${parsed.data.note.trim()}`
-        : `Manually marked as ${parsed.data.verdict}.`;
-
-      const { error: attemptSyncError } = await adminClient
-        .from("submission_attempts")
-        .update({
-          status: parsed.data.verdict,
-          points: newPoints,
-          ai_reason: manualReason,
-          verified_at: now,
-        })
-        .eq("id", latestAttempt.id);
-
-      if (attemptSyncError) {
-        return NextResponse.json(
-          { success: false, error: "Submission updated, but latest attempt sync failed." },
-          { status: 500 }
-        );
-      }
-    }
-
     await logAudit({
       adminId: admin.id,
       action: "override",
       entity: "submission",
       entityId: id,
       note: parsed.data.note,
-      metadata: { previous_status: submission.status, new_status: parsed.data.verdict },
+      metadata: { 
+        previous_status: submission.status, 
+        new_status: parsed.data.verdict,
+        delta: delta
+      },
     });
 
     return NextResponse.json({ success: true }, { status: 200 });

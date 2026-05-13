@@ -4,7 +4,7 @@ import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Challenge, StudentSession } from "@/types/app";
-import type { Submission } from "@/types/database";
+import type { StudentChallengeStatus } from "@/types/database";
 import { useSubmissionPolling } from "@/hooks/useSubmissionPolling";
 const MissionModal = dynamic(() => import("./MissionModal"), {
   ssr: false,
@@ -18,10 +18,10 @@ const ACTIVE_CHALLENGE_IDS = [1, 2, 3, 4, 5, 6];
 
 type ChallengeBoardProps = {
   challenges: Challenge[];
-  submissions: Submission[];
-  setSubmissions: Dispatch<SetStateAction<Submission[]>>;
+  challengeStatuses: StudentChallengeStatus[];
+  setChallengeStatuses: Dispatch<SetStateAction<StudentChallengeStatus[]>>;
   session: StudentSession;
-  onSubmissionsUpdate?: (submissions: Submission[]) => void;
+  onChallengeStatusesUpdate?: (statuses: StudentChallengeStatus[]) => void;
 };
 
 type RingStatus = "default" | "review" | "success" | "danger";
@@ -170,10 +170,10 @@ const NodeLabel = memo(function NodeLabel({
 
 export default function ChallengeBoard({
   challenges,
-  submissions,
-  setSubmissions,
+  challengeStatuses,
+  setChallengeStatuses,
   session,
-  onSubmissionsUpdate,
+  onChallengeStatusesUpdate,
 }: ChallengeBoardProps) {
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
   const [toastData, setToastData] = useState<{ id: number; points: number } | null>(null);
@@ -214,52 +214,23 @@ export default function ChallengeBoard({
     [activeChallenges]
   );
 
-  const submissionByTask = useMemo(() => {
-    const map = new Map<number, Submission[]>();
-    for (const row of submissions) {
-      const list = map.get(row.task_id) ?? [];
-      list.push(row);
-      map.set(row.task_id, list);
+  const statusByTask = useMemo(() => {
+    const map = new Map<number, StudentChallengeStatus>();
+    for (const row of challengeStatuses) {
+      map.set(row.task_id, row);
     }
     return map;
-  }, [submissions]);
-
-  const hasCompletedSubmission = (rows: Submission[]) =>
-    rows.some((row) => COMPLETED_STATUSES.has(String(row.status).toLowerCase()));
+  }, [challengeStatuses]);
 
   const isChallengeComplete = (challengeId: number) => {
-    const rows = submissionByTask.get(challengeId) ?? [];
-    if (challengeId === REFERRAL_CHALLENGE_ID) {
-      const latestReferralRow = rows
-        .slice()
-        .sort(
-          (a, b) =>
-            new Date(b.updated_at ?? b.created_at).getTime() -
-            new Date(a.updated_at ?? a.created_at).getTime()
-        )[0];
-      if (!latestReferralRow) return false;
-      return COMPLETED_STATUSES.has(String(latestReferralRow.status).toLowerCase());
-    }
-    if (challengeId === STREAK_CHALLENGE_ID) {
-      const latest = rows
-        .slice()
-        .sort(
-          (a, b) =>
-            new Date(b.updated_at ?? b.created_at).getTime() -
-            new Date(a.updated_at ?? a.created_at).getTime()
-        )[0];
-      if (!latest || !latest.verified_at) return false;
-      const isApproved = COMPLETED_STATUSES.has(String(latest.status).toLowerCase());
-      const isToday = new Date(latest.verified_at).toDateString() === new Date().toDateString();
-      return isApproved && isToday;
-    }
-    return hasCompletedSubmission(rows);
+    const status = statusByTask.get(challengeId);
+    return status?.is_completed ?? false;
   };
 
   const allComplete = useMemo(
     () =>
       ACTIVE_CHALLENGE_IDS.every((id) => isChallengeComplete(id)),
-    [submissionByTask]
+    [statusByTask]
   );
   // const allComplete = true;
 
@@ -273,10 +244,10 @@ export default function ChallengeBoard({
     }
   }, [allComplete, crestRevealed, isAnimatingFinale]);
 
-  useSubmissionPolling(submissions, setSubmissions, {
+  useSubmissionPolling(challengeStatuses, setChallengeStatuses, {
     onAccepted: ({ taskId, points }) => setToastData({ id: taskId, points }),
     onRejected: (message) => setRejectToastMessage(message),
-    onUpdate: (next) => onSubmissionsUpdate?.(next),
+    onUpdate: (next) => onChallengeStatusesUpdate?.(next),
   });
 
   const activeChallenge = useMemo(
@@ -285,24 +256,36 @@ export default function ChallengeBoard({
   );
 
   const isSubmissionLocked = (challenge: Challenge) => {
-    const rows = submissionByTask.get(challenge.id) ?? [];
-    if (challenge.isReferral) return false;
-    if (challenge.id === STREAK_CHALLENGE_ID) {
-      return isChallengeComplete(STREAK_CHALLENGE_ID);
+    const status = statusByTask.get(challenge.id);
+    const id = challenge.id;
+
+    // --- AUDIT FIX: Enforce Unlock Sequence (1 -> 2 -> 3 -> 4 -> 5) ---
+    if (id === 2 && !isChallengeComplete(1)) return true;
+    if (id === 3 && !isChallengeComplete(2)) return true;
+    if (id === 4 && !isChallengeComplete(3)) return true;
+    if (id === 5 && !isChallengeComplete(4)) return true;
+
+    // --- AUDIT FIX: Enforce Max Attempt Limits ---
+    if (id === STREAK_CHALLENGE_ID) {
+      // Streak task 6: max 3 attempts total
+      return (status?.attempts_used ?? 0) >= 3;
     }
-    return hasCompletedSubmission(rows);
+
+    // --- AUDIT FIX: Referral (Task 3) is infinite ---
+    if (id === REFERRAL_CHALLENGE_ID) {
+      return false; // Always open once unlocked by Task 2
+    }
+    
+    // Normal tasks: locked if already completed
+    return status?.is_completed ?? false;
   };
 
   const getRingStatus = (challenge: Challenge): RingStatus => {
-    const rows = submissionByTask.get(challenge.id) ?? [];
-    if (rows.length === 0) return "default";
-    const statuses = rows.map((r) => String(r.status).toLowerCase());
-    if (challenge.id === STREAK_CHALLENGE_ID) {
-      return isChallengeComplete(STREAK_CHALLENGE_ID) ? "success" : "default";
-    }
-    if (statuses.some((s) => s === "approved" || s === "accepted")) return "success";
-    if (statuses.some((s) => s === "under_review" || s === "verifying")) return "review";
-    if (statuses.some((s) => s === "rejected")) return "danger";
+    const status = statusByTask.get(challenge.id);
+    if (!status || status.latest_status === "not_started") return "default";
+    if (status.is_completed) return "success";
+    if (status.latest_status === "pending") return "review";
+    if (status.latest_status === "rejected") return "danger";
     return "default";
   };
 
@@ -398,55 +381,29 @@ export default function ChallengeBoard({
     return false;
   };
 
-  const handleSubmitted = ({ taskId, submissionId }: { taskId: number; submissionId?: string }) => {
-    setSubmissions((prev) => {
-      let updated = false;
-      let next = prev.map((item) => {
-        if (submissionId && item.id === submissionId) {
-          updated = true;
-          return { ...item, task_id: taskId, status: "pending" as const, resubmit_count: item.resubmit_count + 1, updated_at: new Date().toISOString() };
-        }
-        return item;
-      });
-      if (!updated) {
-        next = prev.map((item) => {
-          if (item.task_id === taskId) {
-            updated = true;
-            return { ...item, status: "pending" as const, resubmit_count: item.resubmit_count + 1, updated_at: new Date().toISOString() };
-          }
-          return item;
+  const handleSubmitted = ({ taskId }: { taskId: number; submissionId?: string }) => {
+    setChallengeStatuses((prev) => {
+      const next = [...prev];
+      const index = next.findIndex((s) => s.task_id === taskId);
+      if (index !== -1) {
+        next[index] = {
+          ...next[index],
+          latest_status: "pending",
+          attempts_used: next[index].attempts_used + 1,
+        };
+      } else {
+        next.push({
+          student_id: session.studentId,
+          task_id: taskId,
+          bootcamp_id: session.bootcampId,
+          attempts_used: 1,
+          is_completed: false,
+          points_earned: 0,
+          latest_status: "pending",
+          completed_at: null,
         });
       }
-      if (!updated && submissionId) {
-        const now = new Date().toISOString();
-        next = [
-          ...next,
-          {
-            id: submissionId,
-            student_id: session.studentId,
-            bootcamp_id: session.bootcampId,
-            section_id: session.sectionId,
-            region_id: session.regionId,
-            task_id: taskId,
-            streak_day: null,
-            file_url: null,
-            file_hash: null,
-            status: "pending",
-            points: 0,
-            ai_reason: null,
-            text_response: null,
-            resubmit_count: 1,
-            verification_attempts: 0,
-            last_attempted_at: null,
-            verified_at: null,
-            override_by: null,
-            override_note: null,
-            created_at: now,
-            updated_at: now,
-          },
-        ];
-      }
-      onSubmissionsUpdate?.(next);
+      onChallengeStatusesUpdate?.(next);
       return next;
     });
     setActiveTaskId(null);
@@ -468,7 +425,7 @@ export default function ChallengeBoard({
       {crestRevealed ? (
         <TribeCrest
           challenges={challenges}
-          submissions={submissions}
+          challengeStatuses={challengeStatuses}
           onStoneClick={(challenge) => {
             if (!isCrestStoneClickable(challenge)) return;
             openChallenge(challenge);
@@ -689,7 +646,7 @@ export default function ChallengeBoard({
         isOpen={Boolean(activeTaskId)}
         challenge={activeChallenge}
         session={session}
-        submissions={submissions}
+        challengeStatuses={challengeStatuses}
         onClose={() => setActiveTaskId(null)}
         onSubmitSuccess={handleSubmitted}
         isSubmissionLocked={activeChallenge ? isSubmissionLocked(activeChallenge) : false}

@@ -139,38 +139,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (student.team_id) {
-      const { data: teamData, error: teamQueryError } = await adminClient
-        .from("teams")
-        .select("total_points")
-        .eq("id", student.team_id)
-        .maybeSingle();
-
-      if (teamQueryError) {
-        return NextResponse.json(
-          { success: false, error: "Unable to update team points right now." },
-          { status: 500 }
-        );
-      }
-
-      if (teamData) {
-        const { error: teamUpdateError } = await adminClient
-          .from("teams")
-          .update({
-            total_points: teamData.total_points + pointsToAward,
-            last_point_at: now,
-          })
-          .eq("id", student.team_id);
-
-        if (teamUpdateError) {
-          return NextResponse.json(
-            { success: false, error: "Unable to update team points right now." },
-            { status: 500 }
-          );
-        }
-      }
-    }
-
     await logAudit({
       adminId: admin.id,
       action: "award",

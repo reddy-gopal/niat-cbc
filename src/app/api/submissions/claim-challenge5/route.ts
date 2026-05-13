@@ -175,37 +175,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const delta = pointsToAward - previousPoints;
-    if (student.team_id && delta !== 0) {
-      const { data: teamData, error: teamReadError } = await adminClient
-        .from("teams")
-        .select("total_points")
-        .eq("id", student.team_id)
-        .maybeSingle();
-
-      if (teamReadError || !teamData) {
-        return NextResponse.json(
-          { success: false, message: "Unable to load team points." },
-          { status: 500 }
-        );
-      }
-
-      const { error: teamUpdateError } = await adminClient
-        .from("teams")
-        .update({
-          total_points: teamData.total_points + delta,
-          last_point_at: now,
-        })
-        .eq("id", student.team_id);
-
-      if (teamUpdateError) {
-        return NextResponse.json(
-          { success: false, message: "Unable to update team points." },
-          { status: 500 }
-        );
-      }
-    }
-
     return NextResponse.json(
       {
         success: true,

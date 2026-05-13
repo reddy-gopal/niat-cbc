@@ -198,7 +198,7 @@ All three must be true to pass. If any fail, return the first failing reason in 
       .eq("student_id", session.studentId)
       .eq("task_id", TASK_ID)
       .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString());
-    
+
     const attemptNumber = (countData?.length ?? 0) + 1;
 
     const { data: attemptRow, error: attemptError } = await adminClient
@@ -224,38 +224,36 @@ All three must be true to pass. If any fail, return the first failing reason in 
 
     if (attemptError) throw attemptError;
 
-    // 8. Update points/status in submissions and teams
+    // 8. Update status in submissions header
     if (isAccepted) {
-      const { data: student } = await adminClient
-        .from("students")
-        .select("team_id")
-        .eq("id", session.studentId)
-        .single();
-
-      await adminClient.rpc("accept_submission_and_award_points", {
-        p_submission_id: submission.id,
-        p_points: CHALLENGE.points,
-        p_ai_reason: parsedAI.feedback,
-        p_verified_at: now,
-        p_team_id: student?.team_id,
-      });
+      await adminClient
+        .from("submissions")
+        .update({
+          status: "accepted",
+          points: CHALLENGE.points,
+          ai_reason: parsedAI.feedback,
+          verified_at: now,
+          updated_at: now,
+        })
+        .eq("id", submission.id);
     } else {
-        await adminClient
-          .from("submissions")
-          .update({
-            status: "rejected",
-            ai_reason: parsedAI.feedback,
-            updated_at: now,
-          })
-          .eq("id", submission.id);
+      await adminClient
+        .from("submissions")
+        .update({
+          status: "rejected",
+          ai_reason: parsedAI.feedback,
+          verified_at: now,
+          updated_at: now,
+        })
+        .eq("id", submission.id);
     }
 
     if (!isAccepted) {
-        return NextResponse.json({
-            success: false,
-            error: parsedAI.feedback,
-            rejection_reason: parsedAI.rejection_reason
-        }, { status: 200 }); // Status 200 because it's a valid processing result
+      return NextResponse.json({
+        success: false,
+        error: parsedAI.feedback,
+        rejection_reason: parsedAI.rejection_reason
+      }, { status: 200 }); // Status 200 because it's a valid processing result
     }
 
     return NextResponse.json({

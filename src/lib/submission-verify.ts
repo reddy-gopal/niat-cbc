@@ -129,7 +129,7 @@ export async function verifySubmissionById(
     // Fallback for environments/providers that require base64 image input.
     if (process.env.ANTHROPIC_IMAGE_SOURCE_MODE === "base64") {
       const segmentImage = performance.now();
-    const imageResponse = await fetch(signedData.signedUrl);
+      const imageResponse = await fetch(signedData.signedUrl);
       const imageBuffer = await imageResponse.arrayBuffer();
       base64Image = Buffer.from(imageBuffer).toString("base64");
       logSegment("imageDownload", segmentImage);
@@ -157,41 +157,41 @@ export async function verifySubmissionById(
             role: "user",
             content: challenge.requiresText
               ? [
-                  {
-                    type: "text",
-                    text: hasChallengePrompt
-                      ? `Student response: "${submission.text_response}". Evaluate using the system prompt only.`
-                      : `Challenge: ${challenge.title}. Challenge description: ${challenge.description}.${challenge.verificationHint ? ` Verification hint: ${challenge.verificationHint}` : ""} Student response: "${submission.text_response}". This is a text-only challenge. Apply the system prompt exactly. Accept if the response is genuinely related to the challenge, even if it is very short, informal, incomplete, or only 2-3 words. Reject only if it is blank, gibberish, spam, abusive/inappropriate, or clearly unrelated.`,
-                  },
-                ]
+                {
+                  type: "text",
+                  text: hasChallengePrompt
+                    ? `Student response: "${submission.text_response}". Evaluate using the system prompt only.`
+                    : `Challenge: ${challenge.title}. Challenge description: ${challenge.description}.${challenge.verificationHint ? ` Verification hint: ${challenge.verificationHint}` : ""} Student response: "${submission.text_response}". This is a text-only challenge. Apply the system prompt exactly. Accept if the response is genuinely related to the challenge, even if it is very short, informal, incomplete, or only 2-3 words. Reject only if it is blank, gibberish, spam, abusive/inappropriate, or clearly unrelated.`,
+                },
+              ]
               : [
-                  {
-                    type: "text",
-                    text: hasChallengePrompt
-                      ? `This is an image-only submission. Evaluate using the system prompt only.`
-                      : `Challenge: ${challenge.title}. Challenge description: ${challenge.description}.${challenge.verificationHint ? ` Verification hint: ${challenge.verificationHint}` : ""} This is an image-only challenge. Apply the system prompt exactly. Accept if the image plausibly shows a related attempt, even if it is blurry, dark, cropped, partial, casual, or imperfect. Reject only if it is blank/corrupt, abusive/inappropriate, clearly unrelated, or an obvious non-attempt.`,
-                  },
-                  signedImageUrl
+                {
+                  type: "text",
+                  text: hasChallengePrompt
+                    ? `This is an image-only submission. Evaluate using the system prompt only.`
+                    : `Challenge: ${challenge.title}. Challenge description: ${challenge.description}.${challenge.verificationHint ? ` Verification hint: ${challenge.verificationHint}` : ""} This is an image-only challenge. Apply the system prompt exactly. Accept if the image plausibly shows a related attempt, even if it is blurry, dark, cropped, partial, casual, or imperfect. Reject only if it is blank/corrupt, abusive/inappropriate, clearly unrelated, or an obvious non-attempt.`,
+                },
+                signedImageUrl
+                  ? {
+                    type: "image",
+                    source: {
+                      type: "url",
+                      url: signedImageUrl,
+                    },
+                  }
+                  : base64Image
                     ? {
-                        type: "image",
-                        source: {
-                          type: "url",
-                          url: signedImageUrl,
-                        },
-                      }
-                    : base64Image
-                    ? {
-                        type: "image",
-                        source: {
-                          type: "base64",
-                          media_type: submission.file_url?.endsWith(".png")
-                            ? "image/png"
-                            : "image/jpeg",
-                          data: base64Image,
-                        },
-                      }
+                      type: "image",
+                      source: {
+                        type: "base64",
+                        media_type: submission.file_url?.endsWith(".png")
+                          ? "image/png"
+                          : "image/jpeg",
+                        data: base64Image,
+                      },
+                    }
                     : { type: "text", text: "(No image provided)" },
-                ],
+              ],
           },
         ],
       }),
@@ -215,28 +215,43 @@ export async function verifySubmissionById(
     const verifiedAt = new Date().toISOString();
 
     if (parsedVerdict.verdict === "accepted") {
-      const { data: student } = await adminClient
-        .from("students")
-        .select("team_id")
-        .eq("id", submission.student_id)
-        .maybeSingle();
-
-      const { error: acceptError } = await adminClient.rpc("accept_submission_and_award_points", {
-        p_submission_id: submission.id,
-        p_points: challenge.points,
-        p_ai_reason: parsedVerdict.reason,
-        p_verified_at: verifiedAt,
-        p_team_id: student?.team_id ?? null,
-      });
-
-      if (acceptError) {
-        console.error("[verify] accept_submission_and_award_points failed", {
-          submissionId: submission.id,
-          error: acceptError,
+      if (submission.task_id === 3) {
+        // Referral task (task_id=3) uses the submissions table as source of truth.
+        // We call the RPC which now only updates the status (triggers handle points).
+        const { error: acceptError } = await adminClient.rpc("accept_submission_and_award_points", {
+          p_submission_id: submission.id,
+          p_points: challenge.points,
+          p_ai_reason: parsedVerdict.reason,
+          p_verified_at: verifiedAt,
+          p_team_id: null, // Triggers handle teams now
         });
-        throw new Error("Failed to accept submission and award points.");
-      }
 
+        if (acceptError) {
+          console.error("[verify] accept_submission_and_award_points failed", {
+            submissionId: submission.id,
+            error: acceptError,
+          });
+          throw new Error("Failed to accept submission and award points.");
+        }
+      } else {
+        // For all other tasks, submission_attempts is the source of truth.
+        // We update the submissions row status here for consistency.
+        // Recalculation triggers will fire when the submission_attempts row is updated below.
+        const { error: syncError } = await adminClient
+          .from("submissions")
+          .update({
+            status: "accepted",
+            points: challenge.points,
+            ai_reason: parsedVerdict.reason,
+            verified_at: verifiedAt,
+            updated_at: verifiedAt,
+          })
+          .eq("id", submission.id);
+
+        if (syncError) {
+          console.error("[verify] failed to sync submissions status", syncError);
+        }
+      }
     } else {
       const { error: rejectError } = await adminClient
         .from("submissions")

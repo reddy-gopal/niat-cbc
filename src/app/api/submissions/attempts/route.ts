@@ -62,30 +62,49 @@ export async function GET(request: Request) {
       }
     }
 
-    const { data: rows, error } = await query;
+    const { data: attemptsData, error: attemptsError } = await query;
 
-    if (error) {
+    let referrals: any[] = [];
+    if (taskIdParam === null || taskIdParam === "3") {
+      const { data: referralData, error: referralError } = await adminClient
+        .from("submissions")
+        .select("*")
+        .eq("student_id", session.studentId)
+        .eq("task_id", 3)
+        .limit(limit);
+      
+      if (!referralError) referrals = referralData ?? [];
+    }
+
+    if (attemptsError) {
       return NextResponse.json(
         { success: false, error: "Unable to fetch attempts." },
         { status: 500 }
       );
     }
 
-    const attempts: SafeAttempt[] = ((rows ?? []) as AttemptRow[]).map((a) => ({
+    const combined = [
+      ...((attemptsData ?? []) as AttemptRow[]),
+      ...referrals,
+    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+     .slice(0, limit);
+
+    const attempts = combined.map((a) => ({
       id: a.id,
-      submission_id: a.submission_id,
+      submission_id: a.submission_id ?? a.id,
       student_id: a.student_id,
       task_id: a.task_id,
       bootcamp_id: a.bootcamp_id,
-      attempt_number: a.attempt_number,
+      attempt_number: a.attempt_number ?? 1,
       status: a.status as SafeAttempt["status"],
       ai_reason: a.ai_reason,
       text_response: a.text_response,
       points: a.points,
       verified_at: a.verified_at,
       created_at: a.created_at,
-      verification_attempts: a.verification_attempts,
-      last_attempted_at: a.last_attempted_at,
+      verification_attempts: a.verification_attempts ?? 0,
+      last_attempted_at: a.last_attempted_at ?? null,
+      file_url: a.file_url,
       hasProof: Boolean(a.file_url),
     }));
 

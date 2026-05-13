@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CHALLENGES } from "@/lib/challenges";
 import type { StudentSession } from "@/types/app";
-import type { Submission, Student } from "@/types/database";
+import type { StudentChallengeStatus, Student } from "@/types/database";
 import ChallengeBoard from "../challenges/ChallengeBoard";
 import { StudentAppShell } from "./StudentAppShell";
 import { studentMainTopPaddingClass } from "./StudentNavbar";
@@ -19,7 +19,7 @@ type StudentWithContext = Student & {
 
 type DashboardProps = {
   student: StudentWithContext;
-  initialSubmissions: Submission[];
+  initialChallengeStatuses: StudentChallengeStatus[];
   session: StudentSession;
   totalPoints: number;
   completedChallenges: number;
@@ -30,12 +30,12 @@ const COMPLETED_STATUSES = new Set(["accepted", "approved"]);
 
 export default function Dashboard({
   student,
-  initialSubmissions,
+  initialChallengeStatuses,
   session,
   totalPoints,
   completedChallenges,
 }: DashboardProps) {
-  const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions);
+  const [challengeStatuses, setChallengeStatuses] = useState<StudentChallengeStatus[]>(initialChallengeStatuses);
   const [isHoveringChart, setIsHoveringChart] = useState(false);
 
   const firstName = session.fullName.split(" ")[0] ?? session.fullName;
@@ -50,19 +50,12 @@ export default function Dashboard({
 
   const totalChallenges = ACTIVE_CHALLENGE_IDS.size;
   const completedCount = useMemo(() => {
-    const acceptedTaskIds = new Set(
-      submissions
-        .filter(
-          (submission) =>
-            COMPLETED_STATUSES.has(String(submission.status ?? "").trim().toLowerCase()) &&
-            ACTIVE_CHALLENGE_IDS.has(submission.task_id)
-        )
-        .map((submission) => submission.task_id)
-    );
+    const completedInState = challengeStatuses.filter(
+      (c) => c.is_completed && ACTIVE_CHALLENGE_IDS.has(c.task_id)
+    ).length;
 
-    // Keep attempt-native count as fallback when board rows lag behind async updates.
-    return Math.min(totalChallenges, Math.max(acceptedTaskIds.size, completedChallenges));
-  }, [submissions, completedChallenges, totalChallenges]);
+    return Math.min(totalChallenges, Math.max(completedInState, completedChallenges));
+  }, [challengeStatuses, completedChallenges, totalChallenges]);
 
   const maxPoints = useMemo(
     () => CHALLENGES.reduce((sum, c) => sum + c.points, 0),
@@ -232,8 +225,8 @@ export default function Dashboard({
             </div>
             <ChallengeBoard
               challenges={CHALLENGES}
-              submissions={submissions}
-              setSubmissions={setSubmissions}
+              challengeStatuses={challengeStatuses}
+              setChallengeStatuses={setChallengeStatuses}
               session={sessionWithReferralContext}
             />
           </section>

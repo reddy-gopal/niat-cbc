@@ -47,55 +47,13 @@ export async function POST(_: Request, { params }: Props) {
       );
     }
 
-    if (oldPoints > 0) {
-      const { data: student } = await adminClient
-        .from("students")
-        .select("team_id")
-        .eq("id", submission.student_id)
-        .maybeSingle();
-
-      if (student?.team_id) {
-        const { data: team } = await adminClient
-          .from("teams")
-          .select("id, total_points")
-          .eq("id", student.team_id)
-          .maybeSingle();
-
-        if (team) {
-          const { error: teamUpdateError } = await adminClient
-            .from("teams")
-            .update({
-              total_points: Math.max(0, team.total_points - oldPoints),
-            })
-            .eq("id", team.id);
-
-          if (teamUpdateError) {
-            return NextResponse.json(
-              { success: false, error: "Unable to deduct team points right now." },
-              { status: 500 }
-            );
-          }
-
-          await logAudit({
-            adminId: admin.id,
-            action: "unlock_points_deducted",
-            entity: "teams",
-            entityId: team.id,
-            metadata: {
-              deducted: oldPoints,
-              submission_id: id,
-            },
-          });
-        }
-      }
-    }
-
     await logAudit({
       adminId: admin.id,
       action: "unlock",
       entity: "submission",
       entityId: id,
       note: "Unlocked submission attempts",
+      metadata: { old_points: oldPoints }
     });
 
     return NextResponse.json({ success: true }, { status: 200 });

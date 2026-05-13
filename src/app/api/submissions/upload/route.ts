@@ -37,6 +37,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Challenge not found." }, { status: 404 });
     }
 
+    // --- AUDIT FIX: Calculate attempt number from submission_attempts ---
+    const { data: lastAttempt } = await adminClient
+      .from("submission_attempts")
+      .select("attempt_number")
+      .eq("student_id", session.studentId)
+      .eq("task_id", taskId)
+      .order("attempt_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const attemptNumber = (lastAttempt?.attempt_number ?? 0) + 1;
+
+    // --- AUDIT FIX: Enforce Attempt Limits ---
+    // Normal tasks: max 1. Streak task (6): max 3.
+    const maxAttempts = taskId === 6 ? 3 : 1;
+    if (attemptNumber > maxAttempts && taskId !== REFERRAL_CHALLENGE_ID) {
+      return NextResponse.json(
+        { success: false, error: "Maximum attempts reached for this challenge." },
+        { status: 400 }
+      );
+    }
+
     if (!challenge.requiresText && !(file instanceof File)) {
       return NextResponse.json({ success: false, error: "File is required." }, { status: 400 });
     }
@@ -186,7 +208,7 @@ export async function POST(request: Request) {
     }
 
     const now = new Date().toISOString();
-    const nextResubmit = targetSubmission.resubmit_count + 1;
+    // nextResubmit is now replaced by attemptNumber calculated above
 
     if (uploadBytes && uploadContentType) {
       const extension = uploadContentType === "image/png" ? "png" : "jpg";
@@ -217,7 +239,7 @@ export async function POST(request: Request) {
           ...(hash !== null && { file_hash: hash }),
           text_response: textResponse,
           ai_reason: PLAGIARISM_REASON,
-          resubmit_count: nextResubmit,
+          resubmit_count: attemptNumber,
           verification_attempts: 3,
           last_attempted_at: now,
           verified_at: now,
@@ -240,7 +262,7 @@ export async function POST(request: Request) {
           student_id: session.studentId,
           task_id: taskId,
           bootcamp_id: targetSubmission.bootcamp_id,
-          attempt_number: nextResubmit,
+          attempt_number: attemptNumber,
           ...(storagePath !== null && { file_url: storagePath }),
           ...(hash !== null && { file_hash: hash }),
           text_response: textResponse,
@@ -279,7 +301,7 @@ export async function POST(request: Request) {
         ...(storagePath !== null && { file_url: storagePath }),
         ...(hash !== null && { file_hash: hash }),
         text_response: textResponse,
-        resubmit_count: nextResubmit,
+        resubmit_count: attemptNumber,
         ai_reason: null,
         verification_attempts: 0,
         last_attempted_at: null,
@@ -296,34 +318,39 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: attemptRow, error: attemptInsertError } = await adminClient
-      .from("submission_attempts")
-      .insert({
-        submission_id: targetSubmission.id,
-        student_id: session.studentId,
-        task_id: taskId,
-        bootcamp_id: targetSubmission.bootcamp_id,
-        attempt_number: nextResubmit,
-        ...(storagePath !== null && { file_url: storagePath }),
-        ...(hash !== null && { file_hash: hash }),
-        text_response: textResponse,
-        status: "pending",
-        verification_attempts: 0,
-        points: 0,
-      })
-      .select("id")
-      .single();
+    // --- AUDIT FIX: Skip attempt record for Referral Task (3) ---
+    let attemptRowId: string | null = null;
+    if (taskId !== REFERRAL_CHALLENGE_ID) {
+      const { data: attemptRow, error: attemptInsertError } = await adminClient
+        .from("submission_attempts")
+        .insert({
+          submission_id: targetSubmission.id,
+          student_id: session.studentId,
+          task_id: taskId,
+          bootcamp_id: targetSubmission.bootcamp_id,
+          attempt_number: attemptNumber,
+          ...(storagePath !== null && { file_url: storagePath }),
+          ...(hash !== null && { file_hash: hash }),
+          text_response: textResponse,
+          status: "pending",
+          verification_attempts: 0,
+          points: 0,
+        })
+        .select("id")
+        .single();
 
-    if (attemptInsertError || !attemptRow) {
-      console.error("Attempt insert error:", attemptInsertError);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Failed to record submission attempt.",
-          detail: attemptInsertError?.message,
-        },
-        { status: 500 }
-      );
+      if (attemptInsertError || !attemptRow) {
+        console.error("Attempt insert error:", attemptInsertError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Failed to record submission attempt.",
+            detail: attemptInsertError?.message,
+          },
+          { status: 500 }
+        );
+      }
+      attemptRowId = attemptRow.id;
     }
 
     // Always verify on the same origin that handled this upload request.
@@ -345,7 +372,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        data: { submissionId: targetSubmission.id, attemptId: attemptRow.id },
+        data: { submissionId: targetSubmission.id, attemptId: attemptRowId },
         message: "Proof received! We are reviewing your submission.",
       },
       { status: 200 }

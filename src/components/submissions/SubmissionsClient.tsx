@@ -1,48 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { AnimatePresence } from "framer-motion";
-import type { Challenge } from "@/types/app";
-import type { StudentSession } from "@/types/app";
-import type { SafeAttempt } from "@/types/database";
+import type { Challenge, StudentSession } from "@/types/app";
+import type { StudentChallengeStatus } from "@/types/database";
 import { CHALLENGES } from "@/lib/challenges";
 import { StudentAppShell } from "@/components/student/StudentAppShell";
 import { studentMainTopPaddingClass } from "@/components/student/StudentNavbar";
-import { Eye } from "lucide-react";
+import { useSubmissionPolling } from "@/hooks/useSubmissionPolling";
 
-const ProofLightbox = dynamic(() => import("@/components/challenges/ProofLightbox"), {
-  ssr: false,
-  loading: () => <div className="sr-only">Loading proof details…</div>,
-});
 const XPToast = dynamic(() => import("@/components/challenges/XPToast"), { ssr: false });
 const RejectToast = dynamic(() => import("@/components/challenges/RejectToast"), {
   ssr: false,
 });
+const ProofLightbox = dynamic(() => import("@/components/challenges/ProofLightbox"), {
+  ssr: false,
+});
 
-type SubmissionsClientProps = {
-  session: StudentSession;
-  initialAttempts: SafeAttempt[];
-};
-
-type FilterStatus = "all" | "accepted" | "pending" | "rejected";
-
-type LightboxState = {
-  attemptId: string;
-  taskName: string;
-  status: string;
-  hasProof: boolean;
-  aiReason?: string;
-  verifiedAt?: string;
-  points?: number;
-  textResponse?: string;
-};
-
+/** Formats ISO date string to human-readable format */
 function formatTableDate(iso: string | null): string {
   if (!iso) return "—";
   try {
     const d = new Date(iso);
-    const parts = new Intl.DateTimeFormat("en-GB", {
+    return new Intl.DateTimeFormat("en-GB", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -50,526 +31,242 @@ function formatTableDate(iso: string | null): string {
       minute: "2-digit",
       hour12: true,
       timeZone: "Asia/Kolkata",
-    }).formatToParts(d);
-
-    const get = (type: Intl.DateTimeFormatPartTypes) =>
-      parts.find((p) => p.type === type)?.value ?? "";
-
-    const day = get("day");
-    const month = get("month");
-    const year = get("year");
-    const hour = get("hour");
-    const minute = get("minute");
-    const dayPeriod = get("dayPeriod").toUpperCase();
-
-    return `${day} ${month} ${year}, ${hour}:${minute} ${dayPeriod}`;
+    }).format(d);
   } catch {
     return "—";
   }
 }
 
-function isPlagiarismReason(reason: string | null | undefined): boolean {
-  if (!reason) return false;
-  return reason.includes("identical to another student");
+export interface SubmissionsClientProps {
+  session: StudentSession;
+  initialAttempts: any[];
+  initialSignedUrls: Record<string, string>;
 }
-
-
-type AttemptsPollResponse = {
-  success?: boolean;
-  data?: { attempts: SafeAttempt[] };
-};
-const ACTIVE_TASK_IDS = new Set(CHALLENGES.map((challenge) => challenge.id));
 
 export default function SubmissionsClient({
   session,
   initialAttempts,
+  initialSignedUrls,
 }: SubmissionsClientProps) {
-  const [attempts, setAttempts] = useState<SafeAttempt[]>(
-    initialAttempts.filter((attempt) => ACTIVE_TASK_IDS.has(attempt.task_id))
-  );
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
-  const [lightbox, setLightbox] = useState<LightboxState | null>(null);
-  const [lightboxSignedUrl, setLightboxSignedUrl] = useState<string | null>(null);
-  const [loadingAttemptId, setLoadingAttemptId] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState<any[]>(initialAttempts);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>(initialSignedUrls);
+  
+  // --- AUDIT FIX: Add status state for polling detection ---
+  const [challengeStatuses, setChallengeStatuses] = useState<StudentChallengeStatus[]>(() => {
+    // Basic mapping from attempts to status view format for polling start
+    const map = new Map<number, StudentChallengeStatus>();
+    initialAttempts.forEach(a => {
+      const existing = map.get(a.task_id);
+      if (!existing || new Date(a.created_at) > new Date(existing.completed_at || 0)) {
+        map.set(a.task_id, {
+          student_id: a.student_id,
+          task_id: a.task_id,
+          bootcamp_id: a.bootcamp_id,
+          attempts_used: (existing?.attempts_used ?? 0) + 1,
+          is_completed: a.status === 'accepted' || (existing?.is_completed ?? false),
+          points_earned: a.points || (existing?.points_earned ?? 0),
+          latest_status: a.status,
+          completed_at: a.status === 'accepted' ? a.created_at : (existing?.completed_at ?? null),
+        });
+      }
+    });
+    return Array.from(map.values());
+  });
+
   const [toastData, setToastData] = useState<{ id: number; points: number } | null>(null);
   const [rejectToastMessage, setRejectToastMessage] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [selectedAttempt, setSelectedAttempt] = useState<any | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  const attemptsRef = useRef(attempts);
-  useEffect(() => {
-    attemptsRef.current = attempts;
-  }, [attempts]);
-
   const firstName = session.fullName.split(" ")[0] ?? session.fullName;
 
-  const hasPending = useMemo(
-    () => attempts.some((a) => a.status === "pending"),
-    [attempts]
-  );
+  const refreshAttempts = async (): Promise<void> => {
+    try {
+      const res = await fetch("/api/submissions/attempts");
+      const json = await res.json();
+      
+      if (json.success && json.data?.attempts) {
+        setAttempts(json.data.attempts);
+      }
+    } catch (err) {
+      console.error("[SubmissionsClient] Refresh failed:", err);
+    }
+  };
+
+  // Real-time polling for status changes
+  useSubmissionPolling(challengeStatuses, setChallengeStatuses, {
+    onAccepted: ({ taskId, points }) => {
+      setToastData({ id: taskId, points });
+      void refreshAttempts();
+    },
+    onRejected: (message) => {
+      setRejectToastMessage(message);
+      void refreshAttempts();
+    },
+  });
+
+  // Re-fetch signed URLs via API if attempts list changes (e.g. after refresh)
+  useEffect(() => {
+    const paths = attempts
+      .map((a) => a.file_url)
+      .filter((url): url is string => Boolean(url));
+    
+    if (paths.length === 0) return;
+
+    // Check if we already have signed URLs for these paths
+    const missingPaths = paths.filter(p => !signedUrls[p]);
+    if (missingPaths.length === 0) return;
+
+    // We fetch one by one using the existing image API or we could create a bulk one.
+    // For now, let's just refresh the ones that are missing.
+    missingPaths.forEach(async (path) => {
+      try {
+        // Find the attempt ID for this path
+        const attempt = attempts.find(a => a.file_url === path);
+        if (!attempt) return;
+
+        const res = await fetch(`/api/submissions/attempts/${attempt.id}/image`);
+        const json = await res.json();
+        if (json.success && json.data?.signedUrl) {
+          setSignedUrls(prev => ({ ...prev, [path]: json.data.signedUrl }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch image URL:", err);
+      }
+    });
+  }, [attempts]);
+
   const challengeById = useMemo(
     () => new Map<number, Challenge>(CHALLENGES.map((challenge) => [challenge.id, challenge])),
     []
   );
 
-  useEffect(() => {
-    if (!hasPending) return;
-
-    const poll = async () => {
-      try {
-        const res = await fetch("/api/submissions/attempts?limit=50", { cache: "no-store" });
-        const json = (await res.json()) as AttemptsPollResponse;
-        if (!res.ok || !json.success || !json.data?.attempts) return;
-        const nextAttempts = json.data.attempts.filter((attempt) =>
-          ACTIVE_TASK_IDS.has(attempt.task_id)
-        );
-        setAttempts(nextAttempts);
-
-        const prev = attemptsRef.current;
-        const next = nextAttempts;
-        for (const row of next) {
-          const was = prev.find((p) => p.id === row.id);
-          if (!was) continue;
-          if (was.status === "pending" && row.status === "accepted") {
-            setToastData({ id: row.task_id, points: row.points });
-            break;
-          }
-          if (
-            was.status === "pending" &&
-            row.status === "rejected" &&
-            row.ai_reason &&
-            !isPlagiarismReason(row.ai_reason)
-          ) {
-            setRejectToastMessage(`❌ Challenge rejected: ${row.ai_reason}`);
-            break;
-          }
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-
-    const timer = window.setInterval(() => {
-      void poll();
-    }, 8000);
-
-    return () => window.clearInterval(timer);
-  }, [hasPending]);
-
-  const filtered = useMemo(() => {
-    if (filterStatus === "all") return attempts;
-    return attempts.filter((a) => a.status === filterStatus);
-  }, [attempts, filterStatus]);
-
-  const counts = useMemo(() => {
-    let accepted = 0;
-    let pending = 0;
-    let rejected = 0;
-    for (const a of attempts) {
-      if (a.status === "accepted") accepted += 1;
-      else if (a.status === "pending") pending += 1;
-      else if (a.status === "rejected") rejected += 1;
-    }
-    return { accepted, pending, rejected, total: attempts.length };
-  }, [attempts]);
-
-  const totalPointsEarned = useMemo(
-    () =>
-      attempts
-        .filter((a) => a.status === "accepted")
-        .reduce((sum, a) => sum + a.points, 0),
-    [attempts]
-  );
-
-  const handleViewProof = async (attempt: SafeAttempt) => {
-    const challenge = challengeById.get(attempt.task_id);
-    const hasTextResponse = Boolean(attempt.text_response?.trim());
-    const expectsImage = Boolean(challenge?.requiresUpload);
-    const expectsText = Boolean(challenge?.requiresText);
-    const hasImageProof = expectsImage && attempt.hasProof;
-    const hasTextProof = expectsText && hasTextResponse;
-    if (!hasImageProof && !hasTextProof) return;
-
-    const taskName = challenge?.title ?? `Task ${attempt.task_id}`;
-    
-    // If only text proof exists, open directly
-    if (!hasImageProof) {
-      setLightbox({
-        attemptId: attempt.id,
-        taskName,
-        status: attempt.status,
-        hasProof: false,
-        aiReason: attempt.ai_reason ?? undefined,
-        verifiedAt: attempt.verified_at ?? undefined,
-        points: attempt.points,
-        textResponse: attempt.text_response ?? undefined,
-      });
-      return;
-    }
-
-    setLoadingAttemptId(attempt.id);
-    setLightboxSignedUrl(null);
-    try {
-      const res = await fetch(`/api/submissions/attempts/${attempt.id}/image`, {
-        cache: "no-store",
-      });
-      const json = (await res.json()) as {
-        success?: boolean;
-        data?: { signedUrl?: string };
-      };
-      if (!res.ok || !json.success || !json.data?.signedUrl) {
-        setRejectToastMessage("Could not load proof image.");
-        return;
-      }
-      setLightboxSignedUrl(json.data.signedUrl);
-      setLightbox({
-        attemptId: attempt.id,
-        taskName,
-        status: attempt.status,
-        hasProof: true,
-        aiReason: attempt.ai_reason ?? undefined,
-        verifiedAt: attempt.verified_at ?? undefined,
-        points: attempt.points,
-        textResponse: attempt.text_response ?? undefined,
-      });
-    } catch {
-      setRejectToastMessage("Could not load proof image.");
-    } finally {
-      setLoadingAttemptId(null);
-    }
-  };
-
-  const closeLightbox = () => {
-    setLightbox(null);
-    setLightboxSignedUrl(null);
-  };
-
-  const filterTabs: { id: FilterStatus; label: string; count: number }[] = [
-    { id: "all", label: "All", count: counts.total },
-    { id: "accepted", label: "Accepted", count: counts.accepted },
-    { id: "pending", label: "Pending", count: counts.pending },
-    { id: "rejected", label: "Rejected", count: counts.rejected },
-  ];
-
   return (
     <>
       <StudentAppShell firstName={firstName}>
         <main
-          className={`min-h-[100dvh] min-h-screen overflow-x-hidden bg-[var(--bg-tint)] text-[var(--text-base)] pb-10 md:pb-16 ${studentMainTopPaddingClass}`}
+          className={`min-h-screen bg-[var(--bg-tint)] text-[var(--text-base)] pb-10 md:pb-16 ${studentMainTopPaddingClass}`}
         >
           <div className="mx-auto max-w-6xl px-3 sm:px-4 lg:px-6 pb-6 md:pb-10">
-            <h1 className="font-heading text-2xl sm:text-3xl font-bold text-[var(--text-dark)] mb-2 px-0.5 [overflow-wrap:anywhere]">
-              My Submissions
-            </h1>
-            <p className="text-sm text-[var(--text-secondary)] mb-4 sm:mb-6 max-w-2xl [overflow-wrap:anywhere]">
-              Full history of every proof upload and review outcome.
-            </p>
-
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-[var(--text-secondary)]">
-                Showing {filtered.length} of {counts.total} submissions
+            <header className="mb-8">
+              <h1 className="font-heading text-2xl sm:text-3xl font-bold text-[var(--text-dark)] mb-2 px-0.5">
+                My Submissions
+              </h1>
+              <p className="text-sm text-[var(--text-secondary)] max-w-2xl">
+                A complete history of your challenge attempts and AI feedback.
               </p>
-              <p className="text-sm font-bold text-[var(--text-dark)]">
-                Total: {totalPointsEarned} Points
-              </p>
-            </div>
+            </header>
 
-            <div className="mb-4 flex flex-wrap gap-1 border-b border-[var(--card-border)]">
-              {filterTabs.map((tab) => {
-                const active = filterStatus === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setFilterStatus(tab.id)}
-                    className={`px-3 py-2 text-sm transition-colors ${
-                      active
-                        ? "border-b-2 border-blue-600 bg-white font-medium text-[var(--text-dark)]"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    {tab.label} ({tab.count})
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="space-y-3 md:hidden">
-              {filtered.length === 0 ? (
-                <div className="rounded-xl border border-[var(--card-border)] bg-white px-4 py-8 text-center text-sm text-[var(--text-secondary)] shadow-sm">
-                  {filterStatus === "all"
-                    ? "No submissions found"
-                    : `No ${filterStatus} submissions found`}
-                </div>
-              ) : (
-                filtered.map((attempt) => {
-                  const challenge = challengeById.get(attempt.task_id);
-                  const title = challenge?.title ?? `Task ${attempt.task_id}`;
-                  const day = challenge?.day ?? "";
-                  const hasTextResponse = Boolean(attempt.text_response?.trim());
-                  const canViewDetails = challenge
-                    ? challenge.requiresUpload
-                      ? attempt.hasProof
-                      : challenge.requiresText
-                        ? hasTextResponse
-                        : false
-                    : (attempt.hasProof || hasTextResponse);
-                  const plagiarized = isPlagiarismReason(attempt.ai_reason);
-
-                  return (
-                    <article
-                      key={attempt.id}
-                      className="rounded-xl border border-[var(--card-border)] bg-white p-3 shadow-sm"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-[var(--text-dark)] [overflow-wrap:anywhere]">
-                            {title}
-                          </p>
-                          {day && (
-                            <span className="mt-1 inline-block rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                              {day}
-                            </span>
-                          )}
-                        </div>
-                        <span className="inline-flex rounded-md bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-700">
-                          #{attempt.attempt_number}
-                        </span>
-                      </div>
-
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {attempt.status === "pending" && (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold uppercase text-amber-900 ring-1 ring-amber-200">
-                            <span
-                              className="inline-block h-2 w-2 animate-spin rounded-full border-2 border-amber-600 border-t-transparent"
-                              aria-hidden
-                            />
-                            Under Review
-                          </span>
-                        )}
-                        {attempt.status === "accepted" && (
-                          <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-200">
-                            Accepted
-                          </span>
-                        )}
-                        {attempt.status === "rejected" && (
-                          <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-bold text-red-800 ring-1 ring-red-200">
-                            Rejected
-                          </span>
-                        )}
-                        {attempt.status === "accepted" && attempt.points > 0 && (
-                          <span className="text-xs font-bold text-emerald-600">+{attempt.points} Points</span>
-                        )}
-                      </div>
-
-                      <div className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
-                        <p>Submitted: {isMounted ? formatTableDate(attempt.created_at) : "—"}</p>
-                        <p>
-                          Reviewed:{" "}
-                          {attempt.status === "pending"
-                            ? "Pending review…"
-                            : isMounted
-                              ? formatTableDate(attempt.verified_at)
-                              : "—"}
-                        </p>
-                      </div>
-
-                      <div className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-                        {plagiarized ? (
-                          <span className="font-semibold text-orange-600">⚠ Duplicate submission</span>
-                        ) : (
-                          <span>{attempt.ai_reason || "—"}</span>
-                        )}
-                      </div>
-
-                      {canViewDetails && (
-                        <button
-                          type="button"
-                          onClick={() => void handleViewProof(attempt)}
-                          disabled={loadingAttemptId === attempt.id}
-                          className="mt-3 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-blue-600 transition-all hover:bg-blue-600 hover:text-white disabled:opacity-50"
-                          title="View details"
-                        >
-                          {loadingAttemptId === attempt.id ? (
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          ) : (
-                            <Eye size={18} />
-                          )}
-                        </button>
-                      )}
-                    </article>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="hidden overflow-x-auto rounded-xl border border-[var(--card-border)] bg-white shadow-sm md:block">
-              <table className="w-full min-w-[800px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--card-border)] bg-slate-50 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                    <th className="px-4 py-3">Challenge</th>
-                    <th className="px-4 py-3">Attempt</th>
-                    <th className="px-4 py-3">Submitted</th>
-                    <th className="px-4 py-3">Reviewed</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Points</th>
-                    <th className="px-4 py-3">Reason</th>
-                    <th className="px-4 py-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-12 text-center text-[var(--text-secondary)]">
-                        {filterStatus === "all"
-                          ? "No submissions found"
-                          : `No ${filterStatus} submissions found`}
-                      </td>
+            <div className="overflow-hidden rounded-2xl border border-[var(--card-border)] bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px] border-collapse text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--card-border)] bg-slate-50 text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">
+                      <th className="px-6 py-4">Proof</th>
+                      <th className="px-6 py-4">Challenge</th>
+                      <th className="px-6 py-4">AI Reason</th>
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4">Submitted At</th>
                     </tr>
-                  ) : (
-                    filtered.map((attempt, i) => {
-                      const challenge = challengeById.get(attempt.task_id);
-                      const title = challenge?.title ?? `Task ${attempt.task_id}`;
-                      const day = challenge?.day ?? "";
-                      const hasTextResponse = Boolean(attempt.text_response?.trim());
-                      const canViewDetails = challenge
-                        ? challenge.requiresUpload
-                          ? attempt.hasProof
-                          : challenge.requiresText
-                            ? hasTextResponse
-                            : false
-                        : (attempt.hasProof || hasTextResponse);
-                      const borderClass =
-                        attempt.status === "accepted"
-                          ? "border-l-2 border-green-400"
-                          : attempt.status === "rejected"
-                            ? "border-l-2 border-red-400"
-                            : "border-l-2 border-amber-400";
-                      const rowBg = i % 2 === 0 ? "bg-white" : "bg-gray-50";
-                      const plagiarized = isPlagiarismReason(attempt.ai_reason);
+                  </thead>
+                  <tbody className="divide-y divide-[var(--card-border)]">
+                    {attempts.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                          You haven't made any submissions yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      attempts.map((attempt) => {
+                        const challenge = challengeById.get(attempt.task_id);
+                        const imageUrl = attempt.file_url ? signedUrls[attempt.file_url] : null;
+                        const status = attempt.status;
 
-                      return (
-                        <tr
-                          key={attempt.id}
-                          className={`${rowBg} ${borderClass} transition-colors hover:bg-blue-50`}
-                        >
-                          <td className="px-4 py-3 align-top">
-                            <div className="font-semibold text-[var(--text-dark)]">{title}</div>
-                            {day && (
-                              <span className="mt-1 inline-block rounded bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                                {day}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <span className="inline-flex rounded-md bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700">
-                              #{attempt.attempt_number}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 align-top text-[var(--text-secondary)] tabular-nums">
-                            {isMounted ? formatTableDate(attempt.created_at) : "—"}
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            {attempt.status === "pending" ? (
-                              <span className="inline-flex items-center gap-1.5 text-amber-800">
-                                <span
-                                  className="inline-block h-2 w-2 animate-spin rounded-full border-2 border-amber-600 border-t-transparent"
-                                  aria-hidden
-                                />
-                                Pending review…
-                              </span>
-                            ) : (
-                              <span className="text-[var(--text-secondary)] tabular-nums">
-                                {isMounted ? formatTableDate(attempt.verified_at) : "—"}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            {attempt.status === "pending" && (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold uppercase text-amber-900 ring-1 ring-amber-200">
-                                <span
-                                  className="inline-block h-2 w-2 animate-spin rounded-full border-2 border-amber-600 border-t-transparent"
-                                  aria-hidden
-                                />
-                                Under Review
-                              </span>
-                            )}
-                            {attempt.status === "accepted" && (
-                              <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-200">
-                                Accepted
-                              </span>
-                            )}
-                            {attempt.status === "rejected" && (
-                              <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-bold text-red-800 ring-1 ring-red-200">
-                                Rejected
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 align-top font-medium tabular-nums">
-                            {attempt.status === "accepted" && attempt.points > 0 ? (
-                              <span className="text-emerald-600">+{attempt.points} Points</span>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          <td className="max-w-[300px] px-4 py-3 align-top text-sm leading-relaxed text-[var(--text-secondary)]">
-                            {plagiarized ? (
-                              <span className="font-semibold text-orange-600">
-                                ⚠ Duplicate submission
-                              </span>
-                            ) : (
-                              <span>{attempt.ai_reason || "—"}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 align-top text-right">
-                            {canViewDetails ? (
-                              <button
-                                type="button"
-                                onClick={() => void handleViewProof(attempt)}
-                                disabled={loadingAttemptId === attempt.id}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-blue-600 transition-all hover:bg-blue-600 hover:text-white disabled:opacity-50"
-                                title="View details"
-                              >
-                                {loadingAttemptId === attempt.id ? (
-                                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                ) : (
-                                  <Eye size={18} />
-                                )}
-                              </button>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                        return (
+                          <tr key={attempt.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-6 py-4">
+                              {imageUrl || attempt.hasProof ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedAttempt(attempt)}
+                                  className="group relative h-16 w-16 overflow-hidden rounded-lg border border-[var(--card-border)] bg-slate-100 transition hover:scale-105 active:scale-95"
+                                >
+                                  {imageUrl ? (
+                                    <img
+                                      src={imageUrl}
+                                      alt="Proof"
+                                      className="h-full w-full object-cover transition group-hover:opacity-90"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-slate-400 uppercase">
+                                      Loading...
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition group-hover:opacity-100">
+                                    <span className="text-white">🔍</span>
+                                  </div>
+                                </button>
+                              ) : (
+                                <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase">
+                                  No File
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-[var(--text-dark)]">
+                                {challenge?.title ?? `Task ${attempt.task_id}`}
+                              </div>
+                              <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mt-1">
+                                {challenge?.day}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                               {attempt.ai_reason ? (
+                                 <div className="max-w-xs rounded-lg bg-slate-100 p-2 text-[11px] font-medium leading-relaxed text-slate-600 border border-slate-200">
+                                   {attempt.ai_reason}
+                                 </div>
+                               ) : (
+                                 <span className="text-slate-400 italic text-xs">No feedback yet</span>
+                               )}
+                            </td>
+                            <td className="px-6 py-4">
+                              {status === "accepted" ? (
+                                <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200">
+                                  ACCEPTED ✅
+                                </span>
+                              ) : status === "pending" ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                  PENDING
+                                </span>
+                              ) : status === "rejected" ? (
+                                <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-[11px] font-bold text-red-700 ring-1 ring-red-200">
+                                  REJECTED ❌
+                                </span>
+                              ) : (
+                                <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-500 ring-1 ring-slate-200">
+                                  {typeof status === 'string' ? status.toUpperCase() : "UNKNOWN"}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-[var(--text-secondary)] tabular-nums">
+                              {isMounted ? formatTableDate(attempt.created_at) : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </main>
       </StudentAppShell>
-
-      {lightbox && (
-        <ProofLightbox
-          submissionId={lightbox.attemptId}
-          taskName={lightbox.taskName}
-          status={lightbox.status}
-          hasProof={lightbox.hasProof}
-          aiReason={lightbox.aiReason}
-          verifiedAt={lightbox.verifiedAt}
-          points={lightbox.points}
-          textResponse={lightbox.textResponse}
-          initialSignedUrl={lightboxSignedUrl}
-          imageEndpoint="attempt"
-          isOpen
-          onClose={closeLightbox}
-        />
-      )}
 
       <AnimatePresence>
         {toastData && (
@@ -589,6 +286,21 @@ export default function SubmissionsClient({
           />
         )}
       </AnimatePresence>
+
+      <ProofLightbox
+        isOpen={!!selectedAttempt}
+        onClose={() => setSelectedAttempt(null)}
+        submissionId={selectedAttempt?.id ?? ""}
+        taskName={challengeById.get(selectedAttempt?.task_id)?.title ?? "Mission Proof"}
+        status={selectedAttempt?.status ?? ""}
+        aiReason={selectedAttempt?.ai_reason ?? ""}
+        verifiedAt={selectedAttempt?.verified_at}
+        points={selectedAttempt?.points}
+        textResponse={selectedAttempt?.text_response}
+        hasProof={selectedAttempt?.hasProof ?? !!selectedAttempt?.file_url}
+        initialSignedUrl={selectedAttempt?.file_url ? signedUrls[selectedAttempt.file_url] : null}
+        imageEndpoint={selectedAttempt?.submission_id && selectedAttempt?.submission_id !== selectedAttempt?.id ? "attempt" : "submission"}
+      />
     </>
   );
 }

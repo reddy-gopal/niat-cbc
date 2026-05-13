@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Challenge } from "@/types/app";
-import type { Submission } from "@/types/database";
+import type { StudentChallengeStatus } from "@/types/database";
 import { motion } from "framer-motion";
 import { toBlob } from "html-to-image";
 import { Crown, Download, Share2, Sparkles } from "lucide-react";
 
 interface TribeCrestProps {
   challenges: Challenge[];
-  submissions: Submission[];
+  challengeStatuses: StudentChallengeStatus[];
   onStoneClick: (c: Challenge) => void;
   isStoneClickable: (c: Challenge) => boolean;
   studentName: string;
@@ -62,7 +62,7 @@ const CONSTELLATION_DOTS = [
 
 export default function TribeCrest({
   challenges,
-  submissions,
+  challengeStatuses,
   onStoneClick,
   isStoneClickable,
   studentName,
@@ -374,18 +374,20 @@ export default function TribeCrest({
                     </div>
                     
                     {/* Approved checkmark badge */}
-                    <div
-                      className="absolute z-10 flex items-center justify-center rounded-full bg-green-500"
-                      style={{
-                        width: `${badgeSize}px`,
-                        height: `${badgeSize}px`,
-                        bottom: "2px",
-                        right: "2px",
-                        border: "2px solid var(--text-dark)",
-                      }}
-                    >
-                      <span className="text-white leading-none" style={{ fontSize: "10px" }}>✓</span>
-                    </div>
+                    {challengeStatuses.find(s => s.task_id === challenge.id)?.is_completed && (
+                      <div
+                        className="absolute z-10 flex items-center justify-center rounded-full bg-green-500"
+                        style={{
+                          width: `${badgeSize}px`,
+                          height: `${badgeSize}px`,
+                          bottom: "2px",
+                          right: "2px",
+                          border: "2px solid var(--text-dark)",
+                        }}
+                      >
+                        <span className="text-white leading-none" style={{ fontSize: "10px" }}>✓</span>
+                      </div>
+                    )}
                     <div
                       className="absolute pointer-events-none text-center whitespace-nowrap"
                       style={{

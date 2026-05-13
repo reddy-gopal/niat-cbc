@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import dynamic from "next/dynamic";
 import { resolveStudentUtmParams } from "@/lib/utils";
 import { getStudentSession } from "@/lib/session";
-import type { Submission, Student } from "@/types/database";
-import { adminClient } from "../../../utils/supabase/admin";
+import type { StudentChallengeStatus, Student } from "@/types/database";
 import { createClient } from "../../../utils/supabase/server";
 
 type StudentWithContext = Student & {
@@ -14,8 +13,6 @@ type StudentWithContext = Student & {
 };
 
 const Dashboard = dynamic(() => import("@/components/student/Dashboard"));
-const COMPLETED_ATTEMPT_STATUSES = new Set(["accepted", "approved"]);
-const REFERRAL_CHALLENGE_ID = 3;
 
 type DashboardPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -36,7 +33,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const supabase = await createClient();
 
-  const [studentResponse, submissionsResponse, scoreResponse] = await Promise.all([
+  const [studentResponse, challengeStatusResponse] = await Promise.all([
     supabase
       .from("students")
       .select(
@@ -59,17 +56,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .eq("id", session.studentId)
       .maybeSingle(),
     supabase
-      .from("submissions")
-      .select(
-        "id,student_id,bootcamp_id,section_id,region_id,task_id,streak_day,file_url,status,points,ai_reason,resubmit_count,verification_attempts,last_attempted_at,verified_at,override_by,override_note,created_at,updated_at"
-      )
+      .from("student_challenge_status")
+      .select("*")
       .eq("student_id", session.studentId)
-      .order("task_id", { ascending: true }),
-    adminClient
-      .from("submission_attempts")
-      .select("points, task_id, status")
-      .eq("student_id", session.studentId)
-      .not("points", "is", null),
+      .eq("bootcamp_id", session.bootcampId),
   ]);
 
   const student = studentResponse.data as (StudentWithContext & { total_points: number }) | null;
@@ -104,58 +94,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect(`/dashboard?${query.toString()}`);
   }
 
-  const submissions = (submissionsResponse.data ?? []) as Submission[];
-  if (scoreResponse.error) {
-    console.error("[dashboard] Score fetch failed:", scoreResponse.error);
-  }
-
-  const attemptScore =
-    (scoreResponse.data as Array<{
-      points: number | string | null;
-      task_id: number | null;
-      status: string | null;
-    }> | null) ?? [];
-  const completedAttemptScore = attemptScore.filter((attempt) =>
-    COMPLETED_ATTEMPT_STATUSES.has(String(attempt.status ?? "").trim().toLowerCase())
-  );
-  const nonReferralAttemptScore = completedAttemptScore.filter(
-    (attempt) => Number(attempt.task_id) !== REFERRAL_CHALLENGE_ID
-  );
-  const referralSubmissionRows = submissions.filter(
-    (row) => row.task_id === REFERRAL_CHALLENGE_ID
-  );
-  const latestReferralSubmission = referralSubmissionRows
-    .slice()
-    .sort(
-      (a, b) =>
-        new Date(b.updated_at ?? b.created_at).getTime() -
-        new Date(a.updated_at ?? a.created_at).getTime()
-    )[0];
-
+  const challengeStatuses = (challengeStatusResponse.data ?? []) as StudentChallengeStatus[];
+  const completedChallenges = challengeStatuses.filter((c) => c.is_completed).length;
   const totalPoints = student.total_points ?? 0;
-
-  const completedChallengeSet = new Set(
-    nonReferralAttemptScore
-      .map((attempt) => {
-        const taskId = Number(attempt.task_id);
-        return Number.isFinite(taskId) ? taskId : null;
-      })
-      .filter((taskId): taskId is number => taskId != null)
-  );
-  if (
-    latestReferralSubmission &&
-    COMPLETED_ATTEMPT_STATUSES.has(
-      String(latestReferralSubmission.status ?? "").trim().toLowerCase()
-    )
-  ) {
-    completedChallengeSet.add(REFERRAL_CHALLENGE_ID);
-  }
-  const completedChallenges = completedChallengeSet.size;
 
   return (
     <Dashboard
       student={student}
-      initialSubmissions={submissions}
+      initialChallengeStatuses={challengeStatuses}
       session={{
         ...session,
         utmSource: utmParams.utmSource,
@@ -165,6 +111,5 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       totalPoints={totalPoints}
       completedChallenges={completedChallenges}
     />
-
   );
 }

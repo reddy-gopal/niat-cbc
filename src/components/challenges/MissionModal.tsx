@@ -5,7 +5,7 @@ import type { Challenge, StudentSession } from "@/types/app";
 import UploadZone from "./UploadZone";
 import DailyPostChallenge from "./DailyPostChallenge";
 import { buildChallenge8ReferralUrl } from "@/lib/utils";
-import type { Submission } from "@/types/database";
+import type { StudentChallengeStatus } from "@/types/database";
 
 type UploadState = "idle" | "uploading" | "received";
 const REFERRAL_STATS_URL = "https://nxtrewards.ccbp.in/";
@@ -18,13 +18,13 @@ export default function MissionModal({
   onSubmitSuccess,
   isSubmissionLocked,
   stoneColor,
-  submissions,
+  challengeStatuses,
 }: {
   isOpen: boolean;
   onClose: () => void;
   challenge: Challenge | null;
   session: StudentSession;
-  submissions: Submission[];
+  challengeStatuses: StudentChallengeStatus[];
   onSubmitSuccess: (payload: { taskId: number; submissionId?: string }) => void;
   isSubmissionLocked: boolean;
   stoneColor?: string;
@@ -432,7 +432,7 @@ export default function MissionModal({
               </div>
             ) : challenge.id === 6 ? (
               <DailyPostChallenge
-                submissions={submissions}
+                status={challengeStatuses.find(s => s.task_id === 6) ?? null}
                 onSuccess={onSubmitSuccess}
                 stoneColor={modalStoneColor}
               />
