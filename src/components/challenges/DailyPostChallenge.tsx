@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import UploadZone from "./UploadZone";
 import type { StudentChallengeStatus } from "@/types/database";
+import { isDailyPostAcceptedToday } from "@/lib/daily-post";
 
 type DailyPostChallengeProps = {
   status: StudentChallengeStatus | null;
@@ -27,12 +28,7 @@ export default function DailyPostChallenge({
   const stoneSoft = `color-mix(in srgb, ${stoneColor} 18%, white)`;
   const stoneBorder = `color-mix(in srgb, ${stoneColor} 82%, white)`;
 
-  const isAcceptedToday = useMemo(() => {
-    if (!status || status.latest_status !== "accepted" || !status.completed_at) return false;
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    return new Date(status.completed_at).getTime() >= startOfToday.getTime();
-  }, [status]);
+  const acceptedToday = useMemo(() => isDailyPostAcceptedToday(status), [status]);
 
   const handleUpload = async () => {
     if (!selectedFile) return;
@@ -65,38 +61,19 @@ export default function DailyPostChallenge({
     }
   };
 
-  const attemptsUsed = status?.attempts_used ?? 0;
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-col items-center gap-2 mb-2">
-        <div className="flex gap-1.5">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className={`h-2.5 w-8 rounded-full border transition-all ${
-                i <= attemptsUsed
-                  ? "bg-emerald-500 border-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
-                  : "bg-slate-200 border-slate-300"
-              }`}
-            />
-          ))}
-        </div>
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-          Streak Progress: {attemptsUsed}/3 Days
-        </span>
-      </div>
+      <p className="text-[11px] text-center font-medium leading-relaxed text-slate-600 px-1">
+        Upload as many times as you need until today&apos;s post is accepted. After that, come back
+        tomorrow for the next one.
+      </p>
 
-      {isAcceptedToday ? (
+      {acceptedToday ? (
         <div className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-5 text-center shadow-inner">
           <div className="text-2xl mb-2">✅</div>
-          <p className="text-[#065f46] font-heading font-bold text-base">
-            Accepted Today!
-          </p>
+          <p className="text-[#065f46] font-heading font-bold text-base">Accepted today!</p>
           <p className="mt-2 text-sm font-medium leading-relaxed text-emerald-900/90">
-            {attemptsUsed >= 3 
-              ? "Streak complete! You've awakened the Time Stone. ⚡"
-              : "Great job! Come back tomorrow for your next post."}
+            Great job! Come back tomorrow for your next post.
           </p>
         </div>
       ) : (
@@ -125,9 +102,7 @@ export default function DailyPostChallenge({
               className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-5 text-center shadow-inner"
             >
               <div className="text-2xl mb-2">✅</div>
-              <p className="text-[#065f46] font-heading font-bold text-base">
-                Accepted!
-              </p>
+              <p className="text-[#065f46] font-heading font-bold text-base">Accepted!</p>
               <p className="mt-2 text-sm font-medium leading-relaxed text-emerald-900/90">
                 Come back tomorrow for your next post.
               </p>
@@ -136,7 +111,7 @@ export default function DailyPostChallenge({
             <button
               type="button"
               onClick={handleUpload}
-              disabled={!selectedFile || uploadState === "uploading" || attemptsUsed >= 3}
+              disabled={!selectedFile || uploadState === "uploading"}
               className="w-full border-[3px] text-white font-black tracking-[0.08em] text-xs sm:text-sm md:text-base py-2.5 sm:py-3.5 rounded-xl active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
               style={{
                 background: stoneDeep,

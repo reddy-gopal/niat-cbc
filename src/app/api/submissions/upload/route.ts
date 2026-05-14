@@ -50,9 +50,9 @@ export async function POST(request: Request) {
     const attemptNumber = (lastAttempt?.attempt_number ?? 0) + 1;
 
     // --- AUDIT FIX: Enforce Attempt Limits ---
-    // Normal tasks: max 1. Streak task (6): max 3.
-    const maxAttempts = taskId === 6 ? 3 : 1;
-    if (attemptNumber > maxAttempts && taskId !== REFERRAL_CHALLENGE_ID) {
+    // Normal tasks: max 1. Task 6 uses `/api/submissions/upload-daily` (unlimited retries until accepted per day).
+    const maxAttempts = 1;
+    if (attemptNumber > maxAttempts && taskId !== REFERRAL_CHALLENGE_ID && taskId !== 6) {
       return NextResponse.json(
         { success: false, error: "Maximum attempts reached for this challenge." },
         { status: 400 }

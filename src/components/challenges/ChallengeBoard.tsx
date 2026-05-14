@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Challenge, StudentSession } from "@/types/app";
 import type { StudentChallengeStatus } from "@/types/database";
+import { isDailyPostAcceptedToday } from "@/lib/daily-post";
 import { useSubmissionPolling } from "@/hooks/useSubmissionPolling";
 const MissionModal = dynamic(() => import("./MissionModal"), {
   ssr: false,
@@ -52,7 +53,8 @@ const DISPLAY_POINTS: Record<number, number> = {
   6: 2,
 };
 
-const STREAK_CHALLENGE_ID = 6;
+/** Daily Insta post — lock only after today's acceptance (see `upload-daily`). */
+const DAILY_POST_TASK_ID = 6;
 const REFERRAL_CHALLENGE_ID = 3;
 const COMPLETED_STATUSES = new Set(["accepted", "approved"]);
 
@@ -259,18 +261,17 @@ export default function ChallengeBoard({
     const status = statusByTask.get(challenge.id);
     const id = challenge.id;
 
-    // --- AUDIT FIX: Enforce Max Attempt Limits ---
-    if (id === STREAK_CHALLENGE_ID) {
-      // Streak task 6: max 3 attempts total
-      return (status?.attempts_used ?? 0) >= 3;
+    // --- Referral (Task 3): never completion-locked (copy / claim UX) ---
+    if (id === REFERRAL_CHALLENGE_ID) {
+      return false;
     }
 
-    // --- AUDIT FIX: Referral (Task 3) is infinite ---
-    if (id === REFERRAL_CHALLENGE_ID) {
-      return false; // Always open once unlocked by Task 2
+    // Daily post (Task 6): unlimited retries until accepted; lock only after today's acceptance
+    if (id === DAILY_POST_TASK_ID) {
+      return isDailyPostAcceptedToday(status);
     }
-    
-    // Normal tasks: locked if already completed
+
+    // Normal one-shot tasks: locked after completion
     return status?.is_completed ?? false;
   };
 
@@ -371,7 +372,7 @@ export default function ChallengeBoard({
 
   const isCrestStoneClickable = (challenge: Challenge) => {
     if (challenge.isReferral) return true;
-    if (challenge.id === STREAK_CHALLENGE_ID) return !isSubmissionLocked(challenge);
+    if (challenge.id === DAILY_POST_TASK_ID) return !isSubmissionLocked(challenge);
     return false;
   };
 
@@ -616,7 +617,11 @@ export default function ChallengeBoard({
                           stoneLabel={STONE_META[challenge.id]?.label ?? "Stone"}
                           stoneColor={getStoneColor(challenge.id)}
                           displayPoints={DISPLAY_POINTS[challenge.id] ?? 0}
-                          coolMessage={hoveredTaskId === challenge.id && challenge.id === 6 && locked ? "Recharging for tomorrow... ⚡" : null}
+                          coolMessage={
+                            hoveredTaskId === challenge.id && challenge.id === DAILY_POST_TASK_ID && locked
+                              ? "Today's post is in — come back tomorrow! ⚡"
+                              : null
+                          }
                         />
                       </motion.button>
                     </div>
