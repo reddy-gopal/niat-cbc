@@ -259,12 +259,6 @@ export default function ChallengeBoard({
     const status = statusByTask.get(challenge.id);
     const id = challenge.id;
 
-    // --- AUDIT FIX: Enforce Unlock Sequence (1 -> 2 -> 3 -> 4 -> 5) ---
-    if (id === 2 && !isChallengeComplete(1)) return true;
-    if (id === 3 && !isChallengeComplete(2)) return true;
-    if (id === 4 && !isChallengeComplete(3)) return true;
-    if (id === 5 && !isChallengeComplete(4)) return true;
-
     // --- AUDIT FIX: Enforce Max Attempt Limits ---
     if (id === STREAK_CHALLENGE_ID) {
       // Streak task 6: max 3 attempts total
