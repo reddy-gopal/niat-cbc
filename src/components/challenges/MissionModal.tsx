@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Challenge, StudentSession } from "@/types/app";
+import { CHALLENGE_ID_MAP } from "@/lib/challenges";
 import UploadZone from "./UploadZone";
 import DailyPostChallenge from "./DailyPostChallenge";
 import { isDateScheduleLockMessage } from "@/lib/challenge-unlock";
@@ -225,7 +226,8 @@ export default function MissionModal({
     }
   };
 
-  const formattedId = String(challenge.id).padStart(2, "0");
+  const displayId = CHALLENGE_ID_MAP[challenge.id] ?? challenge.id;
+  const formattedId = String(displayId).padStart(2, "0");
   const formLocked = uploadState === "uploading" || uploadState === "received";
 
   const modalContent = (

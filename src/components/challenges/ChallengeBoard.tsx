@@ -12,6 +12,7 @@ import {
   isDateScheduleLockMessage,
   TIME_CAPSULE_TASK_ID,
 } from "@/lib/challenge-unlock";
+import { CHALLENGE_ID_MAP } from "@/lib/challenges";
 import { isDailyPostAcceptedToday } from "@/lib/daily-post";
 import { useSubmissionPolling } from "@/hooks/useSubmissionPolling";
 const MissionModal = dynamic(() => import("./MissionModal"), {
@@ -620,7 +621,7 @@ export default function ChallengeBoard({
                     <NodeLabel
                       id={centerChallenge.id}
                       isCenter={true}
-                      shortName={SHORT_NAMES[centerChallenge.id] ?? `Challenge ${centerChallenge.id}`}
+                      shortName={SHORT_NAMES[centerChallenge.id] ?? `Challenge ${CHALLENGE_ID_MAP[centerChallenge.id] ?? centerChallenge.id}`}
                       stoneLabel={STONE_META[centerChallenge.id]?.label ?? "Stone"}
                       stoneColor={getStoneColor(centerChallenge.id)}
                       displayPoints={DISPLAY_POINTS[centerChallenge.id] ?? 0}
@@ -701,7 +702,7 @@ export default function ChallengeBoard({
                         <NodeLabel
                           id={challenge.id}
                           isCenter={false}
-                          shortName={SHORT_NAMES[challenge.id] ?? `Challenge ${challenge.id}`}
+                          shortName={SHORT_NAMES[challenge.id] ?? `Challenge ${CHALLENGE_ID_MAP[challenge.id] ?? challenge.id}`}
                           stoneLabel={STONE_META[challenge.id]?.label ?? "Stone"}
                           stoneColor={getStoneColor(challenge.id)}
                           displayPoints={DISPLAY_POINTS[challenge.id] ?? 0}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Challenge } from "@/types/app";
 import type { StudentChallengeStatus } from "@/types/database";
+import { CHALLENGE_ID_MAP } from "@/lib/challenges";
 import { motion } from "framer-motion";
 import { toBlob } from "html-to-image";
 import { Crown, Download, Share2, Sparkles } from "lucide-react";
@@ -69,7 +70,7 @@ export default function TribeCrest({
 }: TribeCrestProps) {
   const activeChallenges = useMemo(() => {
     // 6 stones on the orbit
-    return [1, 2, 3, 4, 5, 6]
+    return [1, 2, 4, 5, 6, 3]
       .map((id) => challenges.find((c) => c.id === id))
       .filter((c): c is Challenge => Boolean(c));
   }, [challenges]);
@@ -408,7 +409,7 @@ export default function TribeCrest({
                           padding: "2px 8px",
                         }}
                       >
-                        {SHORT_NAMES[challenge.id] ?? challenge.title}
+                        {SHORT_NAMES[challenge.id] ?? `Challenge ${CHALLENGE_ID_MAP[challenge.id] ?? challenge.id}`}
                       </span>
                     </div>
                   </motion.button>

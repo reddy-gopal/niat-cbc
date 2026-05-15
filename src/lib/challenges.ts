@@ -1,5 +1,15 @@
 import type { Challenge } from "@/types/app";
 
+/** Mapping of backend Task IDs (Old) to frontend display IDs (New). */
+export const CHALLENGE_ID_MAP: Record<number, number> = {
+  1: 1,
+  2: 2,
+  4: 3,
+  5: 4,
+  6: 5,
+  3: 6,
+};
+
 export const CHALLENGES: Challenge[] = [
   {
     id: 1,

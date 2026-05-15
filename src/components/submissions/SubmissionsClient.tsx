@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { AnimatePresence } from "framer-motion";
 import type { Challenge, StudentSession } from "@/types/app";
 import type { StudentChallengeStatus } from "@/types/database";
-import { CHALLENGES } from "@/lib/challenges";
+import { CHALLENGES, CHALLENGE_ID_MAP } from "@/lib/challenges";
 import { StudentAppShell } from "@/components/student/StudentAppShell";
 import { studentMainTopPaddingClass } from "@/components/student/StudentNavbar";
 import { useSubmissionPolling } from "@/hooks/useSubmissionPolling";
@@ -145,6 +145,8 @@ export default function SubmissionsClient({
     []
   );
 
+  const getDisplayId = (taskId: number) => CHALLENGE_ID_MAP[taskId] ?? taskId;
+
   return (
     <>
       <StudentAppShell firstName={firstName}>
@@ -218,7 +220,7 @@ export default function SubmissionsClient({
                             </td>
                             <td className="px-6 py-4">
                               <div className="font-bold text-[var(--text-dark)]">
-                                {challenge?.title ?? `Task ${attempt.task_id}`}
+                                {challenge?.title ?? `Task ${getDisplayId(attempt.task_id)}`}
                               </div>
                               <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mt-1">
                                 {challenge?.day}
