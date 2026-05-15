@@ -140,6 +140,7 @@ export type Database = {
           utm_source: string | null;
           utm_medium: string | null;
           utm_campaign: string | null;
+          instagram_handle: string | null;
           created_at: string;
         };
         Insert: {
@@ -154,6 +155,7 @@ export type Database = {
           utm_source?: string | null;
           utm_medium?: string | null;
           utm_campaign?: string | null;
+          instagram_handle?: string | null;
           created_at?: string;
         };
         Update: {
@@ -168,6 +170,7 @@ export type Database = {
           utm_source?: string | null;
           utm_medium?: string | null;
           utm_campaign?: string | null;
+          instagram_handle?: string | null;
           created_at?: string;
         };
       };

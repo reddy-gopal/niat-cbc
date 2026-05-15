@@ -37,6 +37,9 @@ export default function Dashboard({
 }: DashboardProps) {
   const [challengeStatuses, setChallengeStatuses] = useState<StudentChallengeStatus[]>(initialChallengeStatuses);
   const [isHoveringChart, setIsHoveringChart] = useState(false);
+  const [instagramHandle, setInstagramHandle] = useState<string | null>(
+    student.instagram_handle?.trim() ? student.instagram_handle.trim().toLowerCase() : null
+  );
 
   const firstName = session.fullName.split(" ")[0] ?? session.fullName;
   const leaderInvite = useMemo(() => {
@@ -228,6 +231,8 @@ export default function Dashboard({
               challengeStatuses={challengeStatuses}
               setChallengeStatuses={setChallengeStatuses}
               session={sessionWithReferralContext}
+              instagramHandle={instagramHandle}
+              onInstagramHandleSaved={(h) => setInstagramHandle(h)}
             />
           </section>
         </div>

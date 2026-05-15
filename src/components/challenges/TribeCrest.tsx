@@ -27,7 +27,7 @@ const SHORT_NAMES: Record<number, string> = {
   3: "Connect Dots",
   4: "Caught Great",
   5: "Time Capsule",
-  6: "Real Streak",
+  6: "Insta Post Streak",
 };
 
 const CONSTELLATION_DOTS = [

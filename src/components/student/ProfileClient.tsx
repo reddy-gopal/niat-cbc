@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "../ui/Toast";
 import type { StudentSession } from "@/types/app";
 import type { Student } from "@/types/database";
+import { buildInstagramProfileUrl } from "@/lib/instagram-handle";
 import { StudentAppShell } from "./StudentAppShell";
 import { studentMainTopPaddingClass } from "./StudentNavbar";
 
@@ -157,6 +158,28 @@ export default function ProfileClient({
                 >
                   Edit Number
                 </button>
+              )}
+            </div>
+
+            {/* Instagram (saved from Daily Insta challenge; read-only) */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Instagram</p>
+              {student.instagram_handle ? (
+                <div className="mt-1 flex flex-col sm:flex-row sm:items-baseline sm:gap-3 gap-1">
+                  <p className="text-lg font-bold text-[var(--text-dark)]">
+                    @{student.instagram_handle}
+                  </p>
+                  <a
+                    href={buildInstagramProfileUrl(student.instagram_handle)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-semibold text-[var(--primary)] underline"
+                  >
+                    View on Instagram
+                  </a>
+                </div>
+              ) : (
+                <p className="text-sm font-medium text-[var(--text-secondary)] mt-1">Not linked yet</p>
               )}
             </div>
 

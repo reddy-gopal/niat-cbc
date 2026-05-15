@@ -4,17 +4,52 @@ import { CHALLENGES } from "@/lib/challenges";
 import { getStudentFromRequest } from "@/lib/api-auth";
 import { adminClient } from "../../../../../utils/supabase/admin";
 import { env } from "@/lib/env";
+import { normalizeInstagramHandleInput } from "@/lib/instagram-handle";
 
 const TASK_ID = 6;
 const CHALLENGE = CHALLENGES.find((c) => c.id === TASK_ID)!;
 
 type AIResponse = {
   is_instagram: boolean;
-  is_feed_post: boolean;
-  has_hashtag: boolean;
+  is_post_or_story: boolean;
+  has_required_tags: boolean;
+  is_own_post: boolean;
   feedback: string;
-  rejection_reason: "not_instagram" | "not_a_post" | "hashtag_not_found" | null;
+  rejection_reason: string;
 };
+
+function coerceBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") return value;
+  return fallback;
+}
+
+function parseAiDailyResponse(raw: string): AIResponse {
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  return {
+    is_instagram: coerceBoolean(parsed.is_instagram),
+    is_post_or_story: coerceBoolean(parsed.is_post_or_story),
+    has_required_tags: coerceBoolean(parsed.has_required_tags),
+    is_own_post: coerceBoolean(parsed.is_own_post),
+    feedback: typeof parsed.feedback === "string" ? parsed.feedback : "",
+    rejection_reason: typeof parsed.rejection_reason === "string" ? parsed.rejection_reason : "",
+  };
+}
+
+function friendlyRejectionMessage(parsed: AIResponse, expectedUsername: string): string {
+  if (!parsed.is_instagram) {
+    return "This doesn't look like an Instagram screenshot.";
+  }
+  if (!parsed.is_own_post) {
+    return `This doesn't appear to be your account (@${expectedUsername}). Please upload a screenshot of your own post.`;
+  }
+  if (!parsed.is_post_or_story) {
+    return "Please upload a feed post or Story, not a Reel.";
+  }
+  if (!parsed.has_required_tags) {
+    return "Include a #niat… hashtag and an @niat… mention (e.g. #niatbootcamp2026 and @niat_india).";
+  }
+  return parsed.feedback || "Your submission could not be verified. Please try again.";
+}
 
 export async function POST(request: Request) {
   try {
@@ -22,7 +57,6 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
-
 
     const formData = await request.formData();
     const file = formData.get("file");
@@ -34,6 +68,26 @@ export async function POST(request: Request) {
     if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
       return NextResponse.json(
         { success: false, error: "Only PNG and JPG images are allowed." },
+        { status: 400 }
+      );
+    }
+
+    const { data: studentRow } = await adminClient
+      .from("students")
+      .select("instagram_handle")
+      .eq("id", session.studentId)
+      .maybeSingle();
+
+    const expectedUsername = normalizeInstagramHandleInput(
+      String(studentRow?.instagram_handle ?? "")
+    );
+    if (!expectedUsername) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Please save your Instagram profile link before submitting.",
+          rejection_reason: "missing_instagram_handle",
+        },
         { status: 400 }
       );
     }
@@ -103,24 +157,37 @@ export async function POST(request: Request) {
     }
 
     // 5. Call AI
-    const aiPrompt = `Look at this screenshot carefully and answer three things:
+    const aiPrompt = `Look at this Instagram screenshot carefully and answer four things:
 
-1. Is this a screenshot from Instagram? Look for Instagram UI elements such as the like, comment, share buttons, Instagram-style profile picture, and the standard feed post layout.
+1. is_instagram (boolean): Does this look like a genuine Instagram UI — post header with username, 
+   profile pic, like/comment/share icons visible?
 
-2. Is this a feed POST and not a Story or Reel? A feed post has a caption below the image with like and comment counts visible. A story is full-screen with no caption area.
+2. is_post_or_story (boolean): Is this a feed post OR an Instagram Story? 
+   (Accept both. Reject only if it's a Reel.)
 
-3. Is the hashtag #niatbootcamp2026 clearly visible in the caption or comments of this post?
+3. has_required_tags (boolean): In the caption, sticker text, or visible tags, BOTH of the following must appear (case-insensitive):
+   - At least one hashtag whose text after # starts with "niat" (e.g. #niatbootcamp2026, #niatchennai, #niat). Extra NIAT-related hashtags are welcome and must NOT cause rejection.
+   - At least one @mention whose username starts with "niat" after the @ (e.g. @niat_india, @niatchennai). Extra @niat… mentions are welcome and must NOT cause rejection.
+   Do NOT require the exact pair #niatbootcamp2026 and @niat_india only — any qualifying #niat* hashtag plus any qualifying @niat* mention is enough.
 
-Respond in this exact JSON format:
+4. is_own_post (boolean): The username shown at the top of the post (the account that made this post)
+   must match the expected username: "${expectedUsername}"
+   Compare case-insensitively. Ignore leading @.
+   If the screenshot shows someone else's post being viewed (e.g. from explore or another profile),
+   this is false.
+
+Respond ONLY with valid JSON:
 {
-  "is_instagram": true or false,
-  "is_feed_post": true or false,
-  "has_hashtag": true or false,
-  "feedback": "A friendly one-sentence feedback for the student",
-  "rejection_reason": null or one of: "not_instagram" | "not_a_post" | "hashtag_not_found"
+  "is_instagram": boolean,
+  "is_post_or_story": boolean,
+  "has_required_tags": boolean,
+  "is_own_post": boolean,
+  "feedback": "brief explanation",
+  "rejection_reason": "first failing check reason, or empty string if all pass"
 }
 
-All three must be true to pass. If any fail, return the first failing reason in rejection_reason.`;
+All four must be true to pass. Return the first failing reason in rejection_reason.
+Order of checks for rejection_reason: is_instagram → is_own_post → is_post_or_story → has_required_tags`;
 
     const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -156,12 +223,18 @@ All three must be true to pass. If any fail, return the first failing reason in 
     }
 
     const aiResult = await anthropicResponse.json();
-    const textContent = aiResult.content?.find((item: any) => item.type === "text")?.text ?? "{}";
-    const parsedAI = JSON.parse(textContent) as AIResponse;
+    const textContent = aiResult.content?.find((item: { type?: string }) => item.type === "text")?.text ?? "{}";
+    const parsedAI = parseAiDailyResponse(textContent);
 
-    const isAccepted = parsedAI.is_instagram && parsedAI.is_feed_post && parsedAI.has_hashtag;
+    const isAccepted =
+      parsedAI.is_instagram &&
+      parsedAI.is_post_or_story &&
+      parsedAI.has_required_tags &&
+      parsedAI.is_own_post;
     const status = isAccepted ? "accepted" : "rejected";
     const now = new Date().toISOString();
+
+    const studentMessage = isAccepted ? parsedAI.feedback : friendlyRejectionMessage(parsedAI, expectedUsername);
 
     // 6. Get or create submission row
     let { data: submission } = await adminClient
@@ -212,7 +285,7 @@ All three must be true to pass. If any fail, return the first failing reason in 
         file_url: storagePath,
         file_hash: hash,
         status: status,
-        ai_reason: parsedAI.feedback,
+        ai_reason: studentMessage,
         points: isAccepted ? CHALLENGE.points : 0,
         verification_attempts: 1,
         last_attempted_at: now,
@@ -231,7 +304,7 @@ All three must be true to pass. If any fail, return the first failing reason in 
         .update({
           status: "accepted",
           points: CHALLENGE.points,
-          ai_reason: parsedAI.feedback,
+          ai_reason: studentMessage,
           verified_at: now,
           updated_at: now,
         })
@@ -241,7 +314,7 @@ All three must be true to pass. If any fail, return the first failing reason in 
         .from("submissions")
         .update({
           status: "rejected",
-          ai_reason: parsedAI.feedback,
+          ai_reason: studentMessage,
           verified_at: now,
           updated_at: now,
         })
@@ -251,17 +324,16 @@ All three must be true to pass. If any fail, return the first failing reason in 
     if (!isAccepted) {
       return NextResponse.json({
         success: false,
-        error: parsedAI.feedback,
-        rejection_reason: parsedAI.rejection_reason
+        error: studentMessage,
+        rejection_reason: parsedAI.rejection_reason || "verification_failed",
       }, { status: 200 }); // Status 200 because it's a valid processing result
     }
 
     return NextResponse.json({
       success: true,
       message: "Proof received and accepted!",
-      data: { attemptId: attemptRow.id }
+      data: { attemptId: attemptRow.id },
     });
-
   } catch (err) {
     console.error("Daily post upload error:", err);
     return NextResponse.json({ success: false, error: "Internal server error." }, { status: 500 });

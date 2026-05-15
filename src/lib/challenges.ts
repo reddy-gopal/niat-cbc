@@ -217,8 +217,9 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing wh
   },
   {
     id: 6,
-    title: "Daily Insta Post",
-    description: "Upload a screenshot of your Instagram post tagging #niatbootcamp2026",
+    title: "Insta Post Streak",
+    description:
+      "Share your moment, tag @niat_india and drop #niatbootcamp2026 in your caption, then submit your screenshot.",
     day: "Daily",
     points: 2,
     requiresUpload: true,

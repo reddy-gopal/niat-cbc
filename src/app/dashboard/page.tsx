@@ -47,6 +47,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         region_id,
         created_at,
         team_id,
+        instagram_handle,
         sections:section_id (label),
         bootcamps:bootcamp_id (name, date),
         regions:region_id (name),

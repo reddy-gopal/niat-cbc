@@ -5,6 +5,13 @@ import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Challenge, StudentSession } from "@/types/app";
 import type { StudentChallengeStatus } from "@/types/database";
+import {
+  CAUGHT_GREAT_TASK_ID,
+  getChallengeDateLockMessage,
+  isChallengeUnlockedByDate,
+  isDateScheduleLockMessage,
+  TIME_CAPSULE_TASK_ID,
+} from "@/lib/challenge-unlock";
 import { isDailyPostAcceptedToday } from "@/lib/daily-post";
 import { useSubmissionPolling } from "@/hooks/useSubmissionPolling";
 const MissionModal = dynamic(() => import("./MissionModal"), {
@@ -22,6 +29,9 @@ type ChallengeBoardProps = {
   challengeStatuses: StudentChallengeStatus[];
   setChallengeStatuses: Dispatch<SetStateAction<StudentChallengeStatus[]>>;
   session: StudentSession;
+  /** Instagram username (normalized, no @) for daily post (task 6) verification. */
+  instagramHandle: string | null;
+  onInstagramHandleSaved: (handle: string) => void;
   onChallengeStatusesUpdate?: (statuses: StudentChallengeStatus[]) => void;
 };
 
@@ -41,7 +51,7 @@ const SHORT_NAMES: Record<number, string> = {
   3: "Connect Dots",
   4: "Caught Great",
   5: "Time Capsule",
-  6: "Insta Post",
+  6: "Insta Post Streak",
 };
 
 const DISPLAY_POINTS: Record<number, number> = {
@@ -59,12 +69,12 @@ const REFERRAL_CHALLENGE_ID = 3;
 const COMPLETED_STATUSES = new Set(["accepted", "approved"]);
 
 const STONE_META: Record<number, { label: string; color: string }> = {
-  1: { label: "Space Stone", color: "var(--link)" },
-  2: { label: "Mind Stone", color: "var(--yellow)" },
-  3: { label: "Reality Stone", color: "var(--primary-hover)" },
-  4: { label: "Power Stone", color: "var(--purple-dark)" },
-  5: { label: "Soul Stone", color: "var(--orange)" },
-  6: { label: "Time Stone", color: "var(--success)" },
+  1: { label: "Space Stone", color: "#4A9EFF" },
+  2: { label: "Mind Stone", color: "#FFD740" },
+  3: { label: "Reality Stone", color: "#FF1744" },
+  4: { label: "Power Stone", color: "#CE93D8" },
+  5: { label: "Soul Stone", color: "#FF6D00" },
+  6: { label: "Time Stone", color: "#00E676" },
 };
 
 const FacetHighlight = memo(function FacetHighlight() {
@@ -100,6 +110,29 @@ const NodeLabel = memo(function NodeLabel({
   displayPoints,
   coolMessage,
 }: NodeLabelProps & { coolMessage?: string | null }) {
+  const pointsBadgeBase: CSSProperties = {
+    borderRadius: "9999px",
+    fontWeight: 700,
+  };
+
+  const getPointsBadgeStyle = (): CSSProperties => {
+    if (id === DAILY_POST_TASK_ID) return pointsBadgeBase;
+    if (isCenter && id === REFERRAL_CHALLENGE_ID) {
+      return {
+        ...pointsBadgeBase,
+        background: "rgba(255, 23, 68, 0.2)",
+        border: "1px solid #FF1744",
+        color: "#FF1744",
+      };
+    }
+    return {
+      ...pointsBadgeBase,
+      background: `color-mix(in srgb, ${stoneColor} 18%, transparent)`,
+      border: `1px solid ${stoneColor}`,
+      color: stoneColor,
+    };
+  };
+
   return (
     <div
       className="absolute pointer-events-none flex flex-col items-center gap-1 text-center"
@@ -126,16 +159,23 @@ const NodeLabel = memo(function NodeLabel({
       {isCenter ? (
         <>
           <span
-            className="font-black leading-none"
-            style={{ color: "var(--text-secondary)", fontSize: "15px" }}
+            className="leading-none"
+            style={{
+              color: "#FFFFFF",
+              fontWeight: 800,
+              fontSize: "16px",
+              textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+            }}
           >
             {shortName}
           </span>
           <span
-            className="font-bold leading-none"
+            className="leading-none"
             style={{
-              color: "color-mix(in srgb, var(--primary-hover) 70%, transparent)",
-              fontSize: "10px",
+              color: "#FF1744",
+              fontWeight: 600,
+              fontSize: "11px",
+              textShadow: "0 0 8px #FF1744",
             }}
           >
             {stoneLabel}
@@ -144,28 +184,43 @@ const NodeLabel = memo(function NodeLabel({
       ) : (
         <>
           <span
-            className="font-bold leading-none"
+            className="leading-none"
             style={{
-              color: `color-mix(in srgb, ${stoneColor} 70%, transparent)`,
-              fontSize: "10px",
+              color: stoneColor,
+              fontWeight: 600,
+              fontSize: "11px",
+              textShadow: `0 0 8px ${stoneColor}`,
             }}
           >
             {stoneLabel}
           </span>
           <span
-            className="font-bold leading-none"
-            style={{ color: "var(--text-secondary)", fontSize: "12px" }}
+            className="leading-none"
+            style={{
+              color: "#FFFFFF",
+              fontWeight: 700,
+              fontSize: "13px",
+              textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+            }}
           >
             {shortName}
           </span>
         </>
       )}
-      <span
-        className="rounded-full px-2.5 py-0.5 font-bold"
-        style={{ background: "var(--hero-from)", color: "var(--bg-base)" }}
-      >
-        <span style={{ fontSize: "10px" }}>{displayPoints}pt</span>
-      </span>
+      {id === DAILY_POST_TASK_ID ? (
+        <span className="daily-points-badge rounded-full px-2.5 py-0.5">
+          <span
+            className="block max-w-[7.5rem] text-center leading-tight"
+            style={{ fontSize: "8px", letterSpacing: "0.02em" }}
+          >
+            +{displayPoints} Points Daily
+          </span>
+        </span>
+      ) : (
+        <span className="rounded-full px-2.5 py-0.5" style={getPointsBadgeStyle()}>
+          <span style={{ fontSize: "10px" }}>{displayPoints}pt</span>
+        </span>
+      )}
     </div>
   );
 });
@@ -175,6 +230,8 @@ export default function ChallengeBoard({
   challengeStatuses,
   setChallengeStatuses,
   session,
+  instagramHandle,
+  onInstagramHandleSaved,
   onChallengeStatusesUpdate,
 }: ChallengeBoardProps) {
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
@@ -257,22 +314,43 @@ export default function ChallengeBoard({
     [activeTaskId, challenges]
   );
 
-  const isSubmissionLocked = (challenge: Challenge) => {
+  const bootcampDate = session.bootcampDate;
+
+  const isDateLocked = (challengeId: number) =>
+    (challengeId === CAUGHT_GREAT_TASK_ID || challengeId === TIME_CAPSULE_TASK_ID) &&
+    !isChallengeUnlockedByDate(challengeId, bootcampDate);
+
+  const getSubmissionLockMessage = (challenge: Challenge): string | null => {
     const status = statusByTask.get(challenge.id);
     const id = challenge.id;
 
-    // --- Referral (Task 3): never completion-locked (copy / claim UX) ---
     if (id === REFERRAL_CHALLENGE_ID) {
-      return false;
+      return null;
     }
 
-    // Daily post (Task 6): unlimited retries until accepted; lock only after today's acceptance
-    if (id === DAILY_POST_TASK_ID) {
-      return isDailyPostAcceptedToday(status);
+    if (isDateLocked(id)) {
+      return getChallengeDateLockMessage(id, bootcampDate);
     }
 
-    // Normal one-shot tasks: locked after completion
-    return status?.is_completed ?? false;
+    if (id === DAILY_POST_TASK_ID && isDailyPostAcceptedToday(status)) {
+      return "Come back tomorrow.";
+    }
+
+    if (status?.is_completed) {
+      return "Already completed.";
+    }
+
+    return null;
+  };
+
+  const isSubmissionLocked = (challenge: Challenge) =>
+    getSubmissionLockMessage(challenge) !== null;
+
+  /** Date-locked challenges can still be opened to read the unlock date. */
+  const isBoardClickDisabled = (challenge: Challenge) => {
+    const message = getSubmissionLockMessage(challenge);
+    if (!message) return false;
+    return !isDateScheduleLockMessage(message);
   };
 
   const getRingStatus = (challenge: Challenge): RingStatus => {
@@ -285,32 +363,35 @@ export default function ChallengeBoard({
   };
 
   const getStoneColor = (id: number) =>
-    STONE_META[id]?.color ?? "var(--text-muted)";
+    STONE_META[id]?.color ?? "rgba(255,255,255,0.45)";
 
   const getStatusRingStyle = (challenge: Challenge): CSSProperties => {
     const ring = getRingStatus(challenge);
     const color = getStoneColor(challenge.id);
+    const isReality = challenge.id === REFERRAL_CHALLENGE_ID;
+    const glowSpread = isReality ? "0 0 18px" : "0 0 12px";
     if (ring === "success") {
       return {
-        border: `2px solid color-mix(in srgb, ${color} 92%, transparent)`,
-        boxShadow: `0 0 10px color-mix(in srgb, ${color} 50%, transparent)`,
+        border: `3px solid ${color}`,
+        boxShadow: `${glowSpread} ${color}, 0 0 4px color-mix(in srgb, ${color} 40%, transparent)`,
       };
     }
     if (ring === "review") {
       return {
-        border: `2px solid color-mix(in srgb, ${color} 92%, transparent)`,
+        border: `3px solid ${color}`,
         animation: "stonePulse 2s ease-in-out infinite",
+        boxShadow: `${glowSpread} color-mix(in srgb, ${color} 75%, transparent)`,
       };
     }
     if (ring === "danger") {
       return {
-        border: `2px solid color-mix(in srgb, ${color} 88%, transparent)`,
-        boxShadow: `0 0 8px color-mix(in srgb, ${color} 35%, transparent)`,
+        border: `3px solid ${color}`,
+        boxShadow: `0 0 10px color-mix(in srgb, ${color} 55%, transparent)`,
       };
     }
     return {
-      border: `2px solid color-mix(in srgb, ${color} 80%, transparent)`,
-      boxShadow: `0 0 10px color-mix(in srgb, ${color} 25%, transparent)`,
+      border: `3px solid ${color}`,
+      boxShadow: `${glowSpread} color-mix(in srgb, ${color} 50%, transparent)`,
     };
   };
 
@@ -349,7 +430,7 @@ export default function ChallengeBoard({
     height: isCenter ? `${CENTER_NODE_SIZE}px` : `${OUTER_NODE_SIZE}px`,
     borderRadius: "999px",
     border: `1px solid color-mix(in srgb, ${getStoneColor(id)} 40%, transparent)`,
-    background: "var(--text-dark)",
+    background: "#0a0a14",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -366,7 +447,7 @@ export default function ChallengeBoard({
   };
 
   const openChallenge = (challenge: Challenge) => {
-    if (isSubmissionLocked(challenge)) return;
+    if (isBoardClickDisabled(challenge)) return;
     setActiveTaskId(challenge.id);
   };
 
@@ -455,13 +536,15 @@ export default function ChallengeBoard({
                 height: `${DESKTOP_SIZE}px`,
                 transformOrigin: "top left",
                 transform: `scale(${wheelScale})`,
+                background: "#0D0D2B",
               }}
             >
-              {/* Background radial */}
+              {/* Background radial — deep space + indigo center energy */}
               <div
                 className="absolute inset-0 rounded-full pointer-events-none z-0"
                 style={{
-                  background: "radial-gradient(circle at center, color-mix(in srgb, var(--text-dark) 80%, transparent), transparent 70%)",
+                  background:
+                    "radial-gradient(circle at 50% 50%, #2D1B69 0%, rgba(45, 27, 105, 0.55) 22%, rgba(13, 13, 43, 0.4) 48%, transparent 72%)",
                 }}
               />
 
@@ -474,15 +557,19 @@ export default function ChallengeBoard({
               >
                 {outerChallenges.map((challenge, index) => {
                   const { x, y } = getOuterNodePosition(index);
+                  const lineColor = getStoneColor(challenge.id);
                   return (
                     <line
                       key={`line-${challenge.id}`}
                       x1={DESKTOP_CENTER} y1={DESKTOP_CENTER}
                       x2={x} y2={y}
-                      stroke={getStoneColor(challenge.id)}
-                      strokeOpacity={0.2}
+                      stroke={lineColor}
+                      strokeOpacity={0.6}
                       strokeWidth={1.5}
                       strokeDasharray="6 4"
+                      style={{
+                        filter: `drop-shadow(0 0 4px ${lineColor}) drop-shadow(0 0 8px color-mix(in srgb, ${lineColor} 45%, transparent))`,
+                      }}
                     />
                   );
                 })}
@@ -509,9 +596,9 @@ export default function ChallengeBoard({
                     }}
                   >
                     <div className="absolute inset-[-8px] rounded-full pointer-events-none"
-                      style={{ border: "1px solid color-mix(in srgb, var(--primary-hover) 20%, transparent)" }} />
+                      style={{ border: "1px solid rgba(255, 23, 68, 0.35)" }} />
                     <div className="absolute inset-[-14px] rounded-full pointer-events-none"
-                      style={{ border: "1px solid color-mix(in srgb, var(--primary-hover) 10%, transparent)" }} />
+                      style={{ border: "1px solid rgba(255, 23, 68, 0.2)" }} />
                     <div className="absolute inset-[-4px] rounded-full pointer-events-none"
                       style={getStatusRingStyle(centerChallenge)} />
                     <div style={getNodeBodyStyle(centerChallenge.id, true)}>
@@ -567,7 +654,8 @@ export default function ChallengeBoard({
               <div className={`absolute inset-0 pointer-events-none z-[2] ${isAnimatingFinale ? "finale-orbit" : ""}`}>
                 {outerChallenges.map((challenge, index) => {
                   const { x, y } = getOuterNodePosition(index);
-                  const locked = isSubmissionLocked(challenge);
+                  const locked = isBoardClickDisabled(challenge);
+                  const dateLocked = isDateLocked(challenge.id);
                   const completed = getRingStatus(challenge) === "success";
                   return (
                     <div
@@ -618,8 +706,8 @@ export default function ChallengeBoard({
                           stoneColor={getStoneColor(challenge.id)}
                           displayPoints={DISPLAY_POINTS[challenge.id] ?? 0}
                           coolMessage={
-                            hoveredTaskId === challenge.id && challenge.id === DAILY_POST_TASK_ID && locked
-                              ? "Today's post is in — come back tomorrow! ⚡"
+                            hoveredTaskId === challenge.id && (locked || dateLocked)
+                              ? getSubmissionLockMessage(challenge)
                               : null
                           }
                         />
@@ -634,7 +722,7 @@ export default function ChallengeBoard({
 
           <div
             className="mt-8 text-center text-xs font-bold uppercase tracking-[0.2em] relative z-20"
-            style={{ color: "color-mix(in srgb, var(--primary) 60%, transparent)" }}
+            style={{ color: "rgba(255,255,255,0.72)", textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}
           >
             Reveal the Story: Complete challenges to awaken each Infinity Stone
           </div>
@@ -646,16 +734,39 @@ export default function ChallengeBoard({
         challenge={activeChallenge}
         session={session}
         challengeStatuses={challengeStatuses}
+        instagramHandle={instagramHandle}
+        onInstagramHandleSaved={onInstagramHandleSaved}
         onClose={() => setActiveTaskId(null)}
         onSubmitSuccess={handleSubmitted}
         isSubmissionLocked={activeChallenge ? isSubmissionLocked(activeChallenge) : false}
+        submissionLockMessage={
+          activeChallenge ? getSubmissionLockMessage(activeChallenge) : null
+        }
         stoneColor={activeChallenge ? getStoneColor(activeChallenge.id) : undefined}
       />
 
       <style jsx global>{`
         @keyframes stonePulse {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50%       { opacity: 1;   transform: scale(1.05); }
+          0%, 100% { opacity: 0.75; transform: scale(1); filter: brightness(1); }
+          50%       { opacity: 1;   transform: scale(1.04); filter: brightness(1.15); }
+        }
+        @keyframes dailyPointsPulse {
+          0%, 100% {
+            box-shadow:
+              0 0 6px rgba(0, 230, 118, 0.45),
+              0 0 10px rgba(0, 191, 165, 0.25);
+          }
+          50% {
+            box-shadow:
+              0 0 14px rgba(0, 230, 118, 0.75),
+              0 0 22px rgba(0, 191, 165, 0.45);
+          }
+        }
+        .daily-points-badge {
+          background: linear-gradient(135deg, #00e676, #00bfa5);
+          color: #001a0e;
+          font-weight: 700;
+          animation: dailyPointsPulse 2.2s ease-in-out infinite;
         }
       `}</style>
     </div>

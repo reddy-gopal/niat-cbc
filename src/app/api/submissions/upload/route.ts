@@ -2,6 +2,12 @@ import { createHash } from "crypto";
 import { waitUntil } from "@vercel/functions";
 import { NextResponse } from "next/server";
 import { CHALLENGES } from "@/lib/challenges";
+import {
+  CAUGHT_GREAT_TASK_ID,
+  getChallengeDateLockMessage,
+  isChallengeUnlockedByDate,
+  TIME_CAPSULE_TASK_ID,
+} from "@/lib/challenge-unlock";
 import { getStudentFromRequest } from "@/lib/api-auth";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
@@ -35,6 +41,27 @@ export async function POST(request: Request) {
     const challenge = CHALLENGES.find((c) => c.id === taskId);
     if (!challenge) {
       return NextResponse.json({ success: false, error: "Challenge not found." }, { status: 404 });
+    }
+
+    if (taskId === CAUGHT_GREAT_TASK_ID || taskId === TIME_CAPSULE_TASK_ID) {
+      const { data: bootcampRow } = await adminClient
+        .from("bootcamps")
+        .select("date")
+        .eq("id", session.bootcampId)
+        .maybeSingle();
+
+      const bootcampDate = bootcampRow?.date as string | undefined;
+      if (!isChallengeUnlockedByDate(taskId, bootcampDate)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              getChallengeDateLockMessage(taskId, bootcampDate) ??
+              "Not available yet.",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // --- AUDIT FIX: Calculate attempt number from submission_attempts ---

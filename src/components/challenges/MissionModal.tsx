@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Challenge, StudentSession } from "@/types/app";
 import UploadZone from "./UploadZone";
 import DailyPostChallenge from "./DailyPostChallenge";
+import { isDateScheduleLockMessage } from "@/lib/challenge-unlock";
 import { buildChallenge8ReferralUrl } from "@/lib/utils";
 import type { StudentChallengeStatus } from "@/types/database";
 
@@ -17,16 +18,22 @@ export default function MissionModal({
   session,
   onSubmitSuccess,
   isSubmissionLocked,
+  submissionLockMessage,
   stoneColor,
   challengeStatuses,
+  instagramHandle,
+  onInstagramHandleSaved,
 }: {
   isOpen: boolean;
   onClose: () => void;
   challenge: Challenge | null;
   session: StudentSession;
   challengeStatuses: StudentChallengeStatus[];
+  instagramHandle: string | null;
+  onInstagramHandleSaved: (handle: string) => void;
   onSubmitSuccess: (payload: { taskId: number; submissionId?: string }) => void;
   isSubmissionLocked: boolean;
+  submissionLockMessage?: string | null;
   stoneColor?: string;
 }) {
   const [accepted, setAccepted] = useState(false);
@@ -92,10 +99,12 @@ export default function MissionModal({
   const modalStoneSoft = `color-mix(in srgb, ${modalStoneColor} 18%, white)`;
   const modalStoneBorder = `color-mix(in srgb, ${modalStoneColor} 82%, white)`;
   const modalStoneGlow = `color-mix(in srgb, ${modalStoneColor} 45%, transparent)`;
+  const isDateScheduleLocked =
+    isSubmissionLocked && isDateScheduleLockMessage(submissionLockMessage);
 
   const handleSubmit = async () => {
     if (isSubmissionLocked) {
-      setError("This challenge is already completed and cannot be submitted again.");
+      setError(submissionLockMessage ?? "This challenge cannot be submitted right now.");
       return;
     }
     if (challenge.requiresUpload && !selectedFile) return;
@@ -284,44 +293,64 @@ export default function MissionModal({
             >
               {challenge.title}
             </h2>
-            <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
-              <span
-                className="text-[#ffffff] font-black px-2 sm:px-3 py-0.5 sm:py-1 rounded shadow-sm text-[10px] sm:text-xs border"
-                style={{ background: modalStoneColor, borderColor: modalStoneDeep }}
-              >
-                +{challenge.points} Points
-              </span>
-              {challenge.id === 6 && (
-                <span className="bg-[#991b1b] text-[#ffffff] font-bold px-2 sm:px-3 py-0.5 sm:py-1 rounded shadow-sm text-[9px] sm:text-[10px] uppercase border border-[#991b1b] max-w-full">
-                  DEADLINE: {challenge.day}
-                </span>
-              )}
-            </div>
-            <p
-              className="font-medium text-[11px] sm:text-xs p-2.5 sm:p-3 md:p-4 rounded-xl border shadow-sm tracking-normal sm:tracking-wide leading-relaxed text-center break-words [overflow-wrap:anywhere]"
-              style={{
-                color: modalStoneDeep,
-                background: modalStoneSoft,
-                borderColor: modalStoneBorder,
-              }}
-            >
-              {challenge.description}
-            </p>
+            {!isDateScheduleLocked && (
+              <>
+                <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+                  <span
+                    className="text-[#ffffff] font-black px-2 sm:px-3 py-0.5 sm:py-1 rounded shadow-sm text-[10px] sm:text-xs border"
+                    style={{ background: modalStoneColor, borderColor: modalStoneDeep }}
+                  >
+                    {challenge.id === 6
+                      ? `+${challenge.points} Points Daily`
+                      : `+${challenge.points} Points`}
+                  </span>
+                  {challenge.id === 6 && (
+                    <span className="bg-[#991b1b] text-[#ffffff] font-bold px-2 sm:px-3 py-0.5 sm:py-1 rounded shadow-sm text-[9px] sm:text-[10px] uppercase border border-[#991b1b] max-w-full">
+                      DEADLINE: {challenge.day}
+                    </span>
+                  )}
+                </div>
+                <p
+                  className="font-medium text-[11px] sm:text-xs p-2.5 sm:p-3 md:p-4 rounded-xl border shadow-sm tracking-normal sm:tracking-wide leading-relaxed text-center break-words [overflow-wrap:anywhere]"
+                  style={{
+                    color: modalStoneDeep,
+                    background: modalStoneSoft,
+                    borderColor: modalStoneBorder,
+                  }}
+                >
+                  {challenge.description}
+                </p>
+              </>
+            )}
           </div>
 
           <div className="w-full">
             {isSubmissionLocked ? (
-              <div className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-5 text-center shadow-inner">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`rounded-xl border-2 px-4 py-5 text-center shadow-inner ${
+                  isDateScheduleLockMessage(submissionLockMessage)
+                    ? "border-slate-300 bg-slate-50"
+                    : "border-emerald-600 bg-emerald-50"
+                }`}
+              >
                 <div className="text-2xl mb-2" aria-hidden>
-                  ✅
+                  {isDateScheduleLockMessage(submissionLockMessage) ? "🔒" : "✅"}
                 </div>
-                <p className="text-[#065f46] font-heading font-bold text-base sm:text-lg">
-                  Challenge already completed
+                <p
+                  className={`font-heading font-bold text-base sm:text-lg leading-snug ${
+                    isDateScheduleLockMessage(submissionLockMessage)
+                      ? "text-slate-800"
+                      : "text-[#065f46]"
+                  }`}
+                >
+                  {submissionLockMessage ??
+                    (isDateScheduleLockMessage(submissionLockMessage)
+                      ? "Not available yet."
+                      : "Already completed.")}
                 </p>
-                <p className="mt-2 text-sm font-medium leading-relaxed text-emerald-900/90">
-                  This mission is one-time only, so you cannot submit it again.
-                </p>
-              </div>
+              </motion.div>
             ) : !accepted ? (
               <button
                 type="button"
@@ -432,7 +461,9 @@ export default function MissionModal({
               </div>
             ) : challenge.id === 6 ? (
               <DailyPostChallenge
-                status={challengeStatuses.find(s => s.task_id === 6) ?? null}
+                status={challengeStatuses.find((s) => s.task_id === 6) ?? null}
+                instagramHandle={instagramHandle}
+                onInstagramHandleSaved={onInstagramHandleSaved}
                 onSuccess={onSubmitSuccess}
                 stoneColor={modalStoneColor}
               />
