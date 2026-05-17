@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CHALLENGES } from "@/lib/challenges";
 import type { StudentSession } from "@/types/app";
@@ -35,6 +36,7 @@ export default function Dashboard({
   totalPoints,
   completedChallenges,
 }: DashboardProps) {
+  const router = useRouter();
   const [challengeStatuses, setChallengeStatuses] = useState<StudentChallengeStatus[]>(initialChallengeStatuses);
   const [isHoveringChart, setIsHoveringChart] = useState(false);
   const [instagramHandle, setInstagramHandle] = useState<string | null>(
@@ -233,6 +235,7 @@ export default function Dashboard({
               session={sessionWithReferralContext}
               instagramHandle={instagramHandle}
               onInstagramHandleSaved={(h) => setInstagramHandle(h)}
+              onChallengeAccepted={() => router.refresh()}
             />
           </section>
         </div>

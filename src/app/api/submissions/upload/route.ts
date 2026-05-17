@@ -64,24 +64,38 @@ export async function POST(request: Request) {
       }
     }
 
-    // --- AUDIT FIX: Calculate attempt number from submission_attempts ---
-    const { data: lastAttempt } = await adminClient
-      .from("submission_attempts")
-      .select("attempt_number")
-      .eq("student_id", session.studentId)
-      .eq("task_id", taskId)
-      .order("attempt_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const [{ data: existingSubmission }, { data: lastAttempt }] = await Promise.all([
+      adminClient
+        .from("submissions")
+        .select("id, resubmit_count, bootcamp_id, status, streak_day")
+        .eq("student_id", session.studentId)
+        .eq("task_id", taskId)
+        .maybeSingle(),
+      adminClient
+        .from("submission_attempts")
+        .select("attempt_number")
+        .eq("student_id", session.studentId)
+        .eq("task_id", taskId)
+        .order("attempt_number", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
     const attemptNumber = (lastAttempt?.attempt_number ?? 0) + 1;
 
-    // --- AUDIT FIX: Enforce Attempt Limits ---
-    // Normal tasks: max 1. Task 6 uses `/api/submissions/upload-daily` (unlimited retries until accepted per day).
-    const maxAttempts = 1;
-    if (attemptNumber > maxAttempts && taskId !== REFERRAL_CHALLENGE_ID && taskId !== 6) {
+    if (existingSubmission?.status === "accepted" && taskId !== REFERRAL_CHALLENGE_ID) {
       return NextResponse.json(
-        { success: false, error: "Maximum attempts reached for this challenge." },
+        { success: false, error: "Challenge already completed. Re-submission is not allowed." },
+        { status: 400 }
+      );
+    }
+
+    if (existingSubmission?.status === "pending") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Your submission is being reviewed. Please wait for the result before submitting again.",
+        },
         { status: 400 }
       );
     }
@@ -173,34 +187,7 @@ export async function POST(request: Request) {
       streak_day?: number | null;
     } | null = null;
 
-    const { data: submission, error: submissionLookupError } = await adminClient
-      .from("submissions")
-      .select("id, resubmit_count, bootcamp_id, status, streak_day")
-      .eq("student_id", session.studentId)
-      .eq("task_id", taskId)
-      .maybeSingle();
-
-    if (submissionLookupError) {
-      console.error("Submission lookup error:", submissionLookupError);
-      return NextResponse.json(
-        { success: false, error: "Unable to lookup submission." },
-        { status: 500 }
-      );
-    }
-
-    targetSubmission = submission;
-
-    if (targetSubmission && targetSubmission.status === "accepted") {
-      const isReferralChallenge = taskId === REFERRAL_CHALLENGE_ID;
-
-      if (!isReferralChallenge) {
-        return NextResponse.json(
-          { success: false, error: "Challenge already completed. Re-submission is not allowed." },
-          { status: 400 }
-        );
-      }
-    }
-
+    targetSubmission = existingSubmission;
 
     // Self-heal: create missing row if not found
     if (!targetSubmission) {

@@ -63,7 +63,7 @@ export function useSubmissionPolling(
           });
         }
         if (was && was.latest_status === "pending" && row.latest_status === "rejected") {
-          optionsRef.current?.onRejected?.(`❌ Challenge rejected. Try again!`);
+          optionsRef.current?.onRejected?.("❌ Challenge rejected. Try again with new proof.");
         }
       }
 

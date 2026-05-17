@@ -4,6 +4,7 @@ import { CHALLENGES } from "@/lib/challenges";
 import { getStudentFromRequest } from "@/lib/api-auth";
 import { adminClient } from "../../../../../utils/supabase/admin";
 import { env } from "@/lib/env";
+import { getStartOfTodayIso } from "@/lib/calendar-day";
 import { normalizeInstagramHandleInput } from "@/lib/instagram-handle";
 
 const TASK_ID = 6;
@@ -94,15 +95,16 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const hash = createHash("sha256").update(buffer).digest("hex");
+    const startOfTodayIso = getStartOfTodayIso();
 
-    // 1. Daily reset check: already approved today?
+    // 1. Daily reset check (IST midnight): already accepted today?
     const { data: approvedToday } = await adminClient
       .from("submission_attempts")
       .select("id")
       .eq("student_id", session.studentId)
       .eq("task_id", TASK_ID)
       .eq("status", "accepted")
-      .gte("verified_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+      .gte("verified_at", startOfTodayIso)
       .limit(1)
       .maybeSingle();
 
@@ -120,7 +122,7 @@ export async function POST(request: Request) {
       .eq("student_id", session.studentId)
       .eq("task_id", TASK_ID)
       .eq("file_hash", hash)
-      .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+      .gte("created_at", startOfTodayIso)
       .limit(1)
       .maybeSingle();
 
@@ -270,7 +272,7 @@ Order of checks for rejection_reason: is_instagram → is_own_post → is_post_o
       .select("id")
       .eq("student_id", session.studentId)
       .eq("task_id", TASK_ID)
-      .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString());
+      .gte("created_at", startOfTodayIso);
 
     const attemptNumber = (countData?.length ?? 0) + 1;
 

@@ -37,6 +37,8 @@ type ChallengeBoardProps = {
   instagramHandle: string | null;
   onInstagramHandleSaved: (handle: string) => void;
   onChallengeStatusesUpdate?: (statuses: StudentChallengeStatus[]) => void;
+  /** Refetch server props (e.g. students.total_points) after a challenge is accepted. */
+  onChallengeAccepted?: () => void;
 };
 
 type RingStatus = "default" | "review" | "success" | "danger";
@@ -172,6 +174,7 @@ export default function ChallengeBoard({
   instagramHandle,
   onInstagramHandleSaved,
   onChallengeStatusesUpdate,
+  onChallengeAccepted,
 }: ChallengeBoardProps) {
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
   const [toastData, setToastData] = useState<{ id: number; points: number } | null>(null);
@@ -239,7 +242,10 @@ export default function ChallengeBoard({
   }, [allComplete, crestRevealed, isAnimatingFinale]);
 
   useSubmissionPolling(challengeStatuses, setChallengeStatuses, {
-    onAccepted: ({ taskId, points }) => setToastData({ id: taskId, points }),
+    onAccepted: ({ taskId, points }) => {
+      setToastData({ id: taskId, points });
+      onChallengeAccepted?.();
+    },
     onRejected: (message) => setRejectToastMessage(message),
     onUpdate: (next) => onChallengeStatusesUpdate?.(next),
   });
@@ -265,12 +271,22 @@ export default function ChallengeBoard({
       return getChallengeDateLockMessage(id, bootcampDate);
     }
 
-    if (id === DAILY_POST_TASK_ID && isDailyPostAcceptedToday(status)) {
-      return "Come back tomorrow.";
+    if (id === DAILY_POST_TASK_ID) {
+      if (isDailyPostAcceptedToday(status)) {
+        return "Come back tomorrow.";
+      }
+      if (status?.latest_status === "pending") {
+        return "Your submission is being reviewed.";
+      }
+      return null;
     }
 
     if (status?.is_completed) {
       return "Already completed.";
+    }
+
+    if (status?.latest_status === "pending") {
+      return "Your submission is being reviewed.";
     }
 
     return null;
@@ -288,6 +304,14 @@ export default function ChallengeBoard({
   const getRingStatus = (challenge: Challenge): RingStatus => {
     const status = statusByTask.get(challenge.id);
     if (!status || status.latest_status === "not_started") return "default";
+
+    if (challenge.id === DAILY_POST_TASK_ID) {
+      if (isDailyPostAcceptedToday(status)) return "success";
+      if (status.latest_status === "pending") return "review";
+      if (status.latest_status === "rejected") return "danger";
+      return "default";
+    }
+
     if (status.is_completed) return "success";
     if (status.latest_status === "pending") return "review";
     if (status.latest_status === "rejected") return "danger";
