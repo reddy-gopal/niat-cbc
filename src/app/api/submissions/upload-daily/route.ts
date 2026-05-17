@@ -41,13 +41,13 @@ function friendlyRejectionMessage(parsed: AIResponse, expectedUsername: string):
     return "This doesn't look like an Instagram screenshot.";
   }
   if (!parsed.is_own_post) {
-    return `This doesn't appear to be your account (@${expectedUsername}). Please upload a screenshot of your own post.`;
+    return `We couldn't verify @${expectedUsername} on this post. Upload a feed post or Story where your username appears at the top (including collaborative posts like "@${expectedUsername} and 2 others").`;
   }
   if (!parsed.is_post_or_story) {
     return "Please upload a feed post or Story, not a Reel.";
   }
   if (!parsed.has_required_tags) {
-    return "Include a #niat… hashtag and an @niat… mention (e.g. #niatbootcamp2026 and @niat_india).";
+    return "Add both in your caption: a #niat… hashtag (e.g. #niatbootcamp2026) and an @niat… mention (e.g. @niat_india).";
   }
   return parsed.feedback || "Your submission could not be verified. Please try again.";
 }
@@ -159,37 +159,43 @@ export async function POST(request: Request) {
     }
 
     // 5. Call AI
-    const aiPrompt = `Look at this Instagram screenshot carefully and answer four things:
+    const aiPrompt = `You verify a NIAT bootcamp student's Instagram post screenshot. Be student-friendly: if the post clearly qualifies, ACCEPT.
 
-1. is_instagram (boolean): Does this look like a genuine Instagram UI — post header with username, 
-   profile pic, like/comment/share icons visible?
+REGISTERED STUDENT USERNAME (must match post author): "${expectedUsername}"
+Rules: case-insensitive, ignore leading @, compare only letters/numbers/underscores/dots.
 
-2. is_post_or_story (boolean): Is this a feed post OR an Instagram Story? 
-   (Accept both. Reject only if it's a Reel.)
+─── CHECK 1: is_instagram ───
+TRUE for a normal Instagram feed post or Story screenshot: back arrow / "Posts" header, profile avatar, username row, image, like/comment/share row, caption area.
 
-3. has_required_tags (boolean): In the caption, sticker text, or visible tags, BOTH of the following must appear (case-insensitive):
-   - At least one hashtag whose text after # starts with "niat" (e.g. #niatbootcamp2026, #niatchennai, #niat). Extra NIAT-related hashtags are welcome and must NOT cause rejection.
-   - At least one @mention whose username starts with "niat" after the @ (e.g. @niat_india, @niatchennai). Extra @niat… mentions are welcome and must NOT cause rejection.
-   Do NOT require the exact pair #niatbootcamp2026 and @niat_india only — any qualifying #niat* hashtag plus any qualifying @niat* mention is enough.
+─── CHECK 2: is_post_or_story ───
+TRUE for feed posts and Stories. FALSE only for obvious Reels UI (reel player, reel icon layout).
 
-4. is_own_post (boolean): The username shown at the top of the post (the account that made this post)
-   must match the expected username: "${expectedUsername}"
-   Compare case-insensitively. Ignore leading @.
-   If the screenshot shows someone else's post being viewed (e.g. from explore or another profile),
-   this is false.
+─── CHECK 3: has_required_tags ───
+Read the FULL caption / tag block below the image (e.g. "mallu_ab_ @niat_india #niatbootcamp2026 …").
+TRUE if BOTH exist anywhere in caption OR tags line (not required on the image graphic itself):
+  (a) A #hashtag whose tag text starts with "niat" — e.g. #niatbootcamp2026, #niat_india, #niatbengaluru
+  (b) An @mention whose handle starts with "niat" — e.g. @niat_india, @niatbangalore, @niat_india in caption counts
+Large "NIAT" text printed ON the photo is NOT a hashtag — still OK if caption has #niat… and @niat…
 
-Respond ONLY with valid JSON:
-{
-  "is_instagram": boolean,
-  "is_post_or_story": boolean,
-  "has_required_tags": boolean,
-  "is_own_post": boolean,
-  "feedback": "brief explanation",
-  "rejection_reason": "first failing check reason, or empty string if all pass"
-}
+─── CHECK 4: is_own_post ───
+The AUTHOR is the username beside the profile picture at the TOP of the post (under "Posts"), NOT names only in likes.
 
-All four must be true to pass. Return the first failing reason in rejection_reason.
-Order of checks for rejection_reason: is_instagram → is_own_post → is_post_or_story → has_required_tags`;
+Set TRUE if ANY:
+  A) Sole author header equals "${expectedUsername}" (e.g. header shows "mallu_ab_" and student is mallu_ab_).
+  B) Collab header: "${expectedUsername} and 2 others" / "${expectedUsername} and 1 other" / "${expectedUsername} and <name>".
+  C) "View insights" is visible AND header author matches "${expectedUsername}" (strong sign it is their post).
+  D) Header author matches "${expectedUsername}" even if the photo has bootcamp branding, group photos, or large NIAT overlay text.
+
+Set FALSE ONLY if the TOP post author is a clearly DIFFERENT username (e.g. header "other_user" but student is "${expectedUsername}").
+Do NOT reject because: bootcamp photo content, multiple people in image, caption also lists @niat accounts, or hashtags in caption.
+On collab posts, caption handle may differ — use HEADER authors only.
+
+If header author matches "${expectedUsername}" (case-insensitive), is_own_post MUST be true.
+
+Respond ONLY with valid JSON (no markdown):
+{"is_instagram":boolean,"is_post_or_story":boolean,"has_required_tags":boolean,"is_own_post":boolean,"feedback":"one sentence","rejection_reason":""}
+
+rejection_reason: first failed check name, or "" if all pass. Order: is_instagram → is_own_post → is_post_or_story → has_required_tags`;
 
     const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -200,8 +206,9 @@ Order of checks for rejection_reason: is_instagram → is_own_post → is_post_o
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 200,
-        system: "You are a helpful assistant that verifies Instagram screenshots. Respond ONLY with valid JSON.",
+        max_tokens: 300,
+        system:
+          "You verify NIAT bootcamp Instagram screenshots for students. ACCEPT standard feed posts when the registered username matches the post header author. ACCEPT collab posts when the student is in the header. ACCEPT when caption has @niat… and #niat…. Large NIAT graphics on the image are normal. When the header username matches the registered student, is_own_post must be true. Respond ONLY with valid JSON.",
         messages: [
           {
             role: "user",
