@@ -14,11 +14,15 @@ export default async function LeaderboardPage() {
 
   const supabase = await createClient();
 
-  const { data: studentsData } = await supabase
+  const { data: studentsData, error: studentsError } = await supabase
     .from("students")
-    .select("id, full_name, team_id, total_points, sections(label), bootcamps(name), updated_at")
+    .select("id, full_name, team_id, total_points, sections(label), bootcamps(name), created_at")
     .eq("section_id", session.sectionId)
     .eq("bootcamp_id", session.bootcampId);
+
+  if (studentsError) {
+    console.error("[leaderboard] Students fetch failed:", studentsError);
+  }
 
   const { data: teamsData } = await supabase
     .from("teams")
@@ -59,13 +63,13 @@ export default async function LeaderboardPage() {
         fullName: row.full_name as string,
         totalPoints: totalPoints,
         completedChallenges: completedChallenges,
-        updatedAt: row.updated_at,
+        createdAt: row.created_at,
       };
     })
-    // Sort by points (DESC), then by updatedAt (DESC - most recent first) for tie-breaking
+    // Sort by points (DESC), then by createdAt (ASC - earlier join wins ties)
     .sort((a, b) => {
       if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
-      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
     })
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
