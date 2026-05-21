@@ -57,7 +57,7 @@ const SHORT_NAMES: Record<number, string> = {
   3: "Connect Dots",
   4: "Caught Great",
   5: "Time Capsule",
-  6: "Insta Post Streak",
+  6: "3-day Streak",
 };
 
 const DISPLAY_POINTS: Record<number, number> = {
@@ -66,7 +66,7 @@ const DISPLAY_POINTS: Record<number, number> = {
   3: 7,
   4: 2,
   5: 2,
-  6: 2,
+  6: 1,
 };
 
 const DAILY_POST_TASK_ID = 6;

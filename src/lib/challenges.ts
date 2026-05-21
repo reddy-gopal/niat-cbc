@@ -227,11 +227,11 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing wh
   },
   {
     id: 6,
-    title: "Insta Post Streak",
+    title: "3-day Streak",
     description:
       "Share your moment, tag @niat_india and drop #niatbootcamp2026 in your caption, then submit your screenshot.",
     day: "Daily",
-    points: 2,
+    points: 1,
     requiresUpload: true,
     requiresText: false,
   },
