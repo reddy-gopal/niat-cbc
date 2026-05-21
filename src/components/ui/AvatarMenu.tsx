@@ -62,6 +62,14 @@ export function AvatarMenu({
           >
             Profile
           </Link>
+          <Link
+            href="/help"
+            className="block w-full text-left px-4 py-3 sm:py-2 text-sm text-[var(--text-dark)] hover:bg-[var(--bg-tint)] font-medium transition-colors touch-manipulation"
+            role="menuitem"
+            onClick={() => setIsOpen(false)}
+          >
+            Help
+          </Link>
           <button
             type="button"
             onClick={() => {

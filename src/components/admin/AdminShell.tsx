@@ -8,6 +8,7 @@ import {
   Menu,
   FileCheck,
   LayoutDashboard,
+  LifeBuoy,
   MapPin,
   ScrollText,
   Trophy,
@@ -24,6 +25,7 @@ const nav = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/bootcamps", label: "Bootcamps", icon: MapPin },
   { href: "/admin/submissions", label: "Submissions", icon: FileCheck },
+  { href: "/admin/tickets", label: "Tickets", icon: LifeBuoy },
   { href: "/admin/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
 ];

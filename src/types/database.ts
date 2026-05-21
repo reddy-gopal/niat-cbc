@@ -310,6 +310,47 @@ export type Database = {
           created_at?: string;
         };
       };
+      help_tickets: {
+        Row: {
+          id: string;
+          student_id: string;
+          title: string;
+          description: string;
+          category: string;
+          image_path: string | null;
+          status: string;
+          admin_note: string | null;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          title: string;
+          description: string;
+          category: string;
+          image_path?: string | null;
+          status?: string;
+          admin_note?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          title?: string;
+          description?: string;
+          category?: string;
+          image_path?: string | null;
+          status?: string;
+          admin_note?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       audit_logs: {
         Row: {
           id: string;
@@ -428,5 +469,6 @@ export interface SafeAttempt
   hasProof: boolean;
   text_response: string | null;
 }
+export type HelpTicket = Database["public"]["Tables"]["help_tickets"]["Row"];
 export type AuditLog = Database["public"]["Tables"]["audit_logs"]["Row"];
 export type OtpAttempt = Database["public"]["Tables"]["otp_attempts"]["Row"];
