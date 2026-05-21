@@ -245,7 +245,7 @@ export default function MissionModal({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         transition={{ duration: 0.3 }}
-        className="relative w-full min-w-0 max-w-lg max-h-[90vh] border-[4px] sm:border-[6px] rounded-2xl z-10 p-2 overflow-hidden"
+        className="relative flex w-full min-w-0 max-w-lg max-h-[90vh] flex-col border-[4px] sm:border-[6px] rounded-2xl z-10 p-2 overflow-hidden"
         style={{
           background: modalStoneDeep,
           borderColor: modalStoneBorder,
@@ -253,7 +253,7 @@ export default function MissionModal({
         }}
       >
         <div
-          className="bg-[#ffffff] h-full w-full min-w-0 rounded-xl p-3 sm:p-5 md:p-6 relative flex flex-col items-center overflow-y-auto overflow-x-hidden"
+          className="bg-[#ffffff] min-h-0 flex-1 w-full min-w-0 rounded-xl p-3 sm:p-5 md:p-6 relative flex flex-col items-center overflow-y-auto overflow-x-hidden overscroll-contain"
           style={{ fontFamily: "var(--font-body), sans-serif" }}
         >
           <button
