@@ -6,6 +6,7 @@ import { CHALLENGE_ID_MAP } from "@/lib/challenges";
 import UploadZone from "./UploadZone";
 import DailyPostChallenge from "./DailyPostChallenge";
 import { isDateScheduleLockMessage } from "@/lib/challenge-unlock";
+import { fetchApiJson } from "@/lib/fetch-api-error";
 import { buildChallenge8ReferralUrl } from "@/lib/utils";
 import type { StudentChallengeStatus } from "@/types/database";
 
@@ -119,84 +120,63 @@ export default function MissionModal({
     if (selectedFile) formData.append("file", selectedFile);
     if (textResponse) formData.append("textResponse", textResponse);
 
-    try {
-      const res = await fetch("/api/submissions/upload", { method: "POST", body: formData });
-      const result = (await res.json()) as {
-        success?: boolean;
-        error?: string;
-        message?: string;
-        data?: { submissionId?: string; attemptId?: string };
-      };
-      if (!res.ok || !result.success) {
-        setError(result.error || "Submission failed. Try again.");
-        setUploadState("idle");
-        return;
-      }
-      setUploadState("received");
-      onSubmitSuccess({ taskId: challenge.id, submissionId: result.data?.submissionId });
-      window.setTimeout(() => {
-        onClose();
-      }, 2500);
-    } catch {
-      setError("Network error. Try again.");
+    const result = await fetchApiJson<{
+      success?: boolean;
+      error?: string;
+      message?: string;
+      data?: { submissionId?: string; attemptId?: string };
+    }>("/api/submissions/upload", { method: "POST", body: formData });
+
+    if (!result.ok) {
+      setError(result.message);
       setUploadState("idle");
+      return;
     }
+
+    setUploadState("received");
+    onSubmitSuccess({
+      taskId: challenge.id,
+      submissionId: result.body.data?.submissionId,
+    });
+    window.setTimeout(() => {
+      onClose();
+    }, 2500);
   };
 
   const handleClaimChallenge5 = async () => {
     setClaimLoading(true);
     setClaimMessage(null);
-    try {
-      const response = await fetch("/api/submissions/claim-challenge5", {
-        method: "POST",
+    const result = await fetchApiJson<{
+      success?: boolean;
+      message?: string;
+      referralCount?: number;
+      pointsAwarded?: number;
+      status?: "accepted" | "rejected";
+    }>("/api/submissions/claim-challenge5", { method: "POST" });
+
+    if (!result.ok) {
+      setClaimMessage({ kind: "error", text: result.message });
+    } else if (result.body.message === "No referrals found yet.") {
+      setClaimMessage({
+        kind: "info",
+        text: "No referrals verified yet. Share your link and try again.",
       });
-      const result = (await response.json()) as {
-        success?: boolean;
-        message?: string;
-        referralCount?: number;
-        pointsAwarded?: number;
-        status?: "accepted" | "rejected";
-      };
-
-      if (!response.ok || !result.success) {
-        if (result.message === "No referrals found yet.") {
-          setClaimMessage({
-            kind: "info",
-            text: "No referrals verified yet. Share your link and try again.",
-          });
-          return;
-        }
-        setClaimMessage({
-          kind: "error",
-          text: result.message ?? "Unable to claim points right now. Please try again.",
-        });
-        return;
-      }
-
-      if ((result.pointsAwarded ?? 0) === 0 || result.status === "rejected") {
-        setClaimMessage({
-          kind: "info",
-          text: "No referrals verified yet. Challenge is currently marked as rejected.",
-        });
-        return;
-      }
-
+    } else if ((result.body.pointsAwarded ?? 0) === 0 || result.body.status === "rejected") {
+      setClaimMessage({
+        kind: "info",
+        text: "No referrals verified yet. Challenge is currently marked as rejected.",
+      });
+    } else {
       setClaimMessage({
         kind: "success",
-        text: `🎉 ${result.referralCount ?? 0} referrals found! ${result.pointsAwarded ?? 0} points awarded.`,
+        text: `🎉 ${result.body.referralCount ?? 0} referrals found! ${result.body.pointsAwarded ?? 0} points awarded.`,
       });
       window.setTimeout(() => {
         onClose();
         window.location.reload();
       }, 1400);
-    } catch {
-      setClaimMessage({
-        kind: "error",
-        text: "Unable to claim points right now. Please try again.",
-      });
-    } finally {
-      setClaimLoading(false);
     }
+    setClaimLoading(false);
   };
 
   const handleCopyReferralLink = async () => {

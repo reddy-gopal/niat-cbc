@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import UploadZone from "./UploadZone";
 import type { StudentChallengeStatus } from "@/types/database";
 import { isDailyPostAcceptedToday } from "@/lib/daily-post";
+import { fetchApiJson } from "@/lib/fetch-api-error";
 import {
   INSTAGRAM_PROFILE_URL_EXAMPLE,
   normalizeInstagramHandleInput,
@@ -64,36 +65,28 @@ export default function DailyPostChallenge({
     }
 
     setSaveLoading(true);
-    try {
-      const res = await fetch("/api/students/me/instagram-handle", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instagram_handle: parsed.username }),
-      });
-      const result = (await res.json()) as {
-        success?: boolean;
-        error?: string;
-        data?: { student?: { instagram_handle?: string | null } };
-      };
+    const result = await fetchApiJson<{
+      success?: boolean;
+      error?: string;
+      data?: { student?: { instagram_handle?: string | null } };
+    }>("/api/students/me/instagram-handle", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instagram_handle: parsed.username }),
+    });
 
-      if (!res.ok || !result.success) {
-        setSaveError(result.error ?? "Could not save. Try again.");
-        setSaveLoading(false);
-        return;
-      }
-
-      const fromApi = result.data?.student?.instagram_handle;
+    if (!result.ok) {
+      setSaveError(result.message);
+    } else {
+      const fromApi = result.body.data?.student?.instagram_handle;
       const finalHandle = fromApi
         ? normalizeInstagramHandleInput(fromApi)
         : parsed.username;
       setSavedHandle(finalHandle);
       onInstagramHandleSaved(finalHandle);
       setInputValue("");
-    } catch {
-      setSaveError("Network error. Try again.");
-    } finally {
-      setSaveLoading(false);
     }
+    setSaveLoading(false);
   };
 
   const handleUpload = async () => {
@@ -105,26 +98,23 @@ export default function DailyPostChallenge({
     const formData = new FormData();
     formData.append("file", selectedFile);
 
-    try {
-      const res = await fetch("/api/submissions/upload-daily", {
-        method: "POST",
-        body: formData,
-      });
+    const result = await fetchApiJson<{
+      success?: boolean;
+      error?: string;
+      message?: string;
+    }>("/api/submissions/upload-daily", {
+      method: "POST",
+      body: formData,
+    });
 
-      const result = await res.json();
-
-      if (!result.success) {
-        setError(result.error || "Upload failed.");
-        setUploadState("idle");
-        return;
-      }
-
-      setUploadState("received");
-      onSuccess({ taskId: TASK_ID });
-    } catch {
-      setError("Network error. Please try again.");
+    if (!result.ok) {
+      setError(result.message);
       setUploadState("idle");
+      return;
     }
+
+    setUploadState("received");
+    onSuccess({ taskId: TASK_ID });
   };
 
   return (

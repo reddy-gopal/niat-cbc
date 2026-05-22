@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchApiJson } from "@/lib/fetch-api-error";
 
 type Row = {
   id: string;
@@ -18,62 +19,42 @@ export default function Challenge5AwardList({ rows }: { rows: Row[] }) {
 
   async function award(studentId: string) {
     setLoadingStudentId(studentId);
-    try {
-      const response = await fetch("/api/admin/submissions/award-challenge5", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studentId }),
-      });
-      const result = (await response.json()) as {
-        success?: boolean;
-        referralsCount?: number;
-        pointsAwarded?: number;
-        message?: string;
-        error?: string;
-        code?: string;
-      };
+    const result = await fetchApiJson<{
+      success?: boolean;
+      referralsCount?: number;
+      pointsAwarded?: number;
+      message?: string;
+      error?: string;
+      code?: string;
+    }>("/api/admin/submissions/award-challenge5", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ studentId }),
+    });
 
-      if (!response.ok || !result.success) {
-        const detail = result.code ? ` (${result.code})` : "";
-        setMessages((prev) => ({
-          ...prev,
-          [studentId]: {
-            type: "error",
-            text: `${result.error ?? "Unable to award challenge points right now."}${detail}`,
-          },
-        }));
-        return;
-      }
-
-      if ((result.pointsAwarded ?? 0) === 0) {
-        setMessages((prev) => ({
-          ...prev,
-          [studentId]: {
-            type: "success",
-            text: result.message ?? "No referrals found. No points awarded.",
-          },
-        }));
-        return;
-      }
-
+    if (!result.ok) {
+      setMessages((prev) => ({
+        ...prev,
+        [studentId]: { type: "error", text: result.message },
+      }));
+    } else if ((result.body.pointsAwarded ?? 0) === 0) {
       setMessages((prev) => ({
         ...prev,
         [studentId]: {
           type: "success",
-          text: `Referrals: ${result.referralsCount ?? 0} | Points awarded: ${result.pointsAwarded ?? 0}`,
+          text: result.body.message ?? "No referrals found. No points awarded.",
         },
       }));
-    } catch {
+    } else {
       setMessages((prev) => ({
         ...prev,
         [studentId]: {
-          type: "error",
-          text: "Network error while awarding challenge points.",
+          type: "success",
+          text: `Referrals: ${result.body.referralsCount ?? 0} | Points awarded: ${result.body.pointsAwarded ?? 0}`,
         },
       }));
-    } finally {
-      setLoadingStudentId(null);
     }
+    setLoadingStudentId(null);
   }
 
   return (
