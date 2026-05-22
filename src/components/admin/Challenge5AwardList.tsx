@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { fetchApiJson } from "@/lib/fetch-api-error";
+import {
+  formatReferralBreakdownSummary,
+  type ReferralStageBreakdown,
+} from "@/lib/referral-points-shared";
 
 type Row = {
   id: string;
@@ -23,6 +27,7 @@ export default function Challenge5AwardList({ rows }: { rows: Row[] }) {
       success?: boolean;
       referralsCount?: number;
       pointsAwarded?: number;
+      breakdown?: ReferralStageBreakdown[];
       message?: string;
       error?: string;
       code?: string;
@@ -50,7 +55,10 @@ export default function Challenge5AwardList({ rows }: { rows: Row[] }) {
         ...prev,
         [studentId]: {
           type: "success",
-          text: `Referrals: ${result.body.referralsCount ?? 0} | Points awarded: ${result.body.pointsAwarded ?? 0}`,
+          text: formatReferralBreakdownSummary(
+            result.body.breakdown ?? [],
+            result.body.pointsAwarded ?? 0
+          ),
         },
       }));
     }

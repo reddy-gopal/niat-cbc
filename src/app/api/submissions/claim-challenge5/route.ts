@@ -1,21 +1,14 @@
 import { NextResponse } from "next/server";
 import { CHALLENGES } from "@/lib/challenges";
 import { getStudentFromRequest } from "@/lib/api-auth";
-import { NW_CHALLENGE5_STAGE_CODE } from "@/lib/env";
-import { getReferralCountForStage } from "@/lib/nw-referral";
+import {
+  getConnectDotsReferralAward,
+  saveConnectDotsReferralSubmission,
+} from "@/lib/referral-points";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
 const REFERRAL_CHALLENGE_ID =
   CHALLENGES.find((challenge) => challenge.isReferral)?.id ?? 3;
-const POINTS_PER_REFERRAL = 7;
-
-type SubmissionRow = {
-  id: string;
-  status: string;
-  points: number;
-  resubmit_count: number;
-  created_at: string;
-};
 
 export async function POST(request: Request) {
   try {
@@ -37,152 +30,83 @@ export async function POST(request: Request) {
       );
     }
 
-    const referralResult = await getReferralCountForStage(
-      student.mobile,
-      NW_CHALLENGE5_STAGE_CODE
-    );
-    if (!referralResult.success) {
-      if (referralResult.errorCode === "FORBIDDEN") {
+    const award = await getConnectDotsReferralAward(student.mobile);
+    if (!award.success) {
+      if (award.errorCode === "FORBIDDEN") {
         return NextResponse.json(
           {
             success: false,
             message:
               "Referral provider access was denied (403). Please contact support to verify NW API credentials and allowlist.",
-            code: referralResult.errorCode,
-            stageCode: NW_CHALLENGE5_STAGE_CODE,
+            code: award.errorCode,
           },
           { status: 403 }
         );
       }
 
       if (
-        referralResult.errorCode === "USER_DOES_NOT_EXISTS_FOR_GIVEN_PHONE_NUMBER" ||
-        referralResult.errorCode === "USER_ASSOCIATION_DOES_NOT_EXISTS"
+        award.errorCode === "USER_DOES_NOT_EXISTS_FOR_GIVEN_PHONE_NUMBER" ||
+        award.errorCode === "USER_ASSOCIATION_DOES_NOT_EXISTS"
       ) {
         return NextResponse.json(
           {
             success: false,
             message:
               "Your account is not linked in NW yet. Please contact support or try again later.",
-            code: referralResult.errorCode,
+            code: award.errorCode,
           },
           { status: 400 }
         );
       }
 
-      if (referralResult.errorCode === "INVALID_JOURNEY_STAGE_CODE") {
+      if (award.errorCode === "INVALID_JOURNEY_STAGE_CODE") {
         console.error("[claim-challenge5] Invalid stage code config.", {
-          stageCode: NW_CHALLENGE5_STAGE_CODE,
           studentId: session.studentId,
         });
         return NextResponse.json(
           {
             success: false,
             message: "Referral stage configuration issue. Please contact support.",
-            code: referralResult.errorCode,
+            code: award.errorCode,
           },
           { status: 500 }
         );
       }
 
-      const status = referralResult.errorCode === "NETWORK_ERROR" ? 503 : 502;
+      const status = award.errorCode === "NETWORK_ERROR" ? 503 : 502;
       return NextResponse.json(
         {
           success: false,
-          message: referralResult.message,
-          code: referralResult.errorCode,
-          stageCode: NW_CHALLENGE5_STAGE_CODE,
+          message: award.message,
+          code: award.errorCode,
         },
         { status }
       );
     }
 
-    const referralCount = referralResult.referralsCount;
-    const pointsToAward = referralCount * POINTS_PER_REFERRAL;
-    const nextStatus = pointsToAward > 0 ? "accepted" : "rejected";
+    const saved = await saveConnectDotsReferralSubmission({
+      studentId: session.studentId,
+      bootcampId: student.bootcamp_id,
+      sectionId: student.section_id,
+      regionId: student.region_id,
+      taskId: REFERRAL_CHALLENGE_ID,
+      pointsToAward: award.pointsToAward,
+      aiReason: award.aiReason,
+    });
 
-    const { data: existingRows, error: existingRowsError } = await adminClient
-      .from("submissions")
-      .select("id, status, points, resubmit_count, created_at")
-      .eq("student_id", session.studentId)
-      .eq("task_id", REFERRAL_CHALLENGE_ID)
-      .order("created_at", { ascending: false });
-
-    if (existingRowsError) {
-      return NextResponse.json(
-        { success: false, message: "Unable to load challenge submissions." },
-        { status: 500 }
-      );
-    }
-
-    const rows = (existingRows ?? []) as SubmissionRow[];
-    const targetRow =
-      rows.find((row) => row.status === "accepted") ??
-      rows.find((row) => row.status === "rejected") ??
-      rows.find((row) => row.status === "not_started") ??
-      rows[0] ??
-      null;
-
-    const now = new Date().toISOString();
-    const aiReason = `${referralCount} referral(s) verified by NW`;
-
-    let targetSubmissionId = targetRow?.id ?? null;
-    const previousPoints = targetRow?.points ?? 0;
-    const previousResubmitCount = targetRow?.resubmit_count ?? 0;
-
-    if (!targetSubmissionId) {
-      const { data: inserted, error: insertError } = await adminClient
-        .from("submissions")
-        .insert({
-          student_id: session.studentId,
-          bootcamp_id: student.bootcamp_id,
-          section_id: student.section_id,
-          region_id: student.region_id,
-          task_id: REFERRAL_CHALLENGE_ID,
-          status: "not_started",
-          points: 0,
-          resubmit_count: 0,
-        })
-        .select("id")
-        .single();
-
-      if (insertError || !inserted) {
-        return NextResponse.json(
-          { success: false, message: "Unable to create challenge submission." },
-          { status: 500 }
-        );
-      }
-      targetSubmissionId = inserted.id;
-    }
-
-    const nextResubmitCount = previousResubmitCount + 1;
-    const { error: submissionUpdateError } = await adminClient
-      .from("submissions")
-      .update({
-        status: nextStatus,
-        points: pointsToAward,
-        ai_reason: aiReason,
-        verified_at: now,
-        updated_at: now,
-        resubmit_count: nextResubmitCount,
-      })
-      .eq("id", targetSubmissionId);
-
-    if (submissionUpdateError) {
-      return NextResponse.json(
-        { success: false, message: "Unable to update challenge submission." },
-        { status: 500 }
-      );
+    if (!saved.ok) {
+      return NextResponse.json({ success: false, message: saved.message }, { status: 500 });
     }
 
     return NextResponse.json(
       {
         success: true,
-        referralCount,
-        pointsAwarded: pointsToAward,
-        status: nextStatus,
+        referralCount: award.totalCompletions,
+        pointsAwarded: award.pointsToAward,
+        breakdown: award.breakdown,
+        status: saved.status,
         message:
-          pointsToAward > 0
+          award.pointsToAward > 0
             ? "Referral points awarded."
             : "No referrals found. Challenge marked as rejected.",
       },

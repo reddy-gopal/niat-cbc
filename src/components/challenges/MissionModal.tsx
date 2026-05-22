@@ -7,6 +7,10 @@ import UploadZone from "./UploadZone";
 import DailyPostChallenge from "./DailyPostChallenge";
 import { isDateScheduleLockMessage } from "@/lib/challenge-unlock";
 import { fetchApiJson } from "@/lib/fetch-api-error";
+import {
+  formatReferralBreakdownSummary,
+  type ReferralStageBreakdown,
+} from "@/lib/referral-points-shared";
 import { buildChallenge8ReferralUrl } from "@/lib/utils";
 import type { StudentChallengeStatus } from "@/types/database";
 
@@ -151,25 +155,25 @@ export default function MissionModal({
       message?: string;
       referralCount?: number;
       pointsAwarded?: number;
+      breakdown?: ReferralStageBreakdown[];
       status?: "accepted" | "rejected";
     }>("/api/submissions/claim-challenge5", { method: "POST" });
 
     if (!result.ok) {
       setClaimMessage({ kind: "error", text: result.message });
-    } else if (result.body.message === "No referrals found yet.") {
+    } else if ((result.body.pointsAwarded ?? 0) === 0 || result.body.status === "rejected") {
       setClaimMessage({
         kind: "info",
         text: "No referrals verified yet. Share your link and try again.",
       });
-    } else if ((result.body.pointsAwarded ?? 0) === 0 || result.body.status === "rejected") {
-      setClaimMessage({
-        kind: "info",
-        text: "No referrals verified yet. Challenge is currently marked as rejected.",
-      });
     } else {
+      const summary = formatReferralBreakdownSummary(
+        result.body.breakdown ?? [],
+        result.body.pointsAwarded ?? 0
+      );
       setClaimMessage({
         kind: "success",
-        text: `🎉 ${result.body.referralCount ?? 0} referrals found! ${result.body.pointsAwarded ?? 0} points awarded.`,
+        text: `🎉 ${summary}`,
       });
       window.setTimeout(() => {
         onClose();
@@ -284,7 +288,9 @@ export default function MissionModal({
                   >
                     {challenge.id === 6
                       ? `+${challenge.points} Points Daily`
-                      : `+${challenge.points} Points`}
+                      : challenge.isReferral
+                        ? "+2 / +7 Points"
+                        : `+${challenge.points} Points`}
                   </span>
                   {challenge.id === 6 && (
                     <span className="bg-[#991b1b] text-[#ffffff] font-bold px-2 sm:px-3 py-0.5 sm:py-1 rounded shadow-sm text-[9px] sm:text-[10px] uppercase border border-[#991b1b] max-w-full">

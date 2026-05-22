@@ -7,13 +7,14 @@ type EnvKey =
   | "MSG91_TEMPLATE_ID"
   | "NW_API_KEY"
   | "NW_CLIENT_KEY_DETAILS_ID"
-  | "NW_CHALLENGE5_STAGE_CODE";
 
 type OptionalEnvKey =
   | "MSG91_API_KEY"
   | "MSG91_AUTH_KEY"
   | "MSG91_SENDER_ID"
-  | "NW_BASE_URL";
+  | "NW_BASE_URL"
+  | "NW_REFERRAL_STAGE_APPLICATION_STARTED"
+  | "NW_REFERRAL_STAGE_ADMISSION_TEST_FEE";
 
 const requiredEnv: EnvKey[] = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -24,7 +25,6 @@ const requiredEnv: EnvKey[] = [
   "MSG91_TEMPLATE_ID",
   "NW_API_KEY",
   "NW_CLIENT_KEY_DETAILS_ID",
-  "NW_CHALLENGE5_STAGE_CODE",
 ];
 
 function getEnv(): Record<EnvKey | OptionalEnvKey, string> {
@@ -56,7 +56,12 @@ function getEnv(): Record<EnvKey | OptionalEnvKey, string> {
     MSG91_SENDER_ID: process.env.MSG91_SENDER_ID ?? "",
     NW_API_KEY: process.env.NW_API_KEY!,
     NW_CLIENT_KEY_DETAILS_ID: process.env.NW_CLIENT_KEY_DETAILS_ID!,
-    NW_CHALLENGE5_STAGE_CODE: process.env.NW_CHALLENGE5_STAGE_CODE!,
+    NW_REFERRAL_STAGE_APPLICATION_STARTED:
+      process.env.NW_REFERRAL_STAGE_APPLICATION_STARTED ??
+      "NIAT_APPLICATION_STARTED",
+    NW_REFERRAL_STAGE_ADMISSION_TEST_FEE:
+      process.env.NW_REFERRAL_STAGE_ADMISSION_TEST_FEE ??
+      "NIAT_ADMISSION_TEST_FEE",
     NW_BASE_URL: "https://nw-payouts-backend-prod-apis.ccbp.in",
   };
 }
@@ -65,4 +70,7 @@ export const env = getEnv();
 export const NW_API_KEY = env.NW_API_KEY;
 export const NW_CLIENT_KEY_DETAILS_ID = Number(env.NW_CLIENT_KEY_DETAILS_ID);
 export const NW_BASE_URL = env.NW_BASE_URL;
-export const NW_CHALLENGE5_STAGE_CODE = env.NW_CHALLENGE5_STAGE_CODE;
+export const NW_REFERRAL_STAGE_APPLICATION_STARTED =
+  env.NW_REFERRAL_STAGE_APPLICATION_STARTED;
+export const NW_REFERRAL_STAGE_ADMISSION_TEST_FEE =
+  env.NW_REFERRAL_STAGE_ADMISSION_TEST_FEE;
