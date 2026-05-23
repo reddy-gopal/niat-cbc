@@ -1,3 +1,5 @@
+import "server-only";
+
 type EnvKey =
   | "NEXT_PUBLIC_SUPABASE_URL"
   | "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
@@ -13,7 +15,6 @@ type OptionalEnvKey =
   | "MSG91_AUTH_KEY"
   | "MSG91_SENDER_ID"
   | "NW_BASE_URL"
-  | "NW_REFERRAL_STAGE_APPLICATION_STARTED"
   | "NW_REFERRAL_STAGE_ADMISSION_TEST_FEE";
 
 const requiredEnv: EnvKey[] = [
@@ -56,9 +57,6 @@ function getEnv(): Record<EnvKey | OptionalEnvKey, string> {
     MSG91_SENDER_ID: process.env.MSG91_SENDER_ID ?? "",
     NW_API_KEY: process.env.NW_API_KEY!,
     NW_CLIENT_KEY_DETAILS_ID: process.env.NW_CLIENT_KEY_DETAILS_ID!,
-    NW_REFERRAL_STAGE_APPLICATION_STARTED:
-      process.env.NW_REFERRAL_STAGE_APPLICATION_STARTED ??
-      "NIAT_APPLICATION_STARTED",
     NW_REFERRAL_STAGE_ADMISSION_TEST_FEE:
       process.env.NW_REFERRAL_STAGE_ADMISSION_TEST_FEE ??
       "NIAT_ADMISSION_TEST_FEE",
@@ -70,7 +68,5 @@ export const env = getEnv();
 export const NW_API_KEY = env.NW_API_KEY;
 export const NW_CLIENT_KEY_DETAILS_ID = Number(env.NW_CLIENT_KEY_DETAILS_ID);
 export const NW_BASE_URL = env.NW_BASE_URL;
-export const NW_REFERRAL_STAGE_APPLICATION_STARTED =
-  env.NW_REFERRAL_STAGE_APPLICATION_STARTED;
 export const NW_REFERRAL_STAGE_ADMISSION_TEST_FEE =
   env.NW_REFERRAL_STAGE_ADMISSION_TEST_FEE;

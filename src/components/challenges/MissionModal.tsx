@@ -288,9 +288,7 @@ export default function MissionModal({
                   >
                     {challenge.id === 6
                       ? `+${challenge.points} Points Daily`
-                      : challenge.isReferral
-                        ? "+2 / +7 Points"
-                        : `+${challenge.points} Points`}
+                      : `+${challenge.points} Points`}
                   </span>
                   {challenge.id === 6 && (
                     <span className="bg-[#991b1b] text-[#ffffff] font-bold px-2 sm:px-3 py-0.5 sm:py-1 rounded shadow-sm text-[9px] sm:text-[10px] uppercase border border-[#991b1b] max-w-full">

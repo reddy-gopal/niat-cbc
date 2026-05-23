@@ -105,7 +105,7 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing wh
     id: 3,
     title: "Connect Their Dots",
     description:
-      "When the conversation is already real, share your link. Earn 2 points when a friend starts their application and 7 points when they pay the admission test fee.",
+      "When the conversation is already real, share your link. Points only when your friend pays the admission test fee (7 points each).",
     day: "Days 1-3",
     points: 7,
     requiresUpload: false,

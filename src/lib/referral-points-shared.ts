@@ -1,5 +1,3 @@
-/** Client-safe referral types and formatters (no env / server imports). */
-
 export type ReferralStageBreakdown = {
   stageCode: string;
   label: string;
@@ -12,13 +10,15 @@ export function formatReferralBreakdownSummary(
   breakdown: ReferralStageBreakdown[],
   pointsAwarded: number
 ): string {
-  const parts = breakdown
-    .filter((row) => row.count > 0)
-    .map((row) => `${row.count} ${row.label} (+${row.points} pts)`);
-
-  if (parts.length === 0) {
-    return "No referrals found.";
+  const referralCount = breakdown.reduce((sum, row) => sum + row.count, 0);
+  if (referralCount === 0) {
+    return `${pointsAwarded} points awarded`;
   }
 
-  return `${parts.join(", ")} — ${pointsAwarded} pts total`;
+  const detail = breakdown
+    .filter((row) => row.count > 0)
+    .map((row) => `${row.count} ${row.label}`)
+    .join(", ");
+
+  return `${referralCount} referral${referralCount === 1 ? "" : "s"} (${detail}) — ${pointsAwarded} points awarded`;
 }
