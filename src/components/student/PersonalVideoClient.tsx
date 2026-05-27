@@ -16,7 +16,7 @@ import {
 import { useToast } from "../ui/Toast";
 import { StudentAppShell } from "./StudentAppShell";
 import { studentMainTopPaddingClass } from "./StudentNavbar";
-import PersonalVideoSlideshow from "./PersonalVideoSlideshow";
+import BootcampReelGenerator from "./BootcampReelGenerator";
 import type { PersonalizationCopy, PersonalizationPhotos, PhotoKey } from "@/lib/personal-video/personalization";
 
 interface Props {
@@ -56,7 +56,6 @@ export default function PersonalVideoClient({
   session,
   initialPhotos,
   copy,
-  isMockData = true,
 }: Props) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -218,14 +217,9 @@ export default function PersonalVideoClient({
             </motion.div>
           ) : showReel && allPhotosUploaded ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-12">
-              <PersonalVideoSlideshow
-                copy={copy}
-                photos={photos}
-                isMockData={isMockData}
-                firstName={firstName}
-              />
+              <BootcampReelGenerator copy={copy} photos={photos} />
               <div className="grid sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
-                {UPLOAD_SLOTS.map(({ key, label, icon: Icon }) => (
+                {UPLOAD_SLOTS.map(({ key, label }) => (
                   <label
                     key={key}
                     className="px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center gap-2 font-bold uppercase text-[10px] tracking-widest cursor-pointer border border-white/10"

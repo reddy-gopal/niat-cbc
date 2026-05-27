@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>NIAT Bootcamp 2026 – Reel Generator</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0d0d0d;color:#fff;font-family:"Segoe UI",sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+
+  /* ── Loader ── */
+  #loader{position:fixed;inset:0;background:#0d0d0d;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;}
+  #loader-ring{width:64px;height:64px;border:5px solid #333;border-top-color:#c0586a;border-radius:50%;animation:spin 0.9s linear infinite;}
+  #loader-msg{margin-top:20px;font-size:15px;color:#aaa;letter-spacing:.5px;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── Main UI ── */
+  #app{display:none;flex-direction:column;align-items:center;gap:24px;padding:32px 16px;}
+
+  h1{font-size:22px;font-weight:700;letter-spacing:.5px;color:#fff;text-align:center;}
+  h1 span{color:#c0586a;}
+
+  /* Upload panel */
+  .upload-grid{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+  .upload-box{display:flex;flex-direction:column;align-items:center;gap:8px;width:140px;}
+  .upload-box label{font-size:12px;color:#aaa;text-align:center;line-height:1.4;}
+  .upload-box input[type=file]{display:none;}
+  .upload-thumb{width:140px;height:140px;border:2px dashed #444;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#666;cursor:pointer;overflow:hidden;background:#1a1a1a;transition:border-color .2s;}
+  .upload-thumb:hover{border-color:#c0586a;}
+  .upload-thumb img{width:100%;height:100%;object-fit:cover;}
+
+  /* Preview */
+  #preview-wrap{position:relative;width:270px;height:480px;border-radius:18px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.6);}
+  #preview-canvas{width:270px;height:480px;}
+
+  /* Buttons */
+  .btn{padding:12px 32px;border-radius:8px;border:none;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;}
+  .btn:hover{opacity:.85;}
+  #btn-preview{background:#c0586a;color:#fff;}
+  #btn-record{background:#2196f3;color:#fff;}
+  #btn-download{background:#4caf50;color:#fff;display:none;}
+  .btn-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+
+  /* Progress */
+  #prog-wrap{width:270px;display:none;}
+  #prog-bar-bg{background:#222;border-radius:6px;height:8px;overflow:hidden;}
+  #prog-bar{background:#c0586a;height:8px;width:0%;transition:width .1s;}
+  #prog-label{font-size:12px;color:#aaa;margin-top:6px;text-align:center;}
+
+  /* Off-screen recording canvas */
+  #rec-canvas{position:fixed;top:-9999px;left:-9999px;}
+</style>
+</head>
+<body>
+
+<!-- Full-screen loader -->
+<div id="loader">
+  <div id="loader-ring"></div>
+  <div id="loader-msg">Loading assets…</div>
+</div>
+
+<!-- Main app (hidden until loaded) -->
+<div id="app">
+  <h1>NIAT Bootcamp 2026<br/><span>Reel Generator</span></h1>
+
+  <div class="upload-grid">
+    <div class="upload-box">
+      <div class="upload-thumb" id="thumb0" onclick="document.getElementById('inp0').click()">
+        <span>+ Bootcamp Photo</span>
+      </div>
+      <input type="file" id="inp0" accept="image/*" onchange="handleUpload(0,this)"/>
+      <label>Your bootcamp photo</label>
+    </div>
+    <div class="upload-box">
+      <div class="upload-thumb" id="thumb1" onclick="document.getElementById('inp1').click()">
+        <span>+ Tribe Photo</span>
+      </div>
+      <input type="file" id="inp1" accept="image/*" onchange="handleUpload(1,this)"/>
+      <label>Your tribe group photo</label>
+    </div>
+    <div class="upload-box">
+      <div class="upload-thumb" id="thumb2" onclick="document.getElementById('inp2').click()">
+        <span>+ Best Pic</span>
+      </div>
+      <input type="file" id="inp2" accept="image/*" onchange="handleUpload(2,this)"/>
+      <label>Your favourite moment</label>
+    </div>
+  </div>
+
+  <div id="preview-wrap">
+    <canvas id="preview-canvas" width="450" height="800"></canvas>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" id="btn-preview" onclick="previewReel()">Preview Reel</button>
+    <button class="btn" id="btn-record"  onclick="recordReel()">Generate & Download</button>
+    <button class="btn" id="btn-download" onclick="triggerDownload()">Download Video</button>
+  </div>
+
+  <div id="prog-wrap">
+    <div id="prog-bar-bg"><div id="prog-bar"></div></div>
+    <div id="prog-label">Recording…</div>
+  </div>
+</div>
+
+<!-- Off-screen canvas used during recording (must NOT be display:none) -->
+<canvas id="rec-canvas" width="450" height="800"></canvas>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// TODO: Inject all fields below from platform per user
+const USER_NAME       = "Arjun Mehta";
+const USER_TITLE      = "THE BIONIC ENGINEER";
+const USER_TITLE_SUB  = "Builds Machines That Read The Human Body";
+const USER_TRIBE      = "Alpha Tribe";
+const USER_CAME_FOR     = "Hack The Human Signal";
+const USER_CAME_FOR_SUB = "Where Biology Becomes Code";
+const USER_STAYED_FOR   = "Tribe Song";
+const USER_LEFT_AS      = "The Bionic Engineer";
+
+// TODO: Replace with real stones data from platform
+// Each object: { key, label, icon, description }
+const stonesData = [
+  { key:'st1', label:'The Architect',    icon:'🏛️', description:'Designs systems that scale' },
+  { key:'st2', label:'The Alchemist',    icon:'⚗️', description:'Transforms raw ideas into gold' },
+  { key:'st3', label:'The Navigator',    icon:'🧭', description:'Charts the unknown with precision' },
+  { key:'st4', label:'The Catalyst',     icon:'⚡', description:'Accelerates breakthroughs' },
+  { key:'st5', label:'The Sentinel',     icon:'🛡️', description:'Guards what matters most' },
+  { key:'st6', label:'The Luminary',     icon:'💡', description:'Illuminates the path forward' },
+  { key:'st7', label:'The Vanguard',     icon:'🚀', description:'Leads from the front' },
+];
+// ─────────────────────────────────────────────────────────────────────────────
+
+// All PNG assets loaded via relative path (same folder as HTML)
+const IMGS = {
+  s1:  'Screen_1.png',
+  s3:  'Screen_3.png',
+  s4:  'Screen_4.png',
+  s5:  'Screen_5.png',
+  s6:  'Screen_6.png',
+  s7:  'Screen_7.png',
+  s8:  'Screen_8.png',
+  s10: 'Screen_10.png',
+  s11: 'Screen_11.png',
+  s12: 'Screen_12.png',
+};
+
+// [slideNumber, durationSeconds]  — slide 2 uses video (duration=0 means dynamic)
+const SLIDES = [
+  [1,4],[2,0],[3,4],[4,4],[5,4],[6,4],
+  [7,4],[8,4],[10,4],[11,4],[12,4]
+];
+
+let BASE_IMGS = {};   // loaded HTMLImageElement map
+let userImgs  = [null, null, null];  // uploaded user photos
+let userVideo = null;
+let videoDur  = 0;
+let recBlob   = null;
+let recExt    = 'mp4';   // final download extension (always mp4 after conversion)
+
+const pvCanvas = document.getElementById('preview-canvas');
+const pvCtx    = pvCanvas.getContext('2d');
+const recCanvas= document.getElementById('rec-canvas');
+const recCtx   = recCanvas.getContext('2d');
+
+// High-quality downscaling for the large PNGs (4320×7680 → 450×800)
+[pvCtx, recCtx].forEach(c => {
+  c.imageSmoothingEnabled = true;
+  c.imageSmoothingQuality = 'high';
+});
+
+// Active ctx during draw (swapped between preview and recording)
+let ctx = pvCtx;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x+r, y);
+  c.lineTo(x+w-r, y);
+  c.quadraticCurveTo(x+w, y, x+w, y+r);
+  c.lineTo(x+w, y+h-r);
+  c.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  c.lineTo(x+r, y+h);
+  c.quadraticCurveTo(x, y+h, x, y+h-r);
+  c.lineTo(x, y+r);
+  c.quadraticCurveTo(x, y, x+r, y);
+  c.closePath();
+}
+
+function coverFit(img, dw, dh) {
+  const iw = img.naturalWidth  || img.width  || 1;
+  const ih = img.naturalHeight || img.height || 1;
+  const scale = Math.max(dw / iw, dh / ih);
+  const sw = dw / scale, sh = dh / scale;
+  const sx = (iw - sw) / 2, sy = (ih - sh) / 2;
+  return { sx, sy, sw, sh };
+}
+
+// Standard text gradient: linear-gradient(277.99deg, #A8030C -13.12%, rgba(255,255,255,0) 76.38%)
+// over solid white — deep red on the right, pure white on the left.
+// Pass the vertical centre of the text block; width defaults to full canvas.
+function tGrad(yCentre, blockH) {
+  blockH = blockH || 60;
+  const g = ctx.createLinearGradient(400, yCentre - blockH / 2, 50, yCentre + blockH / 2);
+  g.addColorStop(0,    '#A8030C');
+  g.addColorStop(0.76, '#ffffff');
+  g.addColorStop(1,    '#ffffff');
+  return g;
+}
+
+// Draw each word on its own line; middle word in accent red, rest in gradient.
+// Returns the Y position after the last word.
+function drawTitle(words, cx, startY, lineH, font) {
+  const midIdx  = Math.floor(words.length / 2);
+  const blockCY = startY + (words.length * lineH) / 2;
+  ctx.font = font;
+  let y = startY;
+  words.forEach((w, i) => {
+    ctx.fillStyle = (i === midIdx) ? '#A8030C' : tGrad(y, lineH);
+    ctx.fillText(w, cx, y);
+    y += lineH;
+  });
+  return y;
+}
+
+// Composite user photo into a card-frame template.
+// Creates the offscreen canvas at the physical canvas size (450×800 preview,
+// 900×1600 recording) so the template punch-out is always at native resolution.
+function drawPhotoOnTemplate(templateImg, userImg, cx, cy, cw, ch, r) {
+  if (!templateImg) {
+    // Template image not loaded yet — draw placeholder rectangle
+    ctx.save();
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, 450, 800);
+    roundRect(ctx, cx, cy, cw, ch, r);
+    ctx.fillStyle = '#2a2a4e';
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+  // Physical canvas dimensions (varies: 450×800 preview vs 900×1600 recording)
+  const PW = ctx.canvas.width;
+  const PH = ctx.canvas.height;
+  const S  = PW / 450;  // scale factor: 1 (preview) or 2 (recording)
+
+  if (!userImg) {
+    ctx.drawImage(templateImg, 0, 0, 450, 800);
+    ctx.save();
+    roundRect(ctx, cx, cy, cw, ch, r);
+    ctx.clip();
+    ctx.fillStyle = '#111';
+    ctx.fillRect(cx, cy, cw, ch);
+    ctx.fillStyle = '#555';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Upload photo', cx + cw/2, cy + ch/2);
+    ctx.restore();
+    return;
+  }
+
+  // Offscreen canvas at PHYSICAL size so the template renders at full resolution
+  const tmp = Object.assign(document.createElement('canvas'), { width: PW, height: PH });
+  const tc  = tmp.getContext('2d');
+  tc.imageSmoothingEnabled = true;
+  tc.imageSmoothingQuality = 'high';
+  tc.drawImage(templateImg, 0, 0, PW, PH);          // draw template at physical res
+  tc.globalCompositeOperation = 'destination-out';
+  roundRect(tc, cx*S, cy*S, cw*S, ch*S, r*S);       // hole in physical coords
+  tc.fill();
+
+  // Draw user photo clipped to card shape (ctx already has 2× transform for recording)
+  ctx.save();
+  roundRect(ctx, cx, cy, cw, ch, r);
+  ctx.clip();
+  const { sx, sy, sw, sh } = coverFit(userImg, cw, ch);
+  ctx.drawImage(userImg, sx, sy, sw, sh, cx, cy, cw, ch);
+  ctx.restore();
+
+  // Draw physical template-with-hole to logical 450×800 coords
+  // (the 2× transform on ctx scales this to full physical resolution automatically)
+  ctx.drawImage(tmp, 0, 0, 450, 800);
+}
+
+// ── Slide renderer ─────────────────────────────────────────────────────────
+// t = animation progress 0→1 over the slide's duration (default 1 = fully visible)
+
+function drawSlide(slide, t) {
+  if (t === undefined) t = 1;
+  t = Math.max(0, Math.min(1, t));
+
+  // For the recording canvas (900×1600) apply a 2× scale transform so every
+  // draw call uses the same 450×800 logical coordinates but renders at double
+  // the pixel density. Preview canvas stays at 1:1 (450×800 physical).
+  if (ctx === recCtx) ctx.setTransform(2, 0, 0, 2, 0, 0);
+  else                ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.clearRect(0, 0, 450, 800);
+
+  // Easing: ease-out cubic
+  const eo = v => 1 - Math.pow(1 - Math.max(0, Math.min(1, v)), 3);
+  // Remap t from sub-range [s,e] → [0,1], then ease out
+  const sub = (s, e) => eo(Math.max(0, Math.min(1, (t - s) / (e - s))));
+
+  switch (slide) {
+
+    case 1: {
+      // Ken Burns: subtle zoom 1.0 → 1.04
+      const sc = 1 + 0.04 * eo(t);
+      ctx.save();
+      ctx.translate(225, 400); ctx.scale(sc, sc); ctx.translate(-225, -400);
+      if (BASE_IMGS.s1) ctx.drawImage(BASE_IMGS.s1, 0, 0, 450, 800);
+      ctx.restore();
+      break;
+    }
+
+    case 2:
+      if (userVideo && userVideo.readyState >= 2) ctx.drawImage(userVideo, 0, 0, 450, 800);
+      break;
+
+    case 3: {
+      // Template draws at full opacity (fade handled by global overlay)
+      drawPhotoOnTemplate(BASE_IMGS.s3, userImgs[0], 51, 110, 348, 466, 18);
+      // Name slides up + fades in from t=0.5
+      const na = sub(0.5, 0.85);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 28px "Segoe UI",sans-serif';
+      // TODO: inject USER_NAME from platform
+      ctx.fillStyle = tGrad(660, 34);
+      ctx.globalAlpha = na;
+      ctx.translate(0, (1 - na) * 20);
+      ctx.fillText(USER_NAME, 225, 660);
+      ctx.restore();
+      break;
+    }
+
+    case 4: {
+      // Sphere breathes gently once across the slide duration
+      const breathe = 1 + 0.018 * Math.sin(t * Math.PI);
+      ctx.save();
+      ctx.translate(225, 400); ctx.scale(breathe, breathe); ctx.translate(-225, -400);
+      if (BASE_IMGS.s4) ctx.drawImage(BASE_IMGS.s4, 0, 0, 450, 800);
+      ctx.restore();
+      // "Where It" slides up first
+      const a1 = sub(0.15, 0.5);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 54px "Segoe UI",sans-serif';
+      ctx.fillStyle = tGrad(385, 60);
+      ctx.globalAlpha = a1;
+      ctx.translate(0, (1 - a1) * 22);
+      ctx.fillText('Where It', 225, 385);
+      ctx.restore();
+      // "All Began" follows
+      const a2 = sub(0.38, 0.72);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 54px "Segoe UI",sans-serif';
+      ctx.fillStyle = tGrad(450, 60);
+      ctx.globalAlpha = a2;
+      ctx.translate(0, (1 - a2) * 22);
+      ctx.fillText('All Began', 225, 450);
+      ctx.restore();
+      break;
+    }
+
+    case 5:
+      if (BASE_IMGS.s5) ctx.drawImage(BASE_IMGS.s5, 0, 0, 450, 800);
+      break;
+
+    case 6: {
+      // TODO: re-export Screen_6.png from Figma without baked text
+      if (BASE_IMGS.s6) ctx.drawImage(BASE_IMGS.s6, 0, 0, 450, 800);
+      // TODO: inject USER_CAME_FOR and USER_CAME_FOR_SUB from platform
+      const cameWords = USER_CAME_FOR.split(' ');
+      const midIdx6   = Math.floor(cameWords.length / 2);
+      const lineH6    = 54;
+      let y6 = 370 - ((cameWords.length - 1) * lineH6) / 2;
+      const wInterval = 0.55 / cameWords.length;
+      ctx.font = 'bold 46px "Segoe UI",sans-serif';
+      cameWords.forEach((w, i) => {
+        const wa = sub(0.08 + i * wInterval, 0.08 + i * wInterval + 0.28);
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = (i === midIdx6) ? '#A8030C' : tGrad(y6, lineH6);
+        ctx.globalAlpha = wa;
+        ctx.translate(0, (1 - wa) * 18);
+        ctx.fillText(w, 225, y6);
+        ctx.restore();
+        y6 += lineH6;
+      });
+      // Subtitle fades in after all title words
+      const sa6 = sub(0.65, 0.9);
+      const subWords6 = USER_CAME_FOR_SUB.split(' ');
+      const half6 = Math.ceil(subWords6.length / 2);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = '18px "Segoe UI",sans-serif';
+      ctx.fillStyle = tGrad(y6 + 20, 44);
+      ctx.globalAlpha = sa6;
+      ctx.translate(0, (1 - sa6) * 12);
+      ctx.fillText(subWords6.slice(0, half6).join(' '), 225, y6 + 8);
+      ctx.fillText(subWords6.slice(half6).join(' '),    225, y6 + 32);
+      ctx.restore();
+      break;
+    }
+
+    case 7: {
+      drawPhotoOnTemplate(BASE_IMGS.s7, userImgs[1], 51, 110, 348, 466, 18);
+      const na = sub(0.5, 0.85);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 28px "Segoe UI",sans-serif';
+      // TODO: inject USER_TRIBE from platform
+      ctx.fillStyle = tGrad(660, 34);
+      ctx.globalAlpha = na;
+      ctx.translate(0, (1 - na) * 20);
+      ctx.fillText(USER_TRIBE, 225, 660);
+      ctx.restore();
+      break;
+    }
+
+    case 8: {
+      // Subtle Ken Burns on the orbit design
+      const sc8 = 1 + 0.03 * eo(t);
+      ctx.save();
+      ctx.translate(225, 400); ctx.scale(sc8, sc8); ctx.translate(-225, -400);
+      if (BASE_IMGS.s8) ctx.drawImage(BASE_IMGS.s8, 0, 0, 450, 800);
+      ctx.restore();
+      break;
+    }
+
+    case 10:
+      drawPhotoOnTemplate(BASE_IMGS.s10, userImgs[2], 51, 110, 348, 580, 18);
+      break;
+
+    case 11: {
+      if (BASE_IMGS.s11) ctx.drawImage(BASE_IMGS.s11, 0, 0, 450, 800);
+      // TODO: inject USER_CAME_FOR   → "You Came For"  section value from platform
+      // TODO: inject USER_STAYED_FOR → "Stayed For"    section value from platform
+      // TODO: inject USER_LEFT_AS    → "Left As"       section value from platform
+      const sections = [
+        { label:'You Came For',  value: USER_CAME_FOR,   labelY: 152, valueY: 186, s: 0.05 },
+        { label:'Stayed For',    value: USER_STAYED_FOR, labelY: 382, valueY: 416, s: 0.36 },
+        { label:'Left As',       value: USER_LEFT_AS,    labelY: 608, valueY: 642, s: 0.65 },
+      ];
+      sections.forEach(sec => {
+        const sa = sub(sec.s, sec.s + 0.27);
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.translate(0, (1 - sa) * 16);
+        // All text on Screen 11 is pure white
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '17px "Segoe UI",sans-serif';
+        ctx.globalAlpha = sa * 0.75;
+        ctx.fillText(sec.label, 225, sec.labelY);
+        ctx.font = 'bold 22px "Segoe UI",sans-serif';
+        ctx.globalAlpha = sa;
+        ctx.fillText(sec.value, 225, sec.valueY);
+        ctx.restore();
+      });
+      break;
+    }
+
+    case 12: {
+      if (BASE_IMGS.s12) ctx.drawImage(BASE_IMGS.s12, 0, 0, 450, 800);
+      // Name slides in first
+      const na12 = sub(0.05, 0.3);
+      ctx.save();
+      ctx.textAlign = 'center';
+      // TODO: inject USER_NAME from platform
+      ctx.font = '22px "Segoe UI",sans-serif';
+      ctx.fillStyle = tGrad(215, 26);
+      ctx.globalAlpha = na12;
+      ctx.translate(0, (1 - na12) * 16);
+      ctx.fillText(USER_NAME, 225, 215);
+      ctx.restore();
+      // Title words stagger in one by one
+      // TODO: inject USER_TITLE from platform
+      const titleWords = USER_TITLE.split(' ');
+      const midIdxT    = Math.floor(titleWords.length / 2);
+      const tStep      = 0.32 / titleWords.length;
+      ctx.font = 'bold 52px "Segoe UI",sans-serif';
+      let ty = 295;
+      titleWords.forEach((w, i) => {
+        const wa = sub(0.22 + i * tStep, 0.22 + i * tStep + 0.26);
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = (i === midIdxT) ? '#A8030C' : tGrad(ty, 64);
+        ctx.globalAlpha = wa;
+        ctx.translate(0, (1 - wa) * 20);
+        ctx.fillText(w, 225, ty);
+        ctx.restore();
+        ty += 64;
+      });
+      // Subtitle fades in last
+      // TODO: inject USER_TITLE_SUB from platform
+      const sa12 = sub(0.72, 0.95);
+      const subWords = USER_TITLE_SUB.split(' ');
+      const half     = Math.ceil(subWords.length / 2);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = '17px "Segoe UI",sans-serif';
+      ctx.fillStyle = tGrad(ty + 22, 44);
+      ctx.globalAlpha = sa12 * 0.85;
+      ctx.translate(0, (1 - sa12) * 12);
+      ctx.fillText(subWords.slice(0, half).join(' '), 225, ty + 10);
+      ctx.fillText(subWords.slice(half).join(' '),    225, ty + 34);
+      ctx.restore();
+      break;
+    }
+
+    default:
+      ctx.fillStyle = '#0d0d0d';
+      ctx.fillRect(0, 0, 450, 800);
+  }
+
+  // Global fade-in from black for all non-video slides (first 18% of duration)
+  if (slide !== 2) {
+    const fi = Math.max(0, Math.min(1, t / 0.18));
+    if (fi < 1) {
+      ctx.save();
+      ctx.fillStyle = '#000';
+      ctx.globalAlpha = eo(1 - fi);
+      ctx.fillRect(0, 0, 450, 800);
+      ctx.restore();
+    }
+  }
+}
+
+// ── Asset loading ──────────────────────────────────────────────────────────
+
+// Step-down high-quality scaler: halves the image repeatedly until ≤2× target,
+// then does one final draw to exact target. Avoids quality loss from a single
+// extreme downscale (e.g. 4320×7680 → 450×800 in one pass).
+function scaleHQ(src, tw, th) {
+  if (!src) return null;
+  let cur = src;
+  let cw  = src.naturalWidth  || src.width;
+  let ch  = src.naturalHeight || src.height;
+  if (!cw || !ch) return src;
+
+  while (cw > tw * 2 || ch > th * 2) {
+    const nw = Math.max(Math.floor(cw / 2), tw);
+    const nh = Math.max(Math.floor(ch / 2), th);
+    const tmp = Object.assign(document.createElement('canvas'), { width: nw, height: nh });
+    const tc  = tmp.getContext('2d');
+    tc.imageSmoothingEnabled = true;
+    tc.imageSmoothingQuality = 'high';
+    tc.drawImage(cur, 0, 0, nw, nh);
+    cur = tmp; cw = nw; ch = nh;
+  }
+
+  const out = Object.assign(document.createElement('canvas'), { width: tw, height: th });
+  const oc  = out.getContext('2d');
+  oc.imageSmoothingEnabled = true;
+  oc.imageSmoothingQuality = 'high';
+  oc.drawImage(cur, 0, 0, tw, th);
+  return out;
+}
+
+// Same step-down scaler but preserves aspect ratio, capping the long edge at maxPx.
+// Used for user-uploaded photos so coverFit still has clean pixels to work with.
+function scalePhotoHQ(src, maxPx) {
+  if (!src) return null;
+  const iw = src.naturalWidth  || src.width;
+  const ih = src.naturalHeight || src.height;
+  if (!iw || !ih) return src;
+  const scale = Math.min(1, maxPx / Math.max(iw, ih));
+  return scaleHQ(src, Math.round(iw * scale), Math.round(ih * scale));
+}
+
+function loadImg(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload  = () => resolve(img);
+    img.onerror = () => { console.warn('Could not load:', src); resolve(null); };
+    img.src = src;
+  });
+}
+
+function waitForVideo(vid) {
+  return new Promise(resolve => {
+    if (vid.readyState >= 3) { resolve(); return; }
+    const done = () => { vid.removeEventListener('canplaythrough', done); resolve(); };
+    vid.addEventListener('canplaythrough', done);
+    // Fallback: resolve after 15 s even if event never fires
+    setTimeout(resolve, 15000);
+  });
+}
+
+async function preloadAll() {
+  document.getElementById('loader-msg').textContent = 'Loading screen assets…';
+
+  // Load all images in parallel, then step-down scale each to 450×800
+  const keys = Object.keys(IMGS);
+  const imgs = await Promise.all(keys.map(k => loadImg(IMGS[k])));
+  document.getElementById('loader-msg').textContent = 'Optimising images…';
+  // Pre-scale to 900×1600 — used 1:1 by the recording canvas (900×1600) and
+  // 2:1 downscaled by the preview canvas (450×800), both giving sharp results.
+  keys.forEach((k, i) => { BASE_IMGS[k] = imgs[i] ? scaleHQ(imgs[i], 900, 1600) : null; });
+
+  // Load the highlight reel video
+  document.getElementById('loader-msg').textContent = 'Loading highlight reel video…';
+  userVideo = document.createElement('video');
+  userVideo.src = 'Bootcamp_TemplateReel_UpdatedDraft.mp4';
+  userVideo.muted   = true;
+  userVideo.preload = 'auto';
+  userVideo.load();
+  await waitForVideo(userVideo);
+  videoDur = userVideo.duration || 0;
+
+  // All done
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('app').style.display    = 'flex';
+
+  // Show slide 1 in preview at fully-visible state
+  ctx = pvCtx;
+  drawSlide(1, 1);
+}
+
+// ── Upload handler ─────────────────────────────────────────────────────────
+
+function handleUpload(idx, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    // Cap user photo at 2048px long-edge — sufficient for 900×1600 recording canvas
+    userImgs[idx] = scalePhotoHQ(img, 2048);
+    // Update thumbnail (keep the blob URL on the visible <img>, not the scaled canvas)
+    const thumb = document.getElementById('thumb' + idx);
+    thumb.innerHTML = '';
+    const tImg = document.createElement('img');
+    tImg.src = url;
+    thumb.appendChild(tImg);
+    // Refresh preview at fully-visible state
+    ctx = pvCtx;
+    drawSlide(idx === 0 ? 3 : idx === 1 ? 7 : 10, 1);
+  };
+  img.src = url;
+}
+
+// ── Preview (animates all slides once) ────────────────────────────────────
+
+let previewRunning = false;
+
+async function previewReel() {
+  if (previewRunning) return;
+  previewRunning = true;
+  ctx = pvCtx;
+
+  for (const [slide, dur] of SLIDES) {
+    if (slide === 2) {
+      if (!userVideo || videoDur <= 0) {
+        // Video slide — skip gracefully if video didn't load
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      userVideo.currentTime = 0;
+      await new Promise(r => { userVideo.onseeked = () => r(); setTimeout(r, 1000); });
+      userVideo.play().catch(() => {});
+      const end = Date.now() + (videoDur > 0 ? videoDur * 1000 : 5000);
+      while (Date.now() < end) {
+        ctx.clearRect(0, 0, 450, 800);
+        if (userVideo.readyState >= 2) ctx.drawImage(userVideo, 0, 0, 450, 800);
+        await new Promise(r => requestAnimationFrame(r));
+      }
+      userVideo.pause();
+    } else {
+      // Time-based rAF loop so animations play at real speed in preview
+      const durMs = dur * 1000;
+      await new Promise(resolve => {
+        const startMs = performance.now();
+        function frame() {
+          const t = Math.min(1, (performance.now() - startMs) / durMs);
+          drawSlide(slide, t);
+          if (t < 1) requestAnimationFrame(frame);
+          else resolve();
+        }
+        requestAnimationFrame(frame);
+      });
+    }
+  }
+
+  previewRunning = false;
+}
+
+// ── MP4 conversion via FFmpeg.wasm (lazy-loaded from CDN) ─────────────────
+// Converts the recorded WebM blob → H.264 MP4 so it plays on iOS, Android,
+// and every device/app natively. FFmpeg scripts are loaded once on first use.
+
+let _ffmpegInstance = null;
+
+function _loadScript(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+// Minimal fetchFile polyfill — converts Blob/URL/ArrayBuffer → Uint8Array
+async function _fetchFile(src) {
+  if (src instanceof Uint8Array) return src;
+  if (src instanceof ArrayBuffer) return new Uint8Array(src);
+  if (src instanceof Blob) return new Uint8Array(await src.arrayBuffer());
+  const r = await fetch(src); return new Uint8Array(await r.arrayBuffer());
+}
+
+async function _getFFmpeg(progBar, progLabel) {
+  if (_ffmpegInstance) return _ffmpegInstance;
+
+  progLabel.textContent = 'Loading MP4 converter (one-time download)…';
+  progBar.style.width = '0%';
+
+  await _loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js');
+
+  const { FFmpeg } = window.FFmpegWASM;
+  const ff = new FFmpeg();
+
+  ff.on('log', ({ message }) => console.debug('[ffmpeg]', message));
+
+  await ff.load({
+    coreURL:  'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js',
+    wasmURL:  'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm',
+  });
+
+  _ffmpegInstance = ff;
+  return ff;
+}
+
+async function convertToMP4(webmBlob, progBar, progLabel) {
+  const ff = await _getFFmpeg(progBar, progLabel);
+
+  progLabel.textContent = 'Converting to MP4…';
+  progBar.style.width = '0%';
+
+  ff.on('progress', ({ progress }) => {
+    const pct = Math.round(Math.min(1, progress) * 100);
+    progBar.style.width = pct + '%';
+    progLabel.textContent = `Converting to MP4… ${pct}%`;
+  });
+
+  await ff.writeFile('in.webm', await _fetchFile(webmBlob));
+
+  await ff.exec([
+    '-i', 'in.webm',
+    '-c:v', 'libx264',
+    '-preset', 'fast',  // better compression than ultrafast, minimal time cost
+    '-crf', '18',       // near-lossless (23 = default, 18 = visually lossless)
+    '-pix_fmt', 'yuv420p',   // required for iOS / QuickTime compatibility
+    '-movflags', '+faststart', // moov atom at front for streaming/web play
+    '-an',                    // no audio track (canvas has no audio)
+    'out.mp4'
+  ]);
+
+  const data = await ff.readFile('out.mp4');
+  await ff.deleteFile('in.webm');
+  await ff.deleteFile('out.mp4');
+
+  return new Blob([data.buffer], { type: 'video/mp4' });
+}
+
+// ── Recording ──────────────────────────────────────────────────────────────
+
+let isRecording = false;
+const FPS = 30;
+
+async function recordReel() {
+  if (isRecording) return;
+  isRecording = true;
+  recBlob = null;
+
+  document.getElementById('btn-record').disabled   = true;
+  document.getElementById('btn-download').style.display = 'none';
+  const progWrap  = document.getElementById('prog-wrap');
+  const progBar   = document.getElementById('prog-bar');
+  const progLabel = document.getElementById('prog-label');
+  progWrap.style.display = 'block';
+  progBar.style.width = '0%';
+
+  ctx = recCtx;
+
+  // Record at 2× resolution (900×1600) for sharper output.
+  // The 2× setTransform in drawSlide maps all 450×800 logical coords to this space.
+  recCanvas.width  = 900;
+  recCanvas.height = 1600;
+
+  // Prime the recording canvas with a black frame BEFORE captureStream,
+  // so the stream always has valid pixel data from the very first frame.
+  recCtx.setTransform(2, 0, 0, 2, 0, 0);
+  recCtx.fillStyle = '#0d0d0d';
+  recCtx.fillRect(0, 0, 450, 800);
+
+  // Calculate total duration for progress
+  const totalDur = SLIDES.reduce((acc, [, d]) => acc + (d === 0 ? videoDur : d), 0);
+  let elapsed = 0;
+
+  // Prefer native MP4 recording (Chrome 130+ / Edge 130+);
+  // otherwise fall back to WebM and convert via FFmpeg.wasm after recording
+  const mimeType = [
+    'video/mp4;codecs=avc1.42E01E',
+    'video/mp4;codecs=avc1',
+    'video/mp4',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm'
+  ].find(m => MediaRecorder.isTypeSupported(m)) || '';
+  const nativeMP4 = mimeType.startsWith('video/mp4');
+
+  const stream   = recCanvas.captureStream(FPS);
+  const recorder = new MediaRecorder(stream, {
+    ...(mimeType ? { mimeType } : {}),
+    videoBitsPerSecond: 12_000_000,  // 12 Mbps — high quality at 900×1600
+  });
+  const chunks   = [];
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+  // Use a 100ms timeslice for more frequent ondataavailable events
+  recorder.start(100);
+
+  // Wait two rAF ticks so MediaRecorder fully initialises before drawing begins.
+  // Without this the first frames can be dropped → leading black frames in the output.
+  await new Promise(r => requestAnimationFrame(r));
+  await new Promise(r => requestAnimationFrame(r));
+
+  const waitFrame = () => new Promise(r => requestAnimationFrame(r));
+
+  for (const [slide, dur] of SLIDES) {
+    if (slide === 2) {
+      if (!userVideo || videoDur <= 0) {
+        // Video didn't load — skip the video slide
+        progBar.style.width = Math.min(100, ((elapsed) / totalDur) * 100).toFixed(1) + '%';
+        progLabel.textContent = 'Skipping video slide (not loaded)…';
+        continue;
+      }
+      // Ensure the 2× recording transform is active for this slide
+      ctx.setTransform(2, 0, 0, 2, 0, 0);
+      userVideo.currentTime = 0;
+      await new Promise(r => { userVideo.onseeked = () => r(); setTimeout(r, 1000); });
+      userVideo.play().catch(() => {});
+      const frames = Math.ceil(videoDur * FPS);
+      for (let f = 0; f < frames; f++) {
+        ctx.clearRect(0, 0, 450, 800);
+        ctx.drawImage(userVideo, 0, 0, 450, 800);
+        await waitFrame();
+      }
+      userVideo.pause();
+      elapsed += videoDur;
+    } else {
+      const frames = Math.ceil(dur * FPS);
+      for (let f = 0; f < frames; f++) {
+        const t = frames > 1 ? f / (frames - 1) : 1;
+        drawSlide(slide, t);
+        await waitFrame();
+      }
+      elapsed += dur;
+    }
+
+    progBar.style.width   = Math.min(100, (elapsed / totalDur) * 100).toFixed(1) + '%';
+    progLabel.textContent = `Recording… slide ${slide}/${SLIDES.length}`;
+  }
+
+  recorder.stop();
+  await new Promise(r => { recorder.onstop = r; });
+
+  const rawBlob = new Blob(chunks, { type: mimeType || 'video/webm' });
+
+  if (nativeMP4) {
+    // Browser recorded directly as MP4 — no conversion needed
+    recBlob = rawBlob;
+    recExt  = 'mp4';
+    progBar.style.width   = '100%';
+    progLabel.textContent = 'Done! Click Download.';
+  } else {
+    // Convert WebM → H.264 MP4 for iOS / Android / universal compatibility
+    try {
+      recBlob = await convertToMP4(rawBlob, progBar, progLabel);
+      recExt  = 'mp4';
+      progBar.style.width   = '100%';
+      progLabel.textContent = 'Done! Click Download (MP4).';
+    } catch (err) {
+      console.error('MP4 conversion failed:', err);
+      recBlob = rawBlob;
+      recExt  = 'webm';
+      progBar.style.width   = '100%';
+      progLabel.textContent = 'Done! (WebM — MP4 conversion failed)';
+    }
+  }
+
+  // Reset recording canvas back to preview size
+  recCanvas.width  = 450;
+  recCanvas.height = 800;
+
+  document.getElementById('btn-record').disabled = false;
+  document.getElementById('btn-download').style.display = 'inline-block';
+  isRecording = false;
+  ctx = pvCtx;
+}
+
+// ── Download ───────────────────────────────────────────────────────────────
+
+function triggerDownload() {
+  if (!recBlob) return;
+  const url = URL.createObjectURL(recBlob);
+  const a   = Object.assign(document.createElement('a'), {
+    href: url,
+    download: `NIAT_Bootcamp_2026_${USER_NAME.replace(/\s+/g,'_')}.${recExt}`,
+  });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+
+window.addEventListener('DOMContentLoaded', preloadAll);
+</script>
+</body>
+</html>
