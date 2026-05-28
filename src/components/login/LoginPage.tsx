@@ -242,7 +242,7 @@ export default function LoginPage() {
               className="btn-primary w-full py-3 text-base"
               suppressHydrationWarning
             >
-              {isLoading ? "Sending…" : "Send OTP"}
+              {isLoading ? "Verifying..." : "Send OTP"}
             </button>
           </form>
         ) : (

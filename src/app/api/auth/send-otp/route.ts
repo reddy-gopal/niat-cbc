@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { sendOtp } from "@/lib/msg91";
+import { validateNIATRegistration } from "@/lib/niatRegistration";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
 const sendOtpSchema = z.object({
@@ -18,6 +19,19 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json(
         { success: false, error: "Invalid request payload." },
+        { status: 400 }
+      );
+    }
+
+    const niatValidation = await validateNIATRegistration(parsed.data.mobile);
+    if (!niatValidation.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            niatValidation.errorMessage ??
+            "Could not validate NIAT registration right now. Please try again.",
+        },
         { status: 400 }
       );
     }

@@ -11,7 +11,6 @@ import {
   formatReferralBreakdownSummary,
   type ReferralStageBreakdown,
 } from "@/lib/referral-points-shared";
-import { buildChallenge8ReferralUrl } from "@/lib/utils";
 import type { StudentChallengeStatus } from "@/types/database";
 
 type UploadState = "idle" | "uploading" | "received";
@@ -53,16 +52,6 @@ export default function MissionModal({
     kind: "success" | "info" | "error";
     text: string;
   } | null>(null);
-  const [copyLabel, setCopyLabel] = useState("COPY");
-
-  const referralUrl = useMemo(
-    () => buildChallenge8ReferralUrl(session),
-    [session]
-  );
-  const referralFirstOpenKey = useMemo(
-    () => `cbc:referral-form-opened:${session.studentId}:${challenge?.id ?? "unknown"}`,
-    [session.studentId, challenge?.id]
-  );
 
   const wordCount = useMemo(() => {
     if (!textResponse.trim()) return 0;
@@ -90,7 +79,6 @@ export default function MissionModal({
       setUploadState("idle");
       setClaimLoading(false);
       setClaimMessage(null);
-      setCopyLabel("COPY");
     }
   }, [isOpen]);
 
@@ -183,31 +171,8 @@ export default function MissionModal({
     setClaimLoading(false);
   };
 
-  const handleCopyReferralLink = async () => {
-    try {
-      await navigator.clipboard.writeText(referralUrl);
-      setCopyLabel("COPIED");
-      window.setTimeout(() => setCopyLabel("COPY"), 1200);
-    } catch {
-      setCopyLabel("FAILED");
-      window.setTimeout(() => setCopyLabel("COPY"), 1200);
-    }
-  };
-
   const handleAcceptMission = () => {
     setAccepted(true);
-    if (!challenge?.isReferral) return;
-
-    try {
-      const openedOnce = window.localStorage.getItem(referralFirstOpenKey);
-      if (!openedOnce) {
-        window.localStorage.setItem(referralFirstOpenKey, "1");
-        window.open(referralUrl, "_blank", "noopener,noreferrer");
-      }
-    } catch {
-      // If localStorage is blocked, keep old behavior to avoid blocking user flow.
-      window.open(referralUrl, "_blank", "noopener,noreferrer");
-    }
   };
 
   const displayId = CHALLENGE_ID_MAP[challenge.id] ?? challenge.id;
@@ -370,26 +335,6 @@ export default function MissionModal({
               </motion.div>
             ) : challenge.isReferral ? (
               <div className="space-y-4">
-                <div className="bg-orange-50 border-2 border-dashed border-orange-200 p-4 rounded-xl">
-                  <p className="text-[10px] uppercase font-bold text-orange-800 mb-2 tracking-wider">
-                    Onboarding Form 
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={referralUrl}
-                      className="flex-1 bg-white border border-orange-200 px-3 py-2 rounded text-xs text-orange-900 outline-none"
-                    />
-                    <button
-                      type="button"
-                      className="bg-orange-500 text-white px-4 py-2 rounded text-xs font-bold hover:bg-orange-600 transition-colors"
-                      onClick={handleCopyReferralLink}
-                    >
-                      {copyLabel}
-                    </button>
-                  </div>
-                </div>
                 <button
                   type="button"
                   onClick={() => {

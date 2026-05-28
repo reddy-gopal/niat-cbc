@@ -181,46 +181,39 @@ Respond with JSON only:
     description: "One sentence to your future self. Sealed. Collected by your tribe leader. Opened one year from today. Any proof format is allowed.",
     verificationPrompt: `You are evaluating "Tribe Time Capsule" for NIAT CBC.
 
-Task: Students wrote personal messages to their future selves on paper, folded or kept them as-is, and the tribe leader collected ALL papers from their group and submitted a photo of the collected batch.
+Task: A student wrote a personal message to their future self on paper and submitted proof of it.
 
-UNDERSTAND THE FORMAT FIRST:
-This is a TRIBE COLLECTION submission — not an individual student photo.
-Valid submissions look like:
-- Multiple papers collected together (held, stacked, spread out, or loosely arranged)
-- Papers may be folded, half-folded, or flat — all are valid
-- Papers with names, labels, or messages visible on the outside
-- A bundle or pile of notes from the whole tribe
-- Papers being held together or laid out as a group
-- Handwritten notes, index cards, torn notebook pages, sticky notes — all valid formats
-The messages may be partially or fully visible — that is acceptable.
+DEFAULT VERDICT: ACCEPT.
 
-STEP 1 — Is there physical proof of collected papers/notes?
-Look for: any papers, cards, or written notes grouped together.
-If the image shows NO paper or notes at all → REJECT.
+WHAT TO LOOK FOR:
+Any physical paper, card, notebook page, or sticky note with ANY handwriting on it — a name, a sentence, a goal, a date, or a personal note.
 
-STEP 2 — Does it look like a genuine collected batch?
-There should be more than one piece of paper, OR a single paper clearly representing a one-member tribe.
-A completely random unrelated photo with no papers → REJECT.
+ACCEPT if the image shows:
+- A piece of paper or notebook page with any handwriting visible
+- Multiple papers collected together (tribe leader batch submission)
+- A single paper with one or more personal messages on it
+- Multiple messages written on one shared sheet
+- Papers that are folded, unfolded, open, or sealed — ALL are valid
+- A hand holding a paper with writing on it
+- Papers spread on a table or floor with writing
+- Even just a name and date written on paper counts
+- Any physical writing surface with handwritten content
 
-STEP 3 — Light content check if text is visible:
-Names, sentences, or personal notes on the papers → perfectly valid, ACCEPT.
-If messages are readable, they should look like genuine personal sentences — not memes, printed ads, or random unrelated captions.
-Partially written, short sentences, or even just names on papers → ACCEPT.
+REJECT only if:
+- The image is completely blank with zero writing anywhere
+- It is a digital app, phone screen, WhatsApp chat, or text message screenshot
+- It is a completely unrelated photo (selfie only, food, classroom with no papers, promotional poster)
+- It is pure gibberish or spam
 
-ACCEPT if:
-✅ Multiple papers/cards/notes collected or grouped together
-✅ Papers with names or sentences written on them (folded or unfolded)
-✅ A stack, pile, or loose arrangement of handwritten notes
-✅ Papers being held together or laid out by the tribe leader
-✅ Index cards, notebook pages, torn paper — any physical writing surface
-✅ Even a single paper if it clearly appears intentional and complete
+DO NOT REJECT because:
+- Papers are unfolded or readable — that is fine
+- Only one paper is visible — individual submissions are valid
+- The message is short or only has a name and date
+- The paper has multiple people's messages on one sheet — that is valid
+- Writing is partially visible or hard to read
+- It doesn't look like a "batch" collection
 
-REJECT if:
-❌ No paper or written notes visible anywhere in the image
-❌ Completely unrelated photo (selfie only, food, random scene with no papers)
-❌ Completely blank papers with absolutely nothing written on them
-
-JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what was visible in the image and why it was accepted or rejected"}`,
+JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what was visible and why"}`,
     day: "Day 2",
     points: 2,
     requiresUpload: true,

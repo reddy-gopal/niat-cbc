@@ -468,7 +468,7 @@ export default function JoinPage({
                 className="btn-primary w-full text-lg mt-2 py-4"
                 suppressHydrationWarning
               >
-                {isLoading ? "Sending..." : "Send OTP →"}
+                {isLoading ? "Verifying..." : "Send OTP →"}
               </button>
               <p className="text-center text-xs text-[var(--text-muted)] mt-4">
                 🔒 We only use this to verify your identity

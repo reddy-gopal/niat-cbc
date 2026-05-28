@@ -37,7 +37,7 @@ export async function POST(request: Request) {
           {
             success: false,
             message:
-              "Referral provider access was denied (403). Please contact support to verify NW API credentials and allowlist.",
+              "We couldn't verify referrals right now due to an access issue. Please try again shortly or contact support.",
             code: award.errorCode,
           },
           { status: 403 }
@@ -77,7 +77,8 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          message: award.message,
+          message:
+            "We couldn't fetch your referral progress right now. Please try again in a moment.",
           code: award.errorCode,
         },
         { status }
