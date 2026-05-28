@@ -1,7 +1,10 @@
 import "server-only";
 
 import { CHALLENGES } from "@/lib/challenges";
-import { NW_REFERRAL_STAGE_ADMISSION_TEST_FEE } from "@/lib/env";
+import {
+  NW_REFERRAL_STAGE_ADMISSION_TEST_FEE,
+  NW_REFERRAL_STAGE_APPLICATION_STARTED,
+} from "@/lib/env";
 import {
   getReferralCountForStage,
   type ReferralCountResult,
@@ -14,11 +17,20 @@ const POINTS_PER_REFERRAL = REFERRAL_CHALLENGE?.points ?? 7;
 
 const REFERRAL_STAGE_AWARD_RULES = [
   {
+    stageCode: NW_REFERRAL_STAGE_APPLICATION_STARTED,
+    pointsPerCompletion: 0.2,
+    label: "NIAT application initiated",
+  },
+  {
     stageCode: NW_REFERRAL_STAGE_ADMISSION_TEST_FEE,
     pointsPerCompletion: POINTS_PER_REFERRAL,
     label: "admission test fee paid",
   },
 ] as const;
+
+function roundPoints(value: number): number {
+  return Math.round(value * 100) / 100;
+}
 
 export type ConnectDotsReferralAwardSuccess = {
   success: true;
@@ -99,11 +111,13 @@ export async function getConnectDotsReferralAward(
       label: rule.label,
       count,
       pointsPerCompletion: rule.pointsPerCompletion,
-      points: count * rule.pointsPerCompletion,
+      points: roundPoints(count * rule.pointsPerCompletion),
     };
   });
 
-  const pointsToAward = breakdown.reduce((sum, row) => sum + row.points, 0);
+  const pointsToAward = roundPoints(
+    breakdown.reduce((sum, row) => sum + row.points, 0)
+  );
   const totalCompletions = breakdown.reduce((sum, row) => sum + row.count, 0);
 
   return {
