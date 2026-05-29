@@ -1,10 +1,7 @@
 import "server-only";
 
 import { CHALLENGES } from "@/lib/challenges";
-import {
-  NW_REFERRAL_STAGE_ADMISSION_TEST_FEE,
-  NW_REFERRAL_STAGE_APPLICATION_STARTED,
-} from "@/lib/env";
+import { NW_REFERRAL_STAGE_ADMISSION_TEST_FEE } from "@/lib/env";
 import {
   getReferralCountForStage,
   type ReferralCountResult,
@@ -13,14 +10,9 @@ import type { ReferralStageBreakdown } from "./referral-points-shared";
 import { adminClient } from "../../utils/supabase/admin";
 
 const REFERRAL_CHALLENGE = CHALLENGES.find((challenge) => challenge.isReferral);
-const POINTS_PER_REFERRAL = REFERRAL_CHALLENGE?.points ?? 7;
+const POINTS_PER_REFERRAL = REFERRAL_CHALLENGE?.points ?? 10;
 
 const REFERRAL_STAGE_AWARD_RULES = [
-  {
-    stageCode: NW_REFERRAL_STAGE_APPLICATION_STARTED,
-    pointsPerCompletion: 0.2,
-    label: "NIAT application initiated",
-  },
   {
     stageCode: NW_REFERRAL_STAGE_ADMISSION_TEST_FEE,
     pointsPerCompletion: POINTS_PER_REFERRAL,

@@ -63,7 +63,7 @@ const SHORT_NAMES: Record<number, string> = {
 const DISPLAY_POINTS: Record<number, number> = {
   1: 1,
   2: 3,
-  3: 7,
+  3: 10,
   4: 2,
   5: 2,
   6: 1,

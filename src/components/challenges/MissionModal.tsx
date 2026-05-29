@@ -386,7 +386,7 @@ export default function MissionModal({
                   </div>
                 ) : (
                   <p className="text-[10px] text-center text-orange-700 font-medium">
-                    Claim rules: 7 points for each NIAT admission fee paid, plus 1 point for every 5 NIAT applications initiated.
+                    Claim rules: 10 points for each NIAT admission test fee paid.
                   </p>
                 )}
               </div>
