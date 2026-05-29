@@ -54,6 +54,10 @@ export type LeaderboardEntry = {
   fullName: string;
   totalPoints: number;
   completedChallenges: number;
+  sectionLabel?: string;
+  bootcampName?: string;
+  regionName?: string;
+  createdAt?: string;
 };
 
 export type TeamLeaderboardEntry = {
