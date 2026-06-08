@@ -107,6 +107,7 @@ export default async function JoinSlugPage({ params, searchParams }: JoinRoutePr
       bootcampDate={sectionData.bootcamps.date}
       regionId={sectionData.bootcamps.regions.id}
       regionName={sectionData.bootcamps.regions.name}
+      formsRedirectCode={`join/${slug}`}
       utmSource={normalizeUtmValue(resolvedSearchParams.utm_source)}
       utmMedium={normalizeUtmValue(resolvedSearchParams.utm_medium)}
       utmCampaign={normalizeUtmValue(resolvedSearchParams.utm_campaign)}

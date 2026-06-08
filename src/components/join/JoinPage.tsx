@@ -8,6 +8,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Logo } from "../ui/Logo";
 import { resolveStudentUtmParams } from "@/lib/utils";
 
+const FORMS_BASE_URL = "https://forms-gamma.earlywave.in/mid/niat-cbc";
+const PENDING_REG_KEY = "cbc_pending_registration";
+
 type JoinPageProps = {
   sectionId: string;
   sectionLabel: string;
@@ -16,6 +19,7 @@ type JoinPageProps = {
   bootcampDate: string;
   regionId: string;
   regionName: string;
+  formsRedirectCode: string;
   inviteCode?: string;
   teamName?: string;
   leaderName?: string;
@@ -24,10 +28,15 @@ type JoinPageProps = {
   utmCampaign?: string;
 };
 
+type CheckSrResponse = {
+  success: boolean;
+  srFailed?: boolean;
+  error?: string;
+};
+
 type SrVerifyResponse = {
   success: boolean;
   hasTeam?: boolean;
-  srFailed?: boolean;
   error?: string;
 };
 
@@ -47,7 +56,7 @@ type RegisterValues = z.infer<typeof registerSchema>;
 const MOTIVATIONAL_LINES = [
   "🏆 Compete. Connect. Conquer.",
   "🚀 3 Days. 6 Challenges. 1 Champion.",
-  "🔥 Your section is counting on you."
+  "🔥 Your section is counting on you.",
 ];
 
 export default function JoinPage({
@@ -58,9 +67,9 @@ export default function JoinPage({
   bootcampDate,
   regionId,
   regionName,
+  formsRedirectCode,
   inviteCode,
   teamName,
-  leaderName,
   utmSource,
   utmMedium,
   utmCampaign,
@@ -72,27 +81,11 @@ export default function JoinPage({
   const [srFailed, setSrFailed] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const autoSubmitAttempted = useRef(false);
 
   const [tribeName, setTribeName] = useState("");
   const [inviteData, setInviteData] = useState<{ url: string; code: string } | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % MOTIVATIONAL_LINES.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<RegisterValues>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: { fullName: "", mobile: "" },
-  });
 
   const formattedDate = useMemo(
     () =>
@@ -122,30 +115,49 @@ export default function JoinPage({
     return `/dashboard?${query.toString()}`;
   }, [utmSource, utmMedium, utmCampaign, bootcampName, bootcampDate, regionName, sectionLabel]);
 
-  async function onRegisterSubmit(values: RegisterValues) {
-    setError(null);
-    setSrFailed(false);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % MOTIVATIONAL_LINES.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auto-register when returning from Forms with pending registration data
+  useEffect(() => {
+    if (autoSubmitAttempted.current) return;
+
+    const stored = sessionStorage.getItem(PENDING_REG_KEY);
+    if (!stored) return;
+
+    autoSubmitAttempted.current = true;
+
+    let parsed: { fullName: string; mobile: string };
+    try {
+      parsed = JSON.parse(stored);
+    } catch {
+      sessionStorage.removeItem(PENDING_REG_KEY);
+      return;
+    }
+
+    sessionStorage.removeItem(PENDING_REG_KEY);
+    void autoRegister(parsed.fullName, parsed.mobile);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function autoRegister(fullName: string, mobile: string) {
     setIsLoading(true);
+    setError(null);
     try {
       const response = await fetch("/api/auth/verify-sr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: values.fullName,
-          mobile: values.mobile,
-          sectionId,
-          bootcampId,
-          regionId,
-          inviteCode,
-        }),
+        body: JSON.stringify({ fullName, mobile, sectionId, bootcampId, regionId, inviteCode }),
       });
       const result = (await response.json()) as SrVerifyResponse;
 
       if (!response.ok || !result.success) {
-        if (result.srFailed) {
-          setSrFailed(true);
-        }
-        setError(result.error ?? "Verification failed. Please try again.");
+        setError(result.error ?? "Registration failed. Please try again.");
+        setIsLoading(false);
         return;
       }
 
@@ -154,10 +166,53 @@ export default function JoinPage({
         setTimeout(() => router.push(dashboardUrl), 1500);
       } else {
         setStep("create_team");
+        setIsLoading(false);
       }
     } catch {
       setError("Something went wrong. Please try again.");
-    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<RegisterValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { fullName: "", mobile: "" },
+  });
+
+  async function onRegisterSubmit(values: RegisterValues) {
+    setError(null);
+    setSrFailed(false);
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/auth/check-sr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile: values.mobile }),
+      });
+      const result = (await response.json()) as CheckSrResponse;
+
+      if (!response.ok || !result.success) {
+        if (result.srFailed) setSrFailed(true);
+        setError(result.error ?? "SR verification failed.");
+        setIsLoading(false);
+        return;
+      }
+
+      // SR passed — save details and redirect to Forms
+      sessionStorage.setItem(
+        PENDING_REG_KEY,
+        JSON.stringify({ fullName: values.fullName, mobile: values.mobile })
+      );
+
+      const formsUrl = `${FORMS_BASE_URL}?bootcamp_code=${formsRedirectCode}`;
+      window.location.href = formsUrl;
+    } catch {
+      setError("Something went wrong. Please try again.");
       setIsLoading(false);
     }
   }
@@ -166,7 +221,6 @@ export default function JoinPage({
     setError(null);
     setSrFailed(false);
     reset({ fullName: "", mobile: "" });
-    // Point 3 pending: will also clear Forms localStorage and redirect back
   }
 
   async function handleCreateTeam(event: React.FormEvent<HTMLFormElement>) {
@@ -199,7 +253,6 @@ export default function JoinPage({
         color: { dark: "#000000", light: "#ffffff" },
       });
       setQrCodeDataUrl(dataUrl);
-
       setStep("invite_created");
     } catch {
       setError("Something went wrong while creating tribe.");
@@ -211,14 +264,20 @@ export default function JoinPage({
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-white">
       {/* Left Panel */}
-      <div className="w-full md:w-1/2 p-8 md:p-16 flex flex-col justify-between" style={{ background: "linear-gradient(135deg, var(--hero-from), var(--hero-to))" }}>
+      <div
+        className="w-full md:w-1/2 p-8 md:p-16 flex flex-col justify-between"
+        style={{ background: "linear-gradient(135deg, var(--hero-from), var(--hero-to))" }}
+      >
         <div className="flex flex-col items-center justify-center flex-grow text-center">
           <Logo size="xl" className="mb-8 drop-shadow-md" />
           <h1 className="text-4xl md:text-5xl font-heading font-bold text-white mb-12">
             Community Building Championship
           </h1>
           <div className="h-10">
-            <p key={activeIndex} className="text-xl md:text-2xl text-white font-medium animate-[fadeSlideUp_0.5s_ease-out]">
+            <p
+              key={activeIndex}
+              className="text-xl md:text-2xl text-white font-medium animate-[fadeSlideUp_0.5s_ease-out]"
+            >
               {MOTIVATIONAL_LINES[activeIndex]}
             </p>
           </div>
@@ -231,15 +290,16 @@ export default function JoinPage({
       {/* Right Panel */}
       <div className="w-full md:w-1/2 min-h-[65vh] md:min-h-screen flex items-center justify-center p-6 bg-white">
         <div className="w-full max-w-md">
-          {step !== "create_team" && (inviteCode && teamName ? (
-            <div className="inline-flex items-center gap-2 bg-[var(--status-accepted-bg)] px-4 py-2 rounded-full text-sm font-bold text-[var(--status-accepted-text)] mb-4">
-              🤝 You&apos;re joining {teamName}
-            </div>
-          ) : (
-            <div className="inline-flex items-center gap-2 bg-[var(--bg-warm)] px-4 py-2 rounded-full text-sm font-bold text-[var(--primary)] mb-4">
-              🎯 You&apos;re joining Section {sectionLabel}
-            </div>
-          ))}
+          {step !== "create_team" &&
+            (inviteCode && teamName ? (
+              <div className="inline-flex items-center gap-2 bg-[var(--status-accepted-bg)] px-4 py-2 rounded-full text-sm font-bold text-[var(--status-accepted-text)] mb-4">
+                🤝 You&apos;re joining {teamName}
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 bg-[var(--bg-warm)] px-4 py-2 rounded-full text-sm font-bold text-[var(--primary)] mb-4">
+                🎯 You&apos;re joining Section {sectionLabel}
+              </div>
+            ))}
 
           {step !== "create_team" && (
             <p className="text-[var(--text-muted)] text-sm mb-6 font-medium">
@@ -266,6 +326,10 @@ export default function JoinPage({
             <div className="bg-[var(--status-accepted-bg)] text-[var(--status-accepted-text)] p-6 rounded-2xl text-center animate-[fadeSlideUp_0.3s_ease]">
               <div className="text-4xl mb-4">✅</div>
               <p className="font-heading font-bold text-xl">Verified! Taking you in...</p>
+            </div>
+          ) : isLoading && !error ? (
+            <div className="text-center py-10">
+              <p className="text-[var(--text-muted)] font-medium">Setting up your account...</p>
             </div>
           ) : step === "register" ? (
             <form onSubmit={handleSubmit(onRegisterSubmit)} className="space-y-5">
@@ -355,21 +419,31 @@ export default function JoinPage({
               >
                 {isLoading ? "Creating..." : "Create Tribe"}
               </button>
-              {error ? <p className="mt-4 text-sm text-[var(--primary)] font-medium p-3 bg-[var(--status-rejected-bg)] rounded-lg">{error}</p> : null}
+              {error ? (
+                <p className="mt-4 text-sm text-[var(--primary)] font-medium p-3 bg-[var(--status-rejected-bg)] rounded-lg">
+                  {error}
+                </p>
+              ) : null}
             </form>
           ) : (
             <div className="space-y-6 text-center animate-[fadeSlideUp_0.3s_ease]">
               <div className="p-6 bg-green-50 border border-green-200 rounded-2xl mb-6 flex flex-col items-center">
                 <h3 className="text-xl font-bold text-green-800 mb-2">Tribe Created! 🎉</h3>
-                <p className="text-sm text-green-700 mb-4">Share this QR code or link with your friends so they can join you.</p>
-
+                <p className="text-sm text-green-700 mb-4">
+                  Share this QR code or link with your friends so they can join you.
+                </p>
                 {qrCodeDataUrl && (
                   <div className="bg-white p-3 rounded-xl shadow-sm mb-4 inline-block">
                     <img src={qrCodeDataUrl} alt="Invite QR Code" width={180} height={180} />
                   </div>
                 )}
                 <div className="flex gap-2 items-center w-full bg-white rounded-lg p-2 border border-green-200">
-                  <input type="text" readOnly value={inviteData?.url || ""} className="flex-1 bg-transparent text-sm text-gray-700 px-2 outline-none" />
+                  <input
+                    type="text"
+                    readOnly
+                    value={inviteData?.url || ""}
+                    className="flex-1 bg-transparent text-sm text-gray-700 px-2 outline-none"
+                  />
                   <button
                     className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-bold rounded-md transition-colors"
                     onClick={() => {
@@ -381,7 +455,6 @@ export default function JoinPage({
                   </button>
                 </div>
               </div>
-
               <button
                 type="button"
                 onClick={() => router.push(dashboardUrl)}
