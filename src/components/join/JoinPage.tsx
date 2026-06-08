@@ -24,15 +24,10 @@ type JoinPageProps = {
   utmCampaign?: string;
 };
 
-type RegisterResponse = {
-  success: boolean;
-  data?: { requestId?: string };
-  error?: string;
-};
-
-type VerifyResponse = {
+type SrVerifyResponse = {
   success: boolean;
   hasTeam?: boolean;
+  srFailed?: boolean;
   error?: string;
 };
 
@@ -71,19 +66,12 @@ export default function JoinPage({
   utmCampaign,
 }: JoinPageProps) {
   const router = useRouter();
-  const [step, setStep] = useState<"register" | "verify" | "create_team" | "invite_created">("register");
+  const [step, setStep] = useState<"register" | "create_team" | "invite_created">("register");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<{
-    fullName: string;
-    mobile: string;
-    requestId?: string;
-  } | null>(null);
-  const [otpValues, setOtpValues] = useState(["", "", "", ""]);
-  const [countdown, setCountdown] = useState(30);
-  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [srFailed, setSrFailed] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const [tribeName, setTribeName] = useState("");
   const [inviteData, setInviteData] = useState<{ url: string; code: string } | null>(null);
@@ -100,12 +88,10 @@ export default function JoinPage({
     register,
     handleSubmit,
     formState: { errors },
+    reset,
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: {
-      fullName: "",
-      mobile: "",
-    },
+    defaultValues: { fullName: "", mobile: "" },
   });
 
   const formattedDate = useMemo(
@@ -134,33 +120,14 @@ export default function JoinPage({
       utm_campaign: utm.utmCampaign,
     });
     return `/dashboard?${query.toString()}`;
-  }, [
-    utmSource,
-    utmMedium,
-    utmCampaign,
-    bootcampName,
-    bootcampDate,
-    regionName,
-    sectionLabel,
-  ]);
-
-  useEffect(() => {
-    if (step !== "verify" || countdown <= 0) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setCountdown((prev) => prev - 1);
-    }, 1000);
-
-    return () => window.clearTimeout(timer);
-  }, [step, countdown]);
+  }, [utmSource, utmMedium, utmCampaign, bootcampName, bootcampDate, regionName, sectionLabel]);
 
   async function onRegisterSubmit(values: RegisterValues) {
     setError(null);
+    setSrFailed(false);
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/send-otp", {
+      const response = await fetch("/api/auth/verify-sr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -169,163 +136,37 @@ export default function JoinPage({
           sectionId,
           bootcampId,
           regionId,
-        }),
-      });
-      const result = (await response.json()) as RegisterResponse;
-
-      if (!response.ok || !result.success) {
-        setError(result.error ?? "Unable to send OTP.");
-        return;
-      }
-
-      setFormData({
-        fullName: values.fullName,
-        mobile: values.mobile,
-        requestId: result.data?.requestId,
-      });
-      setOtpValues(["", "", "", ""]);
-      setCountdown(30);
-      setStep("verify");
-    } catch {
-      setError("Something went wrong while sending OTP.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  function handleOtpChange(index: number, value: string) {
-    if (!/^\d?$/.test(value)) {
-      return;
-    }
-    const next = [...otpValues];
-    next[index] = value;
-    setOtpValues(next);
-    if (value && index < otpRefs.current.length - 1) {
-      otpRefs.current[index + 1]?.focus();
-    }
-  }
-
-  function handleOtpKeyDown(
-    event: React.KeyboardEvent<HTMLInputElement>,
-    index: number
-  ) {
-    if (event.key === "Backspace" && !otpValues[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus();
-    }
-  }
-
-  function handleOtpPaste(event: React.ClipboardEvent<HTMLInputElement>) {
-    event.preventDefault();
-    const pasted = event.clipboardData.getData("text").replace(/\D/g, "");
-    if (!pasted) {
-      return;
-    }
-    const next = [...otpValues];
-    pasted
-      .slice(0, 4)
-      .split("")
-      .forEach((digit, idx) => {
-        next[idx] = digit;
-      });
-    setOtpValues(next);
-    const focusIndex = Math.min(pasted.length, 3);
-    otpRefs.current[focusIndex]?.focus();
-  }
-
-  async function onVerifySubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!formData) {
-      return;
-    }
-
-    const otp = otpValues.join("");
-    if (otp.length !== 4) {
-      setError("Enter the 4-digit OTP.");
-      return;
-    }
-
-    setError(null);
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mobile: formData.mobile,
-          otp,
-          fullName: formData.fullName,
-          sectionId,
-          bootcampId,
-          regionId,
           inviteCode,
-          utmSource,
-          utmMedium,
-          utmCampaign,
         }),
       });
+      const result = (await response.json()) as SrVerifyResponse;
 
-      const result = (await response.json()) as VerifyResponse;
       if (!response.ok || !result.success) {
-        setError(result.error ?? "OTP verification failed.");
-        setOtpValues(["", "", "", ""]);
-        otpRefs.current[0]?.focus();
+        if (result.srFailed) {
+          setSrFailed(true);
+        }
+        setError(result.error ?? "Verification failed. Please try again.");
         return;
       }
 
       if (inviteCode || result.hasTeam) {
         setIsSuccess(true);
-        setTimeout(() => {
-          router.push(dashboardUrl);
-        }, 1500);
+        setTimeout(() => router.push(dashboardUrl), 1500);
       } else {
         setStep("create_team");
       }
     } catch {
-      setError("Something went wrong while verifying OTP.");
-      setOtpValues(["", "", "", ""]);
-      otpRefs.current[0]?.focus();
+      setError("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function handleResendOtp() {
-    if (!formData || countdown > 0) {
-      return;
-    }
-
+  function handleChangeNumber() {
     setError(null);
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          mobile: formData.mobile,
-          sectionId,
-          bootcampId,
-          regionId,
-        }),
-      });
-      const result = (await response.json()) as RegisterResponse;
-
-      if (!response.ok || !result.success) {
-        setError(result.error ?? "Unable to resend OTP.");
-        return;
-      }
-
-      setFormData((prev) =>
-        prev ? { ...prev, requestId: result.data?.requestId } : prev
-      );
-      setOtpValues(["", "", "", ""]);
-      setCountdown(30);
-      otpRefs.current[0]?.focus();
-    } catch {
-      setError("Something went wrong while resending OTP.");
-    } finally {
-      setIsLoading(false);
-    }
+    setSrFailed(false);
+    reset({ fullName: "", mobile: "" });
+    // Point 3 pending: will also clear Forms localStorage and redirect back
   }
 
   async function handleCreateTeam(event: React.FormEvent<HTMLFormElement>) {
@@ -347,12 +188,16 @@ export default function JoinPage({
         return;
       }
 
-      const inviteCode = result.invite_code as string;
-      const inviteUrl = `${window.location.origin}/join/team/${inviteCode}`;
-      setInviteData({ url: inviteUrl, code: inviteCode });
+      const code = result.invite_code as string;
+      const inviteUrl = `https://forms-gamma.earlywave.in/mid/niat-cbc?bootcamp_code=join/team/${code}`;
+      setInviteData({ url: inviteUrl, code });
 
       const QRCode = (await import("qrcode")).default;
-      const dataUrl = await QRCode.toDataURL(inviteUrl, { width: 300, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
+      const dataUrl = await QRCode.toDataURL(inviteUrl, {
+        width: 300,
+        margin: 2,
+        color: { dark: "#000000", light: "#ffffff" },
+      });
       setQrCodeDataUrl(dataUrl);
 
       setStep("invite_created");
@@ -366,7 +211,7 @@ export default function JoinPage({
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-white">
       {/* Left Panel */}
-      <div className="w-full md:w-1/2 p-8 md:p-16 flex flex-col justify-between" style={{ background: 'linear-gradient(135deg, var(--hero-from), var(--hero-to))' }}>
+      <div className="w-full md:w-1/2 p-8 md:p-16 flex flex-col justify-between" style={{ background: "linear-gradient(135deg, var(--hero-from), var(--hero-to))" }}>
         <div className="flex flex-col items-center justify-center flex-grow text-center">
           <Logo size="xl" className="mb-8 drop-shadow-md" />
           <h1 className="text-4xl md:text-5xl font-heading font-bold text-white mb-12">
@@ -462,80 +307,32 @@ export default function JoinPage({
                 ) : null}
               </div>
 
+              {error ? (
+                <div className="p-4 bg-[var(--status-rejected-bg)] rounded-lg">
+                  <p className="text-sm text-[var(--primary)] font-medium">{error}</p>
+                  {srFailed && (
+                    <button
+                      type="button"
+                      onClick={handleChangeNumber}
+                      className="mt-3 text-sm font-bold text-[var(--link)] hover:text-[var(--link-hover)] underline"
+                    >
+                      Change Number
+                    </button>
+                  )}
+                </div>
+              ) : null}
+
               <button
                 type="submit"
                 disabled={isLoading}
                 className="btn-primary w-full text-lg mt-2 py-4"
                 suppressHydrationWarning
               >
-                {isLoading ? "Verifying..." : "Send OTP →"}
+                {isLoading ? "Verifying..." : "Join Now →"}
               </button>
               <p className="text-center text-xs text-[var(--text-muted)] mt-4">
                 🔒 We only use this to verify your identity
               </p>
-            </form>
-          ) : step === "verify" ? (
-            <form onSubmit={onVerifySubmit} className="space-y-6 animate-[fadeSlideUp_0.3s_ease]">
-              <div className="bg-[var(--teal)]/10 text-[var(--teal)] px-4 py-3 rounded-xl text-sm font-medium border border-[var(--teal)]/20">
-                📲 OTP sent to +91 {formData?.mobile}{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep("register");
-                    setError(null);
-                  }}
-                  className="underline ml-2 hover:text-[var(--teal)]/80"
-                >
-                  Change
-                </button>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                {otpValues.map((digit, index) => (
-                  <input
-                    key={`otp-${index}`}
-                    ref={(el) => {
-                      otpRefs.current[index] = el;
-                    }}
-                    value={digit}
-                    onChange={(event) => handleOtpChange(index, event.target.value)}
-                    onKeyDown={(event) => handleOtpKeyDown(event, index)}
-                    onPaste={handleOtpPaste}
-                    maxLength={1}
-                    inputMode="numeric"
-                    className="w-14 h-16 border-2 border-[#e2d5d5] rounded-xl text-center text-2xl font-bold text-[var(--text-dark)] focus:border-[var(--primary)] focus:outline-none transition-colors"
-                    disabled={isLoading}
-                    suppressHydrationWarning
-                  />
-                ))}
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="btn-primary w-full text-lg py-4"
-                suppressHydrationWarning
-              >
-                {isLoading ? "Verifying..." : "Let's Go! 🚀"}
-              </button>
-
-              <div className="text-center text-sm">
-                {countdown > 0 ? (
-                  <span className="text-[var(--text-muted)] font-medium">🕐 Resend OTP in {countdown}s</span>
-                ) : (
-                  <span className="text-[var(--text-muted)]">
-                    Didn&apos;t get it?{" "}
-                    <button
-                      type="button"
-                      onClick={handleResendOtp}
-                      className="text-[var(--link)] hover:text-[var(--link-hover)] font-bold transition-colors"
-                      disabled={isLoading}
-                      suppressHydrationWarning
-                    >
-                      Resend OTP
-                    </button>
-                  </span>
-                )}
-              </div>
             </form>
           ) : step === "create_team" ? (
             <form onSubmit={handleCreateTeam} className="space-y-6 animate-[fadeSlideUp_0.3s_ease]">
@@ -558,6 +355,7 @@ export default function JoinPage({
               >
                 {isLoading ? "Creating..." : "Create Tribe"}
               </button>
+              {error ? <p className="mt-4 text-sm text-[var(--primary)] font-medium p-3 bg-[var(--status-rejected-bg)] rounded-lg">{error}</p> : null}
             </form>
           ) : (
             <div className="space-y-6 text-center animate-[fadeSlideUp_0.3s_ease]">
@@ -593,8 +391,6 @@ export default function JoinPage({
               </button>
             </div>
           )}
-
-          {error ? <p className="mt-4 text-sm text-[var(--primary)] font-medium p-3 bg-[var(--status-rejected-bg)] rounded-lg">{error}</p> : null}
         </div>
       </div>
     </div>

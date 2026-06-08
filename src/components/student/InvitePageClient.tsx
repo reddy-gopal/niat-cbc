@@ -28,7 +28,7 @@ export default function InvitePageClient({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const url = `${window.location.origin}/join/team/${inviteCode}`;
+    const url = `https://forms-gamma.earlywave.in/mid/niat-cbc?bootcamp_code=join/team/${inviteCode}`;
     setInviteUrl(url);
 
     void (async () => {

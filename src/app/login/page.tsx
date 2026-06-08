@@ -16,10 +16,11 @@ export default async function StudentLoginPage({
   }
 
   const params = await searchParams;
-  const authCode = typeof params.auth_code === "string" ? params.auth_code : null;
+  const authToken = typeof params.auth_token === "string" ? params.auth_token : null;
+  const bootcampCode = typeof params.bootcamp_code === "string" ? params.bootcamp_code : null;
 
-  if (authCode) {
-    const result = await validateAuthToken(authCode);
+  if (authToken) {
+    const result = await validateAuthToken(authToken);
 
     if (result.valid && result.userId) {
       const { data: student } = await adminClient
@@ -53,6 +54,10 @@ export default async function StudentLoginPage({
         });
 
         redirect("/dashboard");
+      }
+
+      if (bootcampCode) {
+        redirect(`/${bootcampCode}`);
       }
     }
   }

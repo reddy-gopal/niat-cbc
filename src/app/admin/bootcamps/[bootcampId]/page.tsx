@@ -36,7 +36,7 @@ export default async function BootcampDetailPage({ params }: Props) {
 
       <div className="space-y-4">
         {(sections ?? []).map((section) => {
-          const joinUrl = `${siteUrl}/join/${section.slug}`;
+          const joinUrl = `https://forms-gamma.earlywave.in/mid/niat-cbc?bootcamp_code=join/${section.slug}`;
           return (
             <div key={section.id} className="card p-4">
               <div className="flex flex-col sm:flex-row sm:justify-between gap-4">

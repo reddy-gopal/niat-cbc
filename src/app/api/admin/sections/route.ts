@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        data: { ...data, joinUrl: `${siteUrl}/join/${data.slug}` },
+        data: { ...data, joinUrl: `https://forms-gamma.earlywave.in/mid/niat-cbc?bootcamp_code=join/${data.slug}` },
       },
       { status: 200 }
     );
