@@ -21,7 +21,7 @@ const IMGS_MAP: Record<string, string> = {
 };
 
 const SLIDES: [number, number][] = [
-  [1,4],[3,4],[4,10],[5,4],[6,4],
+  [1,4],[3,4],[4,10],[5,4],[6,4],[13,10],
   [7,6],[8,4],[10,4],[11,4],[12,8]
 ];
 
@@ -44,6 +44,7 @@ interface ReelState {
   isRecording: boolean;
   audioBuf: ArrayBuffer | null;
   brollVideo: HTMLVideoElement | null;
+  brollVideo2: HTMLVideoElement | null;
 }
 
 // ── Pure canvas helpers (no React state) ─────────────────────────────────────
@@ -202,12 +203,18 @@ function drawSlide(
       break;
     }
     case 4: {
-      // B-roll video slide
       if (st.brollVideo && st.brollVideo.readyState >= 2) {
         ctx.drawImage(st.brollVideo, 0, 0, 450, 800);
       } else {
-        ctx.fillStyle = '#0d0d0d';
-        ctx.fillRect(0, 0, 450, 800);
+        ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
+      }
+      break;
+    }
+    case 13: {
+      if (st.brollVideo2 && st.brollVideo2.readyState >= 2) {
+        ctx.drawImage(st.brollVideo2, 0, 0, 450, 800);
+      } else {
+        ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
       }
       break;
     }
@@ -421,7 +428,7 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
     recBlob: null, recExt: 'mp4',
     pvCtx: null, recCtx: null, activeCtx: null,
     previewRunning: false, isRecording: false,
-    audioBuf: null, brollVideo: null,
+    audioBuf: null, brollVideo: null, brollVideo2: null,
   });
 
   const [loaded, setLoaded]           = useState(false);
@@ -478,20 +485,25 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
         stRef.current.audioBuf = await audioRes.arrayBuffer();
       } catch { /* audio optional */ }
 
-      // Load B-roll video
-      try {
-        const v = document.createElement('video');
-        v.src = '/bootcamp-reel/cbc-broll.mp4';
-        v.preload = 'auto';
-        v.muted = true;
-        v.playsInline = true;
-        await new Promise<void>(resolve => {
-          v.oncanplaythrough = () => resolve();
-          v.onerror = () => resolve();
-          setTimeout(resolve, 5000);
-        });
-        stRef.current.brollVideo = v;
-      } catch { /* broll optional */ }
+      // Load B-roll videos
+      async function loadVideo(src: string): Promise<HTMLVideoElement | null> {
+        try {
+          const v = document.createElement('video');
+          v.src = src; v.preload = 'auto'; v.muted = true; v.playsInline = true;
+          await new Promise<void>(resolve => {
+            v.oncanplaythrough = () => resolve();
+            v.onerror = () => resolve();
+            setTimeout(resolve, 5000);
+          });
+          return v;
+        } catch { return null; }
+      }
+      const [broll1, broll2] = await Promise.all([
+        loadVideo('/bootcamp-reel/cbc-broll.mp4'),
+        loadVideo('/bootcamp-reel/cbc-broll-2.mp4'),
+      ]);
+      stRef.current.brollVideo  = broll1;
+      stRef.current.brollVideo2 = broll2;
 
       stRef.current.activeCtx = pvCtx;
       drawSlide(1, 1, stRef.current, copy);
@@ -543,10 +555,8 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
     }
 
     for (const [slide, dur] of SLIDES) {
-      if (slide === 4 && st.brollVideo) {
-        st.brollVideo.currentTime = 0;
-        st.brollVideo.play().catch(() => {});
-      }
+      if (slide === 4  && st.brollVideo)  { st.brollVideo.currentTime  = 0; st.brollVideo.play().catch(() => {}); }
+      if (slide === 13 && st.brollVideo2) { st.brollVideo2.currentTime = 0; st.brollVideo2.play().catch(() => {}); }
       const durMs = dur * 1000;
       await new Promise<void>(resolve => {
         const startMs = performance.now();
@@ -558,9 +568,8 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
         }
         requestAnimationFrame(frame);
       });
-      if (slide === 4 && st.brollVideo) {
-        st.brollVideo.pause();
-      }
+      if (slide === 4  && st.brollVideo)  st.brollVideo.pause();
+      if (slide === 13 && st.brollVideo2) st.brollVideo2.pause();
     }
 
     if (previewAudio) { previewAudio.pause(); previewAudio.src = ''; }
@@ -628,19 +637,16 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
     const waitFrame = () => new Promise<void>(r => requestAnimationFrame(() => r()));
 
     for (const [slide, dur] of SLIDES) {
-      if (slide === 4 && st.brollVideo) {
-        st.brollVideo.currentTime = 0;
-        st.brollVideo.play().catch(() => {});
-      }
+      if (slide === 4  && st.brollVideo)  { st.brollVideo.currentTime  = 0; st.brollVideo.play().catch(() => {}); }
+      if (slide === 13 && st.brollVideo2) { st.brollVideo2.currentTime = 0; st.brollVideo2.play().catch(() => {}); }
       const frames = Math.ceil(dur * FPS);
       for (let f = 0; f < frames; f++) {
         const t = frames > 1 ? f / (frames - 1) : 1;
         drawSlide(slide, t, st, copy);
         await waitFrame();
       }
-      if (slide === 4 && st.brollVideo) {
-        st.brollVideo.pause();
-      }
+      if (slide === 4  && st.brollVideo)  st.brollVideo.pause();
+      if (slide === 13 && st.brollVideo2) st.brollVideo2.pause();
       elapsed += dur;
       setProgress(Math.min(1, elapsed / totalDur));
       setProgLabel(`Recording slide ${slide}/${SLIDES.length}…`);
