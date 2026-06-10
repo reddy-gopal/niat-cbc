@@ -159,12 +159,13 @@ export default function LoginPage() {
         otpRefs.current[0]?.focus();
         return;
       }
-      setIsSuccess(true);
       const query = new URLSearchParams();
       if (result.data?.utmSource) query.set("utm_source", result.data.utmSource);
       if (result.data?.utmMedium) query.set("utm_medium", result.data.utmMedium);
       if (result.data?.utmCampaign) query.set("utm_campaign", result.data.utmCampaign);
       const dashboardUrl = query.size > 0 ? `/dashboard?${query.toString()}` : "/dashboard";
+
+      setIsSuccess(true);
       window.setTimeout(() => {
         router.push(dashboardUrl);
         router.refresh();

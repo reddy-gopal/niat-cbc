@@ -14,6 +14,7 @@ const verifyOtpSchema = z.object({
   bootcampId: z.string().uuid(),
   regionId: z.string().uuid(),
   inviteCode: z.string().optional(),
+  niatBootcampId: z.string().trim().max(50).optional(),
   utmSource: z.string().trim().min(1).max(120).optional(),
   utmMedium: z.string().trim().min(1).max(120).optional(),
   utmCampaign: z.string().trim().min(1).max(120).optional(),
@@ -181,6 +182,7 @@ export async function POST(request: Request) {
           utm_source: parsedUtmSource,
           utm_medium: parsedUtmMedium,
           utm_campaign: parsedUtmCampaign,
+          ...(parsed.data.niatBootcampId ? { niat_bootcamp_id: parsed.data.niatBootcampId } : {}),
         })
         .select(
           "id, section_id, bootcamp_id, region_id, full_name, mobile, utm_source, utm_medium, utm_campaign"
@@ -203,7 +205,6 @@ export async function POST(request: Request) {
       sessionUtmSource = insertedStudent.utm_source;
       sessionUtmMedium = insertedStudent.utm_medium;
       sessionUtmCampaign = insertedStudent.utm_campaign;
-
       const now = new Date().toISOString();
       const baseSubmissions = ACTIVE_TASK_IDS.map((taskId) => ({
         student_id: insertedStudent.id,
