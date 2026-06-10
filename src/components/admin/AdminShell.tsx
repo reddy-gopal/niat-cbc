@@ -12,6 +12,8 @@ import {
   MapPin,
   ScrollText,
   Trophy,
+  Video,
+  Sheet,
 } from "lucide-react";
 import { createClient } from "../../../utils/supabase/client";
 import { Logo } from "../ui/Logo";
@@ -28,6 +30,8 @@ const nav = [
   { href: "/admin/tickets", label: "Tickets", icon: LifeBuoy },
   { href: "/admin/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
+  { href: "/admin/video-stats",      label: "Video Stats",      icon: Video },
+  { href: "/admin/workshop-sheets",  label: "Workshop Sheets",  icon: Sheet },
 ];
 
 export default function AdminShell({ adminEmail, children }: AdminShellProps) {

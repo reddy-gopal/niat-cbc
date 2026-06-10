@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getStudentSession } from "@/lib/session";
 import { createClient } from "../../../../utils/supabase/server";
+import { adminClient } from "../../../../utils/supabase/admin";
 import PersonalVideoClient from "@/components/student/PersonalVideoClient";
 import { resolvePersonalization } from "@/lib/personal-video/getPersonalization";
 import {
@@ -14,22 +15,18 @@ async function signPhotoUrls(
   paths: Record<PhotoKey, string | null>
 ): Promise<PersonalizationPhotos> {
   const result: PersonalizationPhotos = { photo1: null, photo2: null, photo3: null };
-
   for (const key of ["photo1", "photo2", "photo3"] as PhotoKey[]) {
     const path = paths[key];
     if (!path) continue;
     const { data } = await supabase.storage.from("images").createSignedUrl(path, 3600);
     result[key] = data?.signedUrl ?? null;
   }
-
   return result;
 }
 
 export default async function PersonalVideoPage() {
   const session = await getStudentSession();
-  if (!session) {
-    redirect("/");
-  }
+  if (!session) redirect("/");
 
   const supabase = await createClient();
 
@@ -42,7 +39,7 @@ export default async function PersonalVideoPage() {
       .maybeSingle(),
     supabase
       .from("students")
-      .select("full_name, team_id, teams:team_id (name)")
+      .select("full_name, mobile, team_id, niat_bootcamp_id, teams:team_id (name)")
       .eq("id", session.studentId)
       .single(),
   ]);
@@ -54,9 +51,12 @@ export default async function PersonalVideoPage() {
       ? (student.teams as { name: string }).name
       : undefined;
 
-  const personalization = resolvePersonalization({
-    fullName: student?.full_name ?? session.fullName,
-    tribeName: teamName,
+  const personalization = await resolvePersonalization({
+    fullName:        student?.full_name ?? session.fullName,
+    tribeName:       teamName,
+    bootcampId:      session.bootcampId,
+    niatBootcampId:  (student?.niat_bootcamp_id as string | null) ?? undefined,
+    mobile:          (student?.mobile as string | null) ?? session.mobile,
   });
 
   let photos: PersonalizationPhotos = { photo1: null, photo2: null, photo3: null };

@@ -45,6 +45,11 @@ const registerSchema = z.object({
   mobile: z
     .string()
     .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number."),
+  niatBootcampId: z
+    .string()
+    .trim()
+    .max(50)
+    .optional(),
 });
 
 type RegisterValues = z.infer<typeof registerSchema>;
@@ -77,6 +82,7 @@ export default function JoinPage({
   const [formData, setFormData] = useState<{
     fullName: string;
     mobile: string;
+    niatBootcampId?: string;
     requestId?: string;
   } | null>(null);
   const [otpValues, setOtpValues] = useState(["", "", "", ""]);
@@ -105,6 +111,7 @@ export default function JoinPage({
     defaultValues: {
       fullName: "",
       mobile: "",
+      niatBootcampId: "",
     },
   });
 
@@ -181,6 +188,7 @@ export default function JoinPage({
       setFormData({
         fullName: values.fullName,
         mobile: values.mobile,
+        niatBootcampId: values.niatBootcampId || undefined,
         requestId: result.data?.requestId,
       });
       setOtpValues(["", "", "", ""]);
@@ -254,6 +262,7 @@ export default function JoinPage({
           mobile: formData.mobile,
           otp,
           fullName: formData.fullName,
+          niatBootcampId: formData.niatBootcampId,
           sectionId,
           bootcampId,
           regionId,
@@ -460,6 +469,19 @@ export default function JoinPage({
                     {errors.mobile.message}
                   </p>
                 ) : null}
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2">
+                  🪪 NIAT Bootcamp ID
+                </label>
+                <input
+                  {...register("niatBootcampId")}
+                  className="input-field"
+                  placeholder="e.g. NB123456"
+                  disabled={isLoading}
+                  suppressHydrationWarning
+                />
               </div>
 
               <button

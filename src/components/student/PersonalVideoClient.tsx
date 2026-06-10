@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -60,6 +60,10 @@ export default function PersonalVideoClient({
   const router = useRouter();
   const { showToast } = useToast();
   const [photos, setPhotos] = useState<PersonalizationPhotos>(initialPhotos);
+
+  useEffect(() => {
+    fetch("/api/video-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventType: "visit" }) }).catch(() => {});
+  }, []);
   const [uploadingSlot, setUploadingSlot] = useState<PhotoKey | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -113,6 +117,7 @@ export default function PersonalVideoClient({
       });
       const data = await res.json();
       if (data.success) {
+        fetch("/api/video-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventType: "photo_upload" }) }).catch(() => {});
         showToast(`${UPLOAD_SLOTS.find((s) => s.key === slot)?.label} uploaded!`, "success");
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -168,8 +173,8 @@ export default function PersonalVideoClient({
               </span>
             </motion.h1>
             <p className="text-slate-400 text-lg max-w-xl mx-auto font-medium">
-              Upload three photos to star in your personalized NIAT Bootcamp 2026 reel — 12 frames,
-              ~30 seconds, ready to share.
+              Upload three photos to star in your personalized NIAT Bootcamp 2026 reel —
+              30 seconds, ready to share.
             </p>
           </header>
 
