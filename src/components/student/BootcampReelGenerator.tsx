@@ -637,7 +637,7 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
         v.load();
       }
 
-      loadVideoBg('/bootcamp-reel/screen-1-animated-vid.mp4',       v => { stRef.current.brollVideo0 = v; });
+      loadVideoBg('/bootcamp-reel/screen-1-animated-compressed-vid.mp4', v => { stRef.current.brollVideo0 = v; });
       loadVideoBg('/bootcamp-reel/Screen_3-animated-vid.mp4',       v => { stRef.current.brollVideo3 = v; });
       loadVideoBg('/bootcamp-reel/Screen-animated-6-updated.mp4',   v => { stRef.current.brollVideo6 = v; });
       loadVideoBg('/bootcamp-reel/b-1.mp4',                         v => { stRef.current.brollVideo  = v; });
