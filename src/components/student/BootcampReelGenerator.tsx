@@ -9,6 +9,7 @@ const ASSET_BASE = "/bootcamp-reel";
 
 const IMGS_MAP: Record<string, string> = {
   s1:  `${ASSET_BASE}/Screen_1.png`,
+  s3:  `${ASSET_BASE}/Screen_3.png`,
   s4:  `${ASSET_BASE}/Screen_4.png`,
   s5:  `${ASSET_BASE}/Screen_5.png`,
   s6:  `${ASSET_BASE}/Screen_6.png`,
@@ -111,14 +112,24 @@ function scalePhotoHQ(src: HTMLImageElement, maxPx: number): HTMLCanvasElement |
   return scaleHQ(src, Math.round(iw * scale), Math.round(ih * scale));
 }
 
-function loadImg(src: string): Promise<HTMLImageElement | null> {
-  return new Promise(resolve => {
-    if (!src) { resolve(null); return; }
-    const img = new Image();
-    img.onload  = () => resolve(img);
-    img.onerror = () => { console.warn('Could not load:', src); resolve(null); };
-    img.src = src;
-  });
+async function loadImg(src: string): Promise<HTMLImageElement | null> {
+  if (!src) return null;
+  // Use fetch → blob URL to bypass COEP/CORP restrictions on HTML elements
+  try {
+    const res = await fetch(src);
+    if (!res.ok) { console.warn('Could not fetch:', src, res.status); return null; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    return await new Promise<HTMLImageElement | null>(resolve => {
+      const img = new Image();
+      img.onload  = () => resolve(img);
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  } catch (e) {
+    console.warn('Could not load:', src, e);
+    return null;
+  }
 }
 
 // ── Draw slide ────────────────────────────────────────────────────────────────
@@ -199,9 +210,11 @@ function drawSlide(
       break;
     }
     case 3: {
-      // Video background
+      // Video background (fall back to static Screen_3.png if video not ready)
       if (st.brollVideo3 && st.brollVideo3.readyState >= 2) {
         ctx.drawImage(st.brollVideo3, 0, 0, 450, 800);
+      } else if (BASE.s3) {
+        ctx.drawImage(BASE.s3, 0, 0, 450, 800);
       } else {
         ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
       }
@@ -230,6 +243,8 @@ function drawSlide(
     case 4: {
       if (st.brollVideo && st.brollVideo.readyState >= 2) {
         ctx.drawImage(st.brollVideo, 0, 0, 450, 800);
+      } else if (BASE.s4) {
+        ctx.drawImage(BASE.s4, 0, 0, 450, 800);
       } else {
         ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
       }
@@ -238,6 +253,8 @@ function drawSlide(
     case 13: {
       if (st.brollVideo2 && st.brollVideo2.readyState >= 2) {
         ctx.drawImage(st.brollVideo2, 0, 0, 450, 800);
+      } else if (BASE.s12) {
+        ctx.drawImage(BASE.s12, 0, 0, 450, 800);
       } else {
         ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
       }
@@ -579,8 +596,10 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
       setLoaded(true);
 
       // Load B-roll videos in background (non-blocking)
+      // crossOrigin='anonymous' puts the request in CORS mode which COEP always allows
       function loadVideoBg(src: string, onReady: (v: HTMLVideoElement) => void) {
         const v = document.createElement('video');
+        v.crossOrigin = 'anonymous';
         v.src = src; v.preload = 'auto'; v.muted = true; v.playsInline = true; v.loop = true;
         let resolved = false;
         const resolve = () => {
@@ -589,12 +608,32 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
           if (v.readyState >= 2) {
             v.currentTime = 0;
             v.onseeked = () => { v.onseeked = null; onReady(v); };
-            setTimeout(() => { if (v.onseeked) { v.onseeked = null; onReady(v); } }, 1000);
+            setTimeout(() => { if (v.onseeked) { v.onseeked = null; onReady(v); } }, 2000);
+          } else {
+            onReady(v);
           }
         };
         v.onloadeddata     = resolve;
         v.oncanplaythrough = resolve;
-        v.onerror = () => console.warn('[broll] failed to load:', src);
+        v.onerror = () => {
+          console.warn('[broll] video element failed, retrying via fetch blob URL:', src);
+          // Nuclear fallback: fetch as blob URL (bypasses all COEP/CORP)
+          fetch(src).then(r => r.blob()).then(blob => {
+            const blobUrl = URL.createObjectURL(blob);
+            const v2 = document.createElement('video');
+            v2.src = blobUrl; v2.preload = 'auto'; v2.muted = true; v2.playsInline = true; v2.loop = true;
+            let r2 = false;
+            const res2 = () => {
+              if (r2) return; r2 = true;
+              v2.currentTime = 0;
+              v2.onseeked = () => { v2.onseeked = null; onReady(v2); };
+              setTimeout(() => { if (v2.onseeked) { v2.onseeked = null; onReady(v2); } }, 2000);
+            };
+            v2.onloadeddata = res2; v2.oncanplaythrough = res2;
+            v2.onerror = () => console.warn('[broll] blob fallback also failed:', src);
+            v2.load();
+          }).catch(() => console.warn('[broll] fetch fallback failed:', src));
+        };
         v.load();
       }
 
