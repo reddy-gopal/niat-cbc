@@ -9,7 +9,6 @@ const ASSET_BASE = "/bootcamp-reel";
 
 const IMGS_MAP: Record<string, string> = {
   s1:  `${ASSET_BASE}/Screen_1.png`,
-  s3:  `${ASSET_BASE}/Screen_3.png`,
   s4:  `${ASSET_BASE}/Screen_4.png`,
   s5:  `${ASSET_BASE}/Screen_5.png`,
   s6:  `${ASSET_BASE}/Screen_6.png`,
@@ -18,11 +17,12 @@ const IMGS_MAP: Record<string, string> = {
   s10: `${ASSET_BASE}/Screen_10.png`,
   s11: `${ASSET_BASE}/Screen_11.png`,
   s12: `${ASSET_BASE}/Screen_12.png`,
+  s14: `${ASSET_BASE}/Screen-last.png`,
 };
 
 const SLIDES: [number, number][] = [
-  [1,4],[3,4],[4,10],[5,4],[6,4],[13,10],
-  [7,6],[8,4],[10,4],[11,4],[12,8]
+  [1,4],[3,4],[4,10],[6,4],[13,10],
+  [7,6],[8,4],[10,4],[11,4],[12,8],[14,5]
 ];
 
 const FPS = 30;
@@ -43,6 +43,9 @@ interface ReelState {
   previewRunning: boolean;
   isRecording: boolean;
   audioBuf: ArrayBuffer | null;
+  brollVideo0: HTMLVideoElement | null;
+  brollVideo3: HTMLVideoElement | null;
+  brollVideo6: HTMLVideoElement | null;
   brollVideo: HTMLVideoElement | null;
   brollVideo2: HTMLVideoElement | null;
 }
@@ -182,16 +185,38 @@ function drawSlide(
 
   switch (slide) {
     case 1: {
-      const sc = 1 + 0.04 * eo(t);
-      ctx.save();
-      ctx.translate(225, 400); ctx.scale(sc, sc); ctx.translate(-225, -400);
-      if (BASE.s1) ctx.drawImage(BASE.s1, 0, 0, 450, 800);
-      ctx.restore();
+      if (st.brollVideo0 && st.brollVideo0.readyState >= 3) {
+        ctx.drawImage(st.brollVideo0, 0, 0, 450, 800);
+      } else if (BASE.s1) {
+        const sc = 1 + 0.04 * eo(t);
+        ctx.save();
+        ctx.translate(225, 400); ctx.scale(sc, sc); ctx.translate(-225, -400);
+        ctx.drawImage(BASE.s1, 0, 0, 450, 800);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
+      }
       break;
     }
     case 3: {
-      drawPhotoOnTemplate(BASE.s3 ?? null, uImgs[0] ?? null, 51, 110, 348, 466, 18);
-      const na = sub(0.5, 0.85);
+      // Video background
+      if (st.brollVideo3 && st.brollVideo3.readyState >= 3) {
+        ctx.drawImage(st.brollVideo3, 0, 0, 450, 800);
+      } else {
+        ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
+      }
+      // Photo clipped into frame area
+      ctx.save();
+      roundRect(ctx, 51, 110, 348, 466, 18); ctx.clip();
+      if (uImgs[0]) {
+        const { sx, sy, sw, sh } = coverFit(uImgs[0], 348, 466);
+        ctx.drawImage(uImgs[0], sx, sy, sw, sh, 51, 110, 348, 466);
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(51, 110, 348, 466);
+      }
+      ctx.restore();
+      // Name text fade-in
+      const na = sub(0.2, 0.55);
       ctx.save();
       ctx.textAlign = 'center';
       ctx.font = 'bold 28px "Segoe UI",sans-serif';
@@ -203,7 +228,7 @@ function drawSlide(
       break;
     }
     case 4: {
-      if (st.brollVideo && st.brollVideo.readyState >= 2) {
+      if (st.brollVideo && st.brollVideo.readyState >= 3) {
         ctx.drawImage(st.brollVideo, 0, 0, 450, 800);
       } else {
         ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
@@ -211,7 +236,7 @@ function drawSlide(
       break;
     }
     case 13: {
-      if (st.brollVideo2 && st.brollVideo2.readyState >= 2) {
+      if (st.brollVideo2 && st.brollVideo2.readyState >= 3) {
         ctx.drawImage(st.brollVideo2, 0, 0, 450, 800);
       } else {
         ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
@@ -222,7 +247,26 @@ function drawSlide(
       if (BASE.s5) ctx.drawImage(BASE.s5, 0, 0, 450, 800);
       break;
     case 6: {
-      if (BASE.s6) ctx.drawImage(BASE.s6, 0, 0, 450, 800);
+      if (st.brollVideo6 && st.brollVideo6.readyState >= 3) {
+        ctx.drawImage(st.brollVideo6, 0, 0, 450, 800);
+      } else if (BASE.s6) {
+        ctx.drawImage(BASE.s6, 0, 0, 450, 800);
+      }
+      // "Your Most Loved Workshop" heading (replaces slide 5)
+      const ha = sub(0, 0.25);
+      ctx.save();
+      ctx.font = '600 35px Sora, "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      const hLineH = 42;
+      const hg = ctx.createLinearGradient(400, 70, 50, 125);
+      hg.addColorStop(0, '#A8030C');
+      hg.addColorStop(0.76, '#ffffff');
+      hg.addColorStop(1, '#ffffff');
+      ctx.fillStyle = hg;
+      ctx.globalAlpha = ha;
+      ctx.fillText('Your Most', 225, 78);
+      ctx.fillText('Loved Workshop', 225, 78 + hLineH);
+      ctx.restore();
       const cameWords = copy.cameFor.split(' ');
       const midIdx6   = Math.floor(cameWords.length / 2);
       const lineH6    = 54;
@@ -251,7 +295,20 @@ function drawSlide(
       break;
     }
     case 7: {
-      drawPhotoOnTemplate(BASE.s7 ?? null, uImgs[1] ?? null, 51, 110, 348, 466, 18);
+      if (st.brollVideo3 && st.brollVideo3.readyState >= 3) {
+        ctx.drawImage(st.brollVideo3, 0, 0, 450, 800);
+      } else if (BASE.s7) {
+        ctx.drawImage(BASE.s7, 0, 0, 450, 800);
+      }
+      ctx.save();
+      roundRect(ctx, 51, 110, 348, 466, 18); ctx.clip();
+      if (uImgs[1]) {
+        const { sx, sy, sw, sh } = coverFit(uImgs[1], 348, 466);
+        ctx.drawImage(uImgs[1], sx, sy, sw, sh, 51, 110, 348, 466);
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(51, 110, 348, 466);
+      }
+      ctx.restore();
       // Tribe name just below the photo
       const na = sub(0.5, 0.82);
       ctx.save(); ctx.textAlign = 'center';
@@ -269,8 +326,12 @@ function drawSlide(
       // Friendship line — two lines at the bottom
       const qa = sub(0.65, 0.92);
       ctx.save(); ctx.textAlign = 'center';
-      ctx.font = 'italic 26px "Segoe UI",sans-serif';
-      ctx.fillStyle = '#f0e6e6'; ctx.globalAlpha = qa;
+      ctx.font = '600 italic 26px Sora, "Segoe UI", sans-serif';
+      const fqg = ctx.createLinearGradient(400, 716, 50, 750);
+      fqg.addColorStop(0, '#A8030C');
+      fqg.addColorStop(0.76, '#ffffff');
+      fqg.addColorStop(1, '#ffffff');
+      ctx.fillStyle = fqg; ctx.globalAlpha = qa;
       ctx.translate(0, (1 - qa) * 14);
       ctx.fillText('Made friendships that', 225, 716);
       ctx.fillText('stayed beyond the workshop.', 225, 750);
@@ -284,9 +345,32 @@ function drawSlide(
       ctx.restore();
       break;
     }
-    case 10:
-      drawPhotoOnTemplate(BASE.s10 ?? null, uImgs[2] ?? null, 51, 110, 348, 580, 18);
+    case 10: {
+      if (st.brollVideo3 && st.brollVideo3.readyState >= 3) {
+        ctx.drawImage(st.brollVideo3, 0, 0, 450, 800);
+      } else if (BASE.s10) {
+        ctx.drawImage(BASE.s10, 0, 0, 450, 800);
+      }
+      ctx.save();
+      roundRect(ctx, 51, 110, 348, 580, 18); ctx.clip();
+      if (uImgs[2]) {
+        const { sx, sy, sw, sh } = coverFit(uImgs[2], 348, 580);
+        ctx.drawImage(uImgs[2], sx, sy, sw, sh, 51, 110, 348, 580);
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(51, 110, 348, 580);
+      }
+      ctx.restore();
+      // Gentle photo reveal
+      const pr10 = sub(0, 0.4);
+      if (pr10 < 0.99) {
+        ctx.save();
+        ctx.globalAlpha = (1 - pr10) * 0.85;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(51, 110, 348, 580);
+        ctx.restore();
+      }
       break;
+    }
     case 11: {
       if (BASE.s11) ctx.drawImage(BASE.s11, 0, 0, 450, 800);
       const sections = [
@@ -326,17 +410,23 @@ function drawSlide(
       });
       break;
     }
+    case 14: {
+      if (BASE.s14) ctx.drawImage(BASE.s14, 0, 0, 450, 800);
+      break;
+    }
     default:
       ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
   }
 
-  // Global fade-in from black
+  // Global fade-in / fade-out envelope for smooth slide transitions
   {
-    const fi = Math.max(0, Math.min(1, t / 0.18));
-    if (fi < 1) {
+    const fi = 1 - Math.pow(Math.min(1, t / 0.15), 3);   // fade in from black
+    const fo = Math.pow(Math.max(0, (t - 0.85) / 0.15), 3); // fade out to black
+    const fa = Math.max(fi, fo);
+    if (fa > 0.005) {
       ctx.save();
       ctx.fillStyle = '#000';
-      ctx.globalAlpha = (1 - Math.pow(fi, 3));
+      ctx.globalAlpha = fa;
       ctx.fillRect(0, 0, 450, 800);
       ctx.restore();
     }
@@ -428,7 +518,7 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
     recBlob: null, recExt: 'mp4',
     pvCtx: null, recCtx: null, activeCtx: null,
     previewRunning: false, isRecording: false,
-    audioBuf: null, brollVideo: null, brollVideo2: null,
+    audioBuf: null, brollVideo0: null, brollVideo3: null, brollVideo6: null, brollVideo: null, brollVideo2: null,
   });
 
   const [loaded, setLoaded]           = useState(false);
@@ -481,7 +571,7 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
 
       // Load BGM
       try {
-        const audioRes = await fetch('/bootcamp-reel/cbc-bgm.wav');
+        const audioRes = await fetch('/bootcamp-reel/Bootcamp-Audio.wav');
         stRef.current.audioBuf = await audioRes.arrayBuffer();
       } catch { /* audio optional */ }
 
@@ -489,24 +579,42 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
       async function loadVideo(src: string): Promise<HTMLVideoElement | null> {
         try {
           const v = document.createElement('video');
-          v.src = src; v.preload = 'auto'; v.muted = true; v.playsInline = true;
+          v.src = src; v.preload = 'auto'; v.muted = true; v.playsInline = true; v.loop = true;
+          v.load();
+          // Wait for first frame data
           await new Promise<void>(resolve => {
+            v.onloadeddata     = () => resolve();
             v.oncanplaythrough = () => resolve();
-            v.onerror = () => resolve();
-            setTimeout(resolve, 5000);
+            v.onerror          = () => resolve();
+            setTimeout(resolve, 10000);
           });
+          // Seek to 0 to guarantee a decoded frame is ready for drawImage
+          if (v.readyState >= 2) {
+            v.currentTime = 0;
+            await new Promise<void>(resolve => {
+              v.onseeked = () => resolve();
+              setTimeout(resolve, 1000);
+            });
+          }
           return v;
         } catch { return null; }
       }
-      const [broll1, broll2] = await Promise.all([
-        loadVideo('/bootcamp-reel/cbc-broll.mp4'),
-        loadVideo('/bootcamp-reel/cbc-broll-2.mp4'),
+      const [broll0, broll3, broll6, broll1, broll2] = await Promise.all([
+        loadVideo('/bootcamp-reel/screen-1-animated-vid.mp4'),
+        loadVideo('/bootcamp-reel/Screen_3-animated-vid.mp4'),
+        loadVideo('/bootcamp-reel/Screen-animated-6-updated.mp4'),
+        loadVideo('/bootcamp-reel/b-1.mp4'),
+        loadVideo('/bootcamp-reel/b-2.mp4'),
       ]);
+      stRef.current.brollVideo0 = broll0;
+      stRef.current.brollVideo3 = broll3;
+      stRef.current.brollVideo6 = broll6;
       stRef.current.brollVideo  = broll1;
       stRef.current.brollVideo2 = broll2;
+      console.log('[broll] readyStates — s1:', broll0?.readyState, 's3:', broll3?.readyState, 's6:', broll6?.readyState, 's4:', broll1?.readyState, 's13:', broll2?.readyState);
 
       stRef.current.activeCtx = pvCtx;
-      drawSlide(1, 1, stRef.current, copy);
+      drawSlide(11, 0.5, stRef.current, copy);
       setLoaded(true);
     }
 
@@ -551,10 +659,14 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
       const blob = new Blob([st.audioBuf], { type: 'audio/wav' });
       previewAudioUrl = URL.createObjectURL(blob);
       previewAudio = new Audio(previewAudioUrl);
+      previewAudio.loop = true;
       previewAudio.play().catch(() => {});
     }
 
     for (const [slide, dur] of SLIDES) {
+      if (slide === 1  && st.brollVideo0) { st.brollVideo0.currentTime = 0; st.brollVideo0.play().catch(() => {}); }
+      if ((slide === 3 || slide === 7 || slide === 10) && st.brollVideo3) { st.brollVideo3.currentTime = 0; st.brollVideo3.play().catch(() => {}); }
+      if (slide === 6  && st.brollVideo6) { st.brollVideo6.currentTime = 0; st.brollVideo6.play().catch(() => {}); }
       if (slide === 4  && st.brollVideo)  { st.brollVideo.currentTime  = 0; st.brollVideo.play().catch(() => {}); }
       if (slide === 13 && st.brollVideo2) { st.brollVideo2.currentTime = 0; st.brollVideo2.play().catch(() => {}); }
       const durMs = dur * 1000;
@@ -568,6 +680,9 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
         }
         requestAnimationFrame(frame);
       });
+      if (slide === 1  && st.brollVideo0) st.brollVideo0.pause();
+      if ((slide === 3 || slide === 7 || slide === 10) && st.brollVideo3) st.brollVideo3.pause();
+      if (slide === 6  && st.brollVideo6) st.brollVideo6.pause();
       if (slide === 4  && st.brollVideo)  st.brollVideo.pause();
       if (slide === 13 && st.brollVideo2) st.brollVideo2.pause();
     }
@@ -611,6 +726,7 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
         const dest = audioCtx.createMediaStreamDestination();
         audioSource = audioCtx.createBufferSource();
         audioSource.buffer = decoded;
+        audioSource.loop = true;
         audioSource.connect(dest);
         audioSource.start();
         dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
@@ -634,17 +750,26 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
     recorder.start();
 
-    const waitFrame = () => new Promise<void>(r => requestAnimationFrame(() => r()));
-
     for (const [slide, dur] of SLIDES) {
+      if (slide === 1  && st.brollVideo0) { st.brollVideo0.currentTime = 0; st.brollVideo0.play().catch(() => {}); }
+      if ((slide === 3 || slide === 7 || slide === 10) && st.brollVideo3) { st.brollVideo3.currentTime = 0; st.brollVideo3.play().catch(() => {}); }
+      if (slide === 6  && st.brollVideo6) { st.brollVideo6.currentTime = 0; st.brollVideo6.play().catch(() => {}); }
       if (slide === 4  && st.brollVideo)  { st.brollVideo.currentTime  = 0; st.brollVideo.play().catch(() => {}); }
       if (slide === 13 && st.brollVideo2) { st.brollVideo2.currentTime = 0; st.brollVideo2.play().catch(() => {}); }
-      const frames = Math.ceil(dur * FPS);
-      for (let f = 0; f < frames; f++) {
-        const t = frames > 1 ? f / (frames - 1) : 1;
-        drawSlide(slide, t, st, copy);
-        await waitFrame();
-      }
+      const durMs = dur * 1000;
+      await new Promise<void>(resolve => {
+        const startMs = performance.now();
+        function frame() {
+          const t = Math.min(1, (performance.now() - startMs) / durMs);
+          drawSlide(slide, t, st, copy);
+          if (t < 1) requestAnimationFrame(frame);
+          else resolve();
+        }
+        requestAnimationFrame(frame);
+      });
+      if (slide === 1  && st.brollVideo0) st.brollVideo0.pause();
+      if ((slide === 3 || slide === 7 || slide === 10) && st.brollVideo3) st.brollVideo3.pause();
+      if (slide === 6  && st.brollVideo6) st.brollVideo6.pause();
       if (slide === 4  && st.brollVideo)  st.brollVideo.pause();
       if (slide === 13 && st.brollVideo2) st.brollVideo2.pause();
       elapsed += dur;
