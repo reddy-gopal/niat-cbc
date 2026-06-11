@@ -21,8 +21,8 @@ const IMGS_MAP: Record<string, string> = {
 };
 
 const SLIDES: [number, number][] = [
-  [1,4],[3,4],[4,10],[6,4],[13,10],
-  [7,6],[8,4],[10,4],[11,4],[12,8],[14,5]
+  [1,4],[3,4],[4,4],[6,4],[13,4],
+  [7,4],[8,4],[10,4],[11,4],[12,5],[14,3]
 ];
 
 const FPS = 30;
@@ -185,7 +185,7 @@ function drawSlide(
 
   switch (slide) {
     case 1: {
-      if (st.brollVideo0 && st.brollVideo0.readyState >= 3) {
+      if (st.brollVideo0 && st.brollVideo0.readyState >= 2) {
         ctx.drawImage(st.brollVideo0, 0, 0, 450, 800);
       } else if (BASE.s1) {
         const sc = 1 + 0.04 * eo(t);
@@ -200,7 +200,7 @@ function drawSlide(
     }
     case 3: {
       // Video background
-      if (st.brollVideo3 && st.brollVideo3.readyState >= 3) {
+      if (st.brollVideo3 && st.brollVideo3.readyState >= 2) {
         ctx.drawImage(st.brollVideo3, 0, 0, 450, 800);
       } else {
         ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
@@ -228,7 +228,7 @@ function drawSlide(
       break;
     }
     case 4: {
-      if (st.brollVideo && st.brollVideo.readyState >= 3) {
+      if (st.brollVideo && st.brollVideo.readyState >= 2) {
         ctx.drawImage(st.brollVideo, 0, 0, 450, 800);
       } else {
         ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
@@ -236,7 +236,7 @@ function drawSlide(
       break;
     }
     case 13: {
-      if (st.brollVideo2 && st.brollVideo2.readyState >= 3) {
+      if (st.brollVideo2 && st.brollVideo2.readyState >= 2) {
         ctx.drawImage(st.brollVideo2, 0, 0, 450, 800);
       } else {
         ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
@@ -247,7 +247,7 @@ function drawSlide(
       if (BASE.s5) ctx.drawImage(BASE.s5, 0, 0, 450, 800);
       break;
     case 6: {
-      if (st.brollVideo6 && st.brollVideo6.readyState >= 3) {
+      if (st.brollVideo6 && st.brollVideo6.readyState >= 2) {
         ctx.drawImage(st.brollVideo6, 0, 0, 450, 800);
       } else if (BASE.s6) {
         ctx.drawImage(BASE.s6, 0, 0, 450, 800);
@@ -295,7 +295,7 @@ function drawSlide(
       break;
     }
     case 7: {
-      if (st.brollVideo3 && st.brollVideo3.readyState >= 3) {
+      if (st.brollVideo3 && st.brollVideo3.readyState >= 2) {
         ctx.drawImage(st.brollVideo3, 0, 0, 450, 800);
       } else if (BASE.s7) {
         ctx.drawImage(BASE.s7, 0, 0, 450, 800);
@@ -346,7 +346,7 @@ function drawSlide(
       break;
     }
     case 10: {
-      if (st.brollVideo3 && st.brollVideo3.readyState >= 3) {
+      if (st.brollVideo3 && st.brollVideo3.readyState >= 2) {
         ctx.drawImage(st.brollVideo3, 0, 0, 450, 800);
       } else if (BASE.s10) {
         ctx.drawImage(BASE.s10, 0, 0, 450, 800);
@@ -418,15 +418,13 @@ function drawSlide(
       ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
   }
 
-  // Global fade-in / fade-out envelope for smooth slide transitions
+  // Subtle fade-in only — no fade-out to avoid black screens between slides
   {
-    const fi = 1 - Math.pow(Math.min(1, t / 0.15), 3);   // fade in from black
-    const fo = Math.pow(Math.max(0, (t - 0.85) / 0.15), 3); // fade out to black
-    const fa = Math.max(fi, fo);
-    if (fa > 0.005) {
+    const fi = 1 - Math.pow(Math.min(1, t / 0.06), 3);
+    if (fi > 0.005) {
       ctx.save();
       ctx.fillStyle = '#000';
-      ctx.globalAlpha = fa;
+      ctx.globalAlpha = fi;
       ctx.fillRect(0, 0, 450, 800);
       ctx.restore();
     }
