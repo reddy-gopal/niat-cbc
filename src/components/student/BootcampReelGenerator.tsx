@@ -852,28 +852,6 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }, [copy.fullName]);
 
-  const handleShareNative = useCallback(async () => {
-    const st = stRef.current;
-    fetch("/api/video-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventType: "share" }) }).catch(() => {});
-    const shareText = `🎬 I just created my personalized NIAT Bootcamp 2026 reel! #NIATBootcamp2026`;
-    if (st.recBlob) {
-      const file = new File([st.recBlob], `NIAT_Bootcamp_2026_${copy.fullName.replace(/\s+/g, '_')}.mp4`, { type: 'video/mp4' });
-      if (navigator.canShare?.({ files: [file] })) {
-        try {
-          await navigator.share({ title: 'My NIAT Bootcamp 2026 Reel', text: shareText, files: [file] });
-          return;
-        } catch (err) {
-          if ((err as DOMException).name !== 'AbortError') {
-            // share failed, fall through
-          } else {
-            return; // user cancelled
-          }
-        }
-      }
-    }
-    window.open(`https://wa.me/?text=${encodeURIComponent('🎬 I just created my personalized NIAT Bootcamp 2026 reel! #NIATBootcamp2026')}`, '_blank');
-  }, [copy.fullName]);
-
   const handleShareWhatsApp = useCallback(async () => {
     const st = stRef.current;
     if (!st.recBlob) return;
@@ -966,7 +944,7 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
               </button>
               <button
                 type="button"
-                onClick={handleShareNative}
+                onClick={handleShareWhatsApp}
                 className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#25D366] text-white font-semibold text-sm hover:opacity-85 transition"
               >
                 <Share2 className="w-4 h-4" /> Share My Reel
