@@ -113,8 +113,8 @@ function scalePhotoHQ(src: HTMLImageElement, maxPx: number): HTMLCanvasElement |
 
 function loadImg(src: string): Promise<HTMLImageElement | null> {
   return new Promise(resolve => {
+    if (!src) { resolve(null); return; }
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload  = () => resolve(img);
     img.onerror = () => { console.warn('Could not load:', src); resolve(null); };
     img.src = src;
@@ -573,47 +573,36 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
         stRef.current.audioBuf = await audioRes.arrayBuffer();
       } catch { /* audio optional */ }
 
-      // Load B-roll videos
-      async function loadVideo(src: string): Promise<HTMLVideoElement | null> {
-        try {
-          const v = document.createElement('video');
-          v.src = src; v.preload = 'auto'; v.muted = true; v.playsInline = true; v.loop = true;
-          v.load();
-          // Wait for first frame data
-          await new Promise<void>(resolve => {
-            v.onloadeddata     = () => resolve();
-            v.oncanplaythrough = () => resolve();
-            v.onerror          = () => resolve();
-            setTimeout(resolve, 10000);
-          });
-          // Seek to 0 to guarantee a decoded frame is ready for drawImage
-          if (v.readyState >= 2) {
-            v.currentTime = 0;
-            await new Promise<void>(resolve => {
-              v.onseeked = () => resolve();
-              setTimeout(resolve, 1000);
-            });
-          }
-          return v;
-        } catch { return null; }
-      }
-      const [broll0, broll3, broll6, broll1, broll2] = await Promise.all([
-        loadVideo('/bootcamp-reel/screen-1-animated-vid.mp4'),
-        loadVideo('/bootcamp-reel/Screen_3-animated-vid.mp4'),
-        loadVideo('/bootcamp-reel/Screen-animated-6-updated.mp4'),
-        loadVideo('/bootcamp-reel/b-1.mp4'),
-        loadVideo('/bootcamp-reel/b-2.mp4'),
-      ]);
-      stRef.current.brollVideo0 = broll0;
-      stRef.current.brollVideo3 = broll3;
-      stRef.current.brollVideo6 = broll6;
-      stRef.current.brollVideo  = broll1;
-      stRef.current.brollVideo2 = broll2;
-      console.log('[broll] readyStates — s1:', broll0?.readyState, 's3:', broll3?.readyState, 's6:', broll6?.readyState, 's4:', broll1?.readyState, 's13:', broll2?.readyState);
-
+      // Show UI immediately — videos load in background and swap in when ready
       stRef.current.activeCtx = pvCtx;
       drawSlide(11, 0.5, stRef.current, copy);
       setLoaded(true);
+
+      // Load B-roll videos in background (non-blocking)
+      function loadVideoBg(src: string, onReady: (v: HTMLVideoElement) => void) {
+        const v = document.createElement('video');
+        v.src = src; v.preload = 'auto'; v.muted = true; v.playsInline = true; v.loop = true;
+        let resolved = false;
+        const resolve = () => {
+          if (resolved) return;
+          resolved = true;
+          if (v.readyState >= 2) {
+            v.currentTime = 0;
+            v.onseeked = () => { v.onseeked = null; onReady(v); };
+            setTimeout(() => { if (v.onseeked) { v.onseeked = null; onReady(v); } }, 1000);
+          }
+        };
+        v.onloadeddata     = resolve;
+        v.oncanplaythrough = resolve;
+        v.onerror = () => console.warn('[broll] failed to load:', src);
+        v.load();
+      }
+
+      loadVideoBg('/bootcamp-reel/screen-1-animated-vid.mp4',       v => { stRef.current.brollVideo0 = v; });
+      loadVideoBg('/bootcamp-reel/Screen_3-animated-vid.mp4',       v => { stRef.current.brollVideo3 = v; });
+      loadVideoBg('/bootcamp-reel/Screen-animated-6-updated.mp4',   v => { stRef.current.brollVideo6 = v; });
+      loadVideoBg('/bootcamp-reel/b-1.mp4',                         v => { stRef.current.brollVideo  = v; });
+      loadVideoBg('/bootcamp-reel/b-2.mp4',                         v => { stRef.current.brollVideo2 = v; });
     }
 
     init();
