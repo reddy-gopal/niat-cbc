@@ -51,10 +51,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const noopToast: ToastContextValue = { showToast: () => {} };
+
 export function useToast() {
-  const ctx = useContext(ToastContext);
-  if (!ctx) {
-    throw new Error("useToast must be used within ToastProvider");
-  }
-  return ctx;
+  // During SSR, client-component contexts don't thread through server component
+  // boundaries in Next.js App Router — return a no-op so SSR doesn't throw.
+  return useContext(ToastContext) ?? noopToast;
 }
