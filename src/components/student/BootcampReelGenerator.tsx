@@ -8,7 +8,6 @@ import type { PersonalizationPhotos } from "@/lib/personal-video/personalization
 const ASSET_BASE = "/bootcamp-reel";
 
 const IMGS_MAP: Record<string, string> = {
-  s1:  `${ASSET_BASE}/Screen_1.png`,
   s3:  `${ASSET_BASE}/Screen_3.png`,
   s4:  `${ASSET_BASE}/Screen_4.png`,
   s5:  `${ASSET_BASE}/Screen_5.png`,
@@ -198,12 +197,6 @@ function drawSlide(
     case 1: {
       if (st.brollVideo0 && st.brollVideo0.readyState >= 2) {
         ctx.drawImage(st.brollVideo0, 0, 0, 450, 800);
-      } else if (BASE.s1) {
-        const sc = 1 + 0.04 * eo(t);
-        ctx.save();
-        ctx.translate(225, 400); ctx.scale(sc, sc); ctx.translate(-225, -400);
-        ctx.drawImage(BASE.s1, 0, 0, 450, 800);
-        ctx.restore();
       } else {
         ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, 450, 800);
       }
