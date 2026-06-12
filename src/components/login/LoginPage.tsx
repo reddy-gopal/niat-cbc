@@ -6,6 +6,11 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Logo } from "@/components/ui/Logo";
+import {
+  consumePostLoginRedirect,
+  isSafeRedirectPath,
+  setPostLoginRedirect,
+} from "@/lib/post-login-redirect";
 
 type SendResponse = {
   success: boolean;
@@ -43,6 +48,7 @@ export default function LoginPage() {
   const [otpValues, setOtpValues] = useState(["", "", "", ""]);
   const [countdown, setCountdown] = useState(30);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("Signed in. Opening dashboard…");
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const {
@@ -54,6 +60,15 @@ export default function LoginPage() {
     resolver: zodResolver(mobileSchema),
     defaultValues: { mobile: "" },
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const returnTo = params.get("returnTo");
+    if (returnTo && isSafeRedirectPath(returnTo)) {
+      setPostLoginRedirect(returnTo);
+      router.replace("/", { scroll: false });
+    }
+  }, [router]);
 
   useEffect(() => {
     if (step !== "verify" || countdown <= 0) {
@@ -164,10 +179,15 @@ export default function LoginPage() {
       if (result.data?.utmMedium) query.set("utm_medium", result.data.utmMedium);
       if (result.data?.utmCampaign) query.set("utm_campaign", result.data.utmCampaign);
       const dashboardUrl = query.size > 0 ? `/dashboard?${query.toString()}` : "/dashboard";
+      const storedRedirect = consumePostLoginRedirect();
+      const targetUrl = storedRedirect ?? dashboardUrl;
 
+      setSuccessMessage(
+        storedRedirect ? "Signed in. Opening your page…" : "Signed in. Opening dashboard…"
+      );
       setIsSuccess(true);
       window.setTimeout(() => {
-        router.push(dashboardUrl);
+        router.push(targetUrl);
         router.refresh();
       }, 800);
     } catch {
@@ -213,7 +233,7 @@ export default function LoginPage() {
 
         {isSuccess ? (
           <div className="bg-[var(--status-accepted-bg)] text-[var(--status-accepted-text)] p-6 rounded-2xl text-center">
-            <p className="font-heading font-bold text-lg">Signed in. Opening dashboard…</p>
+            <p className="font-heading font-bold text-lg">{successMessage}</p>
           </div>
         ) : step === "phone" ? (
           <form onSubmit={handleSubmit(onPhoneSubmit)} className="space-y-5">

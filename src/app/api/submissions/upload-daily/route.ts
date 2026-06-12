@@ -6,6 +6,7 @@ import { adminClient } from "../../../../../utils/supabase/admin";
 import { env } from "@/lib/env";
 import { getStartOfTodayIso } from "@/lib/calendar-day";
 import { normalizeInstagramHandleInput } from "@/lib/instagram-handle";
+import { parseModelJsonText } from "@/lib/parse-model-json";
 
 const TASK_ID = 6;
 const CHALLENGE = CHALLENGES.find((c) => c.id === TASK_ID)!;
@@ -24,16 +25,21 @@ function coerceBoolean(value: unknown, fallback = false): boolean {
   return fallback;
 }
 
-function parseAiDailyResponse(raw: string): AIResponse {
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
-  return {
-    is_instagram: coerceBoolean(parsed.is_instagram),
-    is_post_or_story: coerceBoolean(parsed.is_post_or_story),
-    has_required_tags: coerceBoolean(parsed.has_required_tags),
-    is_own_post: coerceBoolean(parsed.is_own_post),
-    feedback: typeof parsed.feedback === "string" ? parsed.feedback : "",
-    rejection_reason: typeof parsed.rejection_reason === "string" ? parsed.rejection_reason : "",
-  };
+function parseAiDailyResponse(raw: string): AIResponse | null {
+  try {
+    const parsed = parseModelJsonText<Record<string, unknown>>(raw);
+    return {
+      is_instagram: coerceBoolean(parsed.is_instagram),
+      is_post_or_story: coerceBoolean(parsed.is_post_or_story),
+      has_required_tags: coerceBoolean(parsed.has_required_tags),
+      is_own_post: coerceBoolean(parsed.is_own_post),
+      feedback: typeof parsed.feedback === "string" ? parsed.feedback : "",
+      rejection_reason:
+        typeof parsed.rejection_reason === "string" ? parsed.rejection_reason : "",
+    };
+  } catch {
+    return null;
+  }
 }
 
 function friendlyRejectionMessage(parsed: AIResponse, expectedUsername: string): string {
@@ -149,14 +155,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Failed to upload file." }, { status: 500 });
     }
 
-    // 4. Get signed URL for AI
-    const { data: signedData, error: signedError } = await adminClient.storage
-      .from("submissions")
-      .createSignedUrl(storagePath, 60);
+    const mediaType = file.type === "image/png" ? "image/png" : "image/jpeg";
+    const imageBase64 = buffer.toString("base64");
 
-    if (signedError || !signedData?.signedUrl) {
-      return NextResponse.json({ success: false, error: "Unable to read submission file." }, { status: 500 });
-    }
+    // 4. Next attempt number (must be globally unique per student/task — not reset daily)
+    const { data: lastAttempt } = await adminClient
+      .from("submission_attempts")
+      .select("attempt_number")
+      .eq("student_id", session.studentId)
+      .eq("task_id", TASK_ID)
+      .order("attempt_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const attemptNumber = (lastAttempt?.attempt_number ?? 0) + 1;
 
     // 5. Call AI
     const aiPrompt = `You verify a NIAT bootcamp student's Instagram post screenshot. Be student-friendly: if the post clearly qualifies, ACCEPT.
@@ -217,8 +229,9 @@ rejection_reason: first failed check name, or "" if all pass. Order: is_instagra
               {
                 type: "image",
                 source: {
-                  type: "url",
-                  url: signedData.signedUrl,
+                  type: "base64",
+                  media_type: mediaType,
+                  data: imageBase64,
                 },
               },
             ],
@@ -228,14 +241,24 @@ rejection_reason: first failed check name, or "" if all pass. Order: is_instagra
     });
 
     if (!anthropicResponse.ok) {
-      throw new Error("Anthropic request failed.");
+      const errBody = await anthropicResponse.text().catch(() => "");
+      console.error("Anthropic request failed:", anthropicResponse.status, errBody);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Verification is temporarily unavailable. Please try again in a few minutes.",
+        },
+        { status: 503 }
+      );
     }
 
     const aiResult = await anthropicResponse.json();
     const textContent = aiResult.content?.find((item: { type?: string }) => item.type === "text")?.text ?? "{}";
     const parsedAI = parseAiDailyResponse(textContent);
+    const aiParseFailed = parsedAI === null;
 
     const isAccepted =
+      !aiParseFailed &&
       parsedAI.is_instagram &&
       parsedAI.is_post_or_story &&
       parsedAI.has_required_tags &&
@@ -243,7 +266,11 @@ rejection_reason: first failed check name, or "" if all pass. Order: is_instagra
     const status = isAccepted ? "accepted" : "rejected";
     const now = new Date().toISOString();
 
-    const studentMessage = isAccepted ? parsedAI.feedback : friendlyRejectionMessage(parsedAI, expectedUsername);
+    const studentMessage = isAccepted
+      ? (parsedAI?.feedback ?? "Post verified.")
+      : aiParseFailed
+        ? "We could not verify your screenshot. Please try again with a clear Instagram post screenshot."
+        : friendlyRejectionMessage(parsedAI!, expectedUsername);
 
     // 6. Get or create submission row
     let { data: submission } = await adminClient
@@ -254,7 +281,7 @@ rejection_reason: first failed check name, or "" if all pass. Order: is_instagra
       .maybeSingle();
 
     if (!submission) {
-      const { data: inserted } = await adminClient
+      const { data: inserted, error: insertError } = await adminClient
         .from("submissions")
         .insert({
           student_id: session.studentId,
@@ -268,21 +295,32 @@ rejection_reason: first failed check name, or "" if all pass. Order: is_instagra
         })
         .select("id, resubmit_count")
         .single();
-      submission = inserted;
+
+      if (insertError?.code === "23505") {
+        const { data: existing } = await adminClient
+          .from("submissions")
+          .select("id, resubmit_count")
+          .eq("student_id", session.studentId)
+          .eq("task_id", TASK_ID)
+          .maybeSingle();
+        submission = existing;
+      } else {
+        submission = inserted;
+      }
     }
 
-    if (!submission) throw new Error("Failed to initialize submission.");
+    if (!submission) {
+      console.error("Failed to initialize submission for daily post", {
+        studentId: session.studentId,
+        taskId: TASK_ID,
+      });
+      return NextResponse.json(
+        { success: false, error: "Unable to initialize submission." },
+        { status: 500 }
+      );
+    }
 
     // 7. Insert attempt
-    const { data: countData } = await adminClient
-      .from("submission_attempts")
-      .select("id")
-      .eq("student_id", session.studentId)
-      .eq("task_id", TASK_ID)
-      .gte("created_at", startOfTodayIso);
-
-    const attemptNumber = (countData?.length ?? 0) + 1;
-
     const { data: attemptRow, error: attemptError } = await adminClient
       .from("submission_attempts")
       .insert({
@@ -304,7 +342,13 @@ rejection_reason: first failed check name, or "" if all pass. Order: is_instagra
       .select("id")
       .single();
 
-    if (attemptError) throw attemptError;
+    if (attemptError) {
+      console.error("Daily post attempt insert error:", attemptError);
+      return NextResponse.json(
+        { success: false, error: "Failed to record your submission. Please try again." },
+        { status: 500 }
+      );
+    }
 
     // 8. Update status in submissions header
     if (isAccepted) {
@@ -334,7 +378,9 @@ rejection_reason: first failed check name, or "" if all pass. Order: is_instagra
       return NextResponse.json({
         success: false,
         error: studentMessage,
-        rejection_reason: parsedAI.rejection_reason || "verification_failed",
+        rejection_reason: aiParseFailed
+          ? "ai_parse_failed"
+          : parsedAI?.rejection_reason || "verification_failed",
       }, { status: 200 }); // Status 200 because it's a valid processing result
     }
 

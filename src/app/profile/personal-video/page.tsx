@@ -9,6 +9,7 @@ import {
   type PersonalizationPhotos,
   type PhotoKey,
 } from "@/lib/personal-video/personalization";
+import { PERSONAL_VIDEO_PATH } from "@/lib/post-login-redirect";
 
 async function signPhotoUrls(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -26,7 +27,9 @@ async function signPhotoUrls(
 
 export default async function PersonalVideoPage() {
   const session = await getStudentSession();
-  if (!session) redirect("/");
+  if (!session) {
+    redirect(`/?returnTo=${encodeURIComponent(PERSONAL_VIDEO_PATH)}`);
+  }
 
   const supabase = await createClient();
 
