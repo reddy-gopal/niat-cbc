@@ -19,6 +19,14 @@ const nextConfig: NextConfig = {
           { key: "Cross-Origin-Embedder-Policy",  value: "require-corp" },
         ],
       },
+      {
+        // Allow same-origin pages to load static assets (images, videos, audio)
+        // under COEP require-corp — without this header the browser blocks them
+        source: "/bootcamp-reel/:path*",
+        headers: [
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+        ],
+      },
     ];
   },
 };
