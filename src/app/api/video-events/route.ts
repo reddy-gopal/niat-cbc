@@ -20,11 +20,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false }, { status: 400 });
     }
 
-    await adminClient.from("video_events").insert({
-      student_id: student.studentId,
-      bootcamp_id: student.bootcampId,
-      event_type: parsed.data.eventType,
-    });
+    // Insert only if this student hasn't triggered this event type before
+    const { count } = await adminClient
+      .from("video_events")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", student.studentId)
+      .eq("event_type", parsed.data.eventType);
+
+    if ((count ?? 0) === 0) {
+      await adminClient.from("video_events").insert({
+        student_id: student.studentId,
+        bootcamp_id: student.bootcampId,
+        event_type: parsed.data.eventType,
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch {
