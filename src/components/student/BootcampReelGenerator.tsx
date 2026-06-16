@@ -30,6 +30,7 @@ const FPS = 30;
 interface Props {
   copy: PersonalizationCopy;
   photos: PersonalizationPhotos;
+  stonesEarned?: number;
 }
 
 interface ReelState {
@@ -67,7 +68,16 @@ function coverFit(img: HTMLCanvasElement | HTMLImageElement, dw: number, dh: num
   const scale = Math.max(dw / iw, dh / ih);
   const sw = dw / scale, sh = dh / scale;
   const sx = (iw - sw) / 2, sy = (ih - sh) / 2;
-  return { sx, sy, sw, sh };
+  return { sx, sy, sw, sh, dw, dh, dx: 0, dy: 0 };
+}
+
+function containFit(img: HTMLCanvasElement | HTMLImageElement, dw: number, dh: number) {
+  const iw = (img as HTMLCanvasElement).width  || (img as HTMLImageElement).naturalWidth  || 1;
+  const ih = (img as HTMLCanvasElement).height || (img as HTMLImageElement).naturalHeight || 1;
+  const scale = Math.min(dw / iw, dh / ih);
+  const rw = iw * scale, rh = ih * scale;
+  const dx = (dw - rw) / 2, dy = (dh - rh) / 2;
+  return { sx: 0, sy: 0, sw: iw, sh: ih, dw: rw, dh: rh, dx, dy };
 }
 
 function tGrad(ctx: CanvasRenderingContext2D, yCentre: number, blockH = 60) {
@@ -137,6 +147,7 @@ function drawSlide(
   slide: number, t: number,
   st: ReelState,
   copy: PersonalizationCopy,
+  stonesEarned = 0,
 ) {
   const ctx = st.activeCtx;
   if (!ctx) return;
@@ -313,8 +324,17 @@ function drawSlide(
       ctx.save();
       roundRect(ctx, 51, 110, 348, 466, 18); ctx.clip();
       if (uImgs[1]) {
-        const { sx, sy, sw, sh } = coverFit(uImgs[1], 348, 466);
-        ctx.drawImage(uImgs[1], sx, sy, sw, sh, 51, 110, 348, 466);
+        const iw = (uImgs[1] as HTMLCanvasElement).width  || (uImgs[1] as HTMLImageElement).naturalWidth  || 1;
+        const ih = (uImgs[1] as HTMLCanvasElement).height || (uImgs[1] as HTMLImageElement).naturalHeight || 1;
+        const isLandscape = iw > ih;
+        if (isLandscape) {
+          ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(51, 110, 348, 466);
+          const { sx, sy, sw, sh, dw, dh, dx, dy } = containFit(uImgs[1], 348, 466);
+          ctx.drawImage(uImgs[1], sx, sy, sw, sh, 51 + dx, 110 + dy, dw, dh);
+        } else {
+          const { sx, sy, sw, sh } = coverFit(uImgs[1], 348, 466);
+          ctx.drawImage(uImgs[1], sx, sy, sw, sh, 51, 110, 348, 466);
+        }
       } else {
         ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(51, 110, 348, 466);
       }
@@ -352,6 +372,19 @@ function drawSlide(
       const sc8 = 1 + 0.03 * eo(t);
       ctx.save(); ctx.translate(225, 400); ctx.scale(sc8, sc8); ctx.translate(-225, -400);
       if (BASE.s8) ctx.drawImage(BASE.s8, 0, 0, 450, 800);
+      ctx.restore();
+      // Dynamic stones count — Sora font, gradient #A8030C → transparent white
+      const s8a = sub(0.1, 0.3);
+      const s8g = ctx.createLinearGradient(50, 730, 400, 730);
+      s8g.addColorStop(0, '#A8030C');
+      s8g.addColorStop(1, '#ffffff');
+      ctx.save(); ctx.textAlign = 'center'; ctx.translate(0, (1 - s8a) * 16);
+      ctx.font = '300 18px Sora,sans-serif';
+      ctx.fillStyle = s8g; ctx.globalAlpha = s8a;
+      ctx.fillText("You've Collected", 225, 710);
+      ctx.font = '600 42px Sora,sans-serif';
+      ctx.fillStyle = s8g; ctx.globalAlpha = s8a;
+      ctx.fillText(`${stonesEarned} Tribe Stones`, 225, 762);
       ctx.restore();
       break;
     }
@@ -518,9 +551,12 @@ async function convertToMP4(
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function BootcampReelGenerator({ copy, photos }: Props) {
+export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }: Props) {
   const pvCanvasRef  = useRef<HTMLCanvasElement>(null);
   const recCanvasRef = useRef<HTMLCanvasElement>(null);
+  const stonesRef = useRef(stonesEarned);
+  stonesRef.current = stonesEarned;
+
   const stRef = useRef<ReelState>({
     BASE_IMGS: {}, userImgs: [null, null, null],
     recBlob: null, recExt: 'mp4',
@@ -583,9 +619,13 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
         stRef.current.audioBuf = await audioRes.arrayBuffer();
       } catch { /* audio optional */ }
 
+      // Preload Sora font so canvas drawText uses it correctly
+      await document.fonts.load('300 18px Sora').catch(() => {});
+      await document.fonts.load('600 42px Sora').catch(() => {});
+
       // Show UI immediately — videos load in background and swap in when ready
       stRef.current.activeCtx = pvCtx;
-      drawSlide(11, 0.5, stRef.current, copy);
+      drawSlide(11, 0.5, stRef.current, copy, stonesEarned);
       setLoaded(true);
 
       // Load B-roll videos in background (non-blocking)
@@ -658,7 +698,7 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
       stRef.current.activeCtx = stRef.current.pvCtx;
       // Show whichever photo-slide was just updated
       const firstFilled = photos.photo1 ? 3 : photos.photo2 ? 7 : 10;
-      drawSlide(firstFilled, 1, stRef.current, copy);
+      drawSlide(firstFilled, 1, stRef.current, copy, stonesEarned);
     }
     reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -693,7 +733,7 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
         const startMs = performance.now();
         function frame() {
           const t = Math.min(1, (performance.now() - startMs) / durMs);
-          drawSlide(slide, t, st, copy);
+          drawSlide(slide, t, st, copy, stonesRef.current);
           if (t < 1) requestAnimationFrame(frame);
           else resolve();
         }
@@ -780,7 +820,7 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
         const startMs = performance.now();
         function frame() {
           const t = Math.min(1, (performance.now() - startMs) / durMs);
-          drawSlide(slide, t, st, copy);
+          drawSlide(slide, t, st, copy, stonesRef.current);
           if (t < 1) requestAnimationFrame(frame);
           else resolve();
         }
@@ -911,7 +951,7 @@ export default function BootcampReelGenerator({ copy, photos }: Props) {
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:opacity-85 transition disabled:opacity-40"
             >
               {isRecording ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clapperboard className="w-4 h-4" />}
-              {isRecording ? 'Creating…' : 'Create My Reel'}
+              {isRecording ? 'Creating…' : 'Share My Reel'}
             </button>
           </div>
 

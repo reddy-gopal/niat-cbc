@@ -33,7 +33,7 @@ export default async function PersonalVideoPage() {
 
   const supabase = await createClient();
 
-  const [submissionRes, studentRes] = await Promise.all([
+  const [submissionRes, studentRes, stonesRes] = await Promise.all([
     supabase
       .from("submissions")
       .select("file_url, status")
@@ -45,6 +45,11 @@ export default async function PersonalVideoPage() {
       .select("full_name, mobile, team_id, niat_bootcamp_id, teams:team_id (name)")
       .eq("id", session.studentId)
       .single(),
+    supabase
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", session.studentId)
+      .eq("status", "accepted"),
   ]);
 
   const submission = submissionRes.data;
@@ -68,12 +73,15 @@ export default async function PersonalVideoPage() {
     photos = await signPhotoUrls(supabase, paths);
   }
 
+  const stonesEarned = Math.min(stonesRes.count ?? 0, 6);
+
   return (
     <PersonalVideoClient
       session={session}
       initialPhotos={photos}
       copy={personalization.copy}
       isMockData={personalization.isMock}
+      stonesEarned={stonesEarned}
     />
   );
 }
