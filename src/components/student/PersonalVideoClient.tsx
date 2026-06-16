@@ -24,6 +24,7 @@ interface Props {
   initialPhotos: PersonalizationPhotos;
   copy: PersonalizationCopy;
   isMockData?: boolean;
+  stonesEarned?: number;
 }
 
 const UPLOAD_SLOTS: {
@@ -31,24 +32,28 @@ const UPLOAD_SLOTS: {
   label: string;
   hint: string;
   icon: typeof User;
+  orientation: "portrait" | "landscape";
 }[] = [
   {
     key: "photo1",
     label: "Portrait",
     hint: "Screen 3 — your hero shot",
     icon: User,
+    orientation: "portrait" as const,
   },
   {
     key: "photo2",
     label: "Tribe",
     hint: "Screen 7 — your tribe moment",
     icon: Users,
+    orientation: "landscape" as const,
   },
   {
     key: "photo3",
     label: "Moment",
     hint: "Screen 10 — a bootcamp highlight",
     icon: Camera,
+    orientation: "portrait" as const,
   },
 ];
 
@@ -56,6 +61,7 @@ export default function PersonalVideoClient({
   session,
   initialPhotos,
   copy,
+  stonesEarned = 0,
 }: Props) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -222,7 +228,7 @@ export default function PersonalVideoClient({
             </motion.div>
           ) : showReel && allPhotosUploaded ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-12">
-              <BootcampReelGenerator copy={copy} photos={photos} />
+              <BootcampReelGenerator copy={copy} photos={photos} stonesEarned={stonesEarned} />
               <div className="grid sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
                 {UPLOAD_SLOTS.map(({ key, label }) => (
                   <label
@@ -250,25 +256,47 @@ export default function PersonalVideoClient({
               className="max-w-3xl mx-auto space-y-8"
             >
               <div className="grid sm:grid-cols-3 gap-6">
-                {UPLOAD_SLOTS.map(({ key, label, hint, icon: Icon }) => (
+                {UPLOAD_SLOTS.map(({ key, label, hint, icon: Icon, orientation }) => (
                   <div
                     key={key}
                     className="bg-slate-900/50 backdrop-blur-2xl border border-white/5 rounded-[32px] p-6 text-center relative overflow-hidden group hover:border-yellow-500/30 transition-all"
                   >
-                    <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/10">
-                      {photos[key] ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={photos[key]!}
-                          alt={label}
-                          className="w-full h-full object-cover rounded-2xl"
-                        />
-                      ) : (
-                        <Icon className="w-7 h-7 text-slate-500" />
-                      )}
-                    </div>
+                    {orientation === "landscape" ? (
+                      <div className="w-full aspect-video bg-white/5 rounded-2xl flex items-center justify-center mb-4 border border-white/10 overflow-hidden">
+                        {photos[key] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={photos[key]!}
+                            alt={label}
+                            className="w-full h-full object-contain rounded-2xl"
+                          />
+                        ) : (
+                          <Icon className="w-7 h-7 text-slate-500" />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-16 h-20 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/10 overflow-hidden">
+                        {photos[key] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={photos[key]!}
+                            alt={label}
+                            className="w-full h-full object-cover rounded-2xl"
+                          />
+                        ) : (
+                          <Icon className="w-7 h-7 text-slate-500" />
+                        )}
+                      </div>
+                    )}
                     <h3 className="text-lg font-black mb-1">{label}</h3>
-                    <p className="text-slate-500 text-xs mb-4">{hint}</p>
+                    <p className="text-slate-500 text-xs mb-1">{hint}</p>
+                    <p className="text-[10px] font-semibold mb-3 tracking-wider uppercase">
+                      {orientation === "landscape" ? (
+                        <span className="text-yellow-400">Landscape preferred</span>
+                      ) : (
+                        <span className="text-slate-500">Portrait preferred</span>
+                      )}
+                    </p>
                     <label className="cursor-pointer inline-flex items-center gap-2 px-5 py-3 bg-white/10 hover:bg-yellow-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
                       {uploadingSlot === key ? (
                         <Loader2 className="w-3 h-3 animate-spin" />

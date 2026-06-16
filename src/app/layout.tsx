@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Inter, Outfit, Sora } from "next/font/google";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ConditionalFooter } from "@/components/ui/ConditionalFooter";
 import { RouteScrollReset } from "@/components/ui/RouteScrollReset";
@@ -15,6 +15,12 @@ const inter = Inter({
   variable: "--font-body",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+});
+
+const sora = Sora({
+  variable: "--font-sora",
+  subsets: ["latin"],
+  weight: ["300", "600"],
 });
 
 export const metadata: Metadata = {
@@ -36,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.variable} ${inter.variable} h-full`}>
+    <html lang="en" className={`${outfit.variable} ${inter.variable} ${sora.variable} h-full`}>
       <body
         suppressHydrationWarning
         className="min-h-full flex flex-col bg-[var(--bg-base)] text-[var(--text-base)] antialiased"
