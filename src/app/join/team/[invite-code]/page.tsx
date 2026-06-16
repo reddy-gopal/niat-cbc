@@ -79,6 +79,7 @@ export default async function TeamJoinPage({ params }: TeamJoinRouteProps) {
       bootcampDate={teamData.sections.bootcamps.date}
       regionId={teamData.sections.bootcamps.regions.id}
       regionName={teamData.sections.bootcamps.regions.name}
+      formsRedirectCode={`join/team/${inviteCode}`}
       inviteCode={inviteCode}
       teamName={teamData.name}
       leaderName={leaderName}
