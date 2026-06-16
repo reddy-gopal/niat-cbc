@@ -324,8 +324,9 @@ function drawSlide(
       ctx.save();
       roundRect(ctx, 51, 110, 348, 466, 18); ctx.clip();
       if (uImgs[1]) {
-        const iw = (uImgs[1] as HTMLCanvasElement).width  || (uImgs[1] as HTMLImageElement).naturalWidth  || 1;
-        const ih = (uImgs[1] as HTMLCanvasElement).height || (uImgs[1] as HTMLImageElement).naturalHeight || 1;
+        const img1 = uImgs[1] as unknown as HTMLCanvasElement & HTMLImageElement;
+        const iw = img1.width || img1.naturalWidth || 1;
+        const ih = img1.height || img1.naturalHeight || 1;
         const isLandscape = iw > ih;
         if (isLandscape) {
           ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(51, 110, 348, 466);
