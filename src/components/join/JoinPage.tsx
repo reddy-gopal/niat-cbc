@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Logo } from "../ui/Logo";
 import { resolveStudentUtmParams } from "@/lib/utils";
 
-const FORMS_BASE_URL = "https://forms-gamma.earlywave.in/mid/niat-cbc";
+const FORMS_BASE_URL = "https://forms.ccbp.in/mid/niat-cbc";
 const PENDING_REG_KEY = "cbc_pending_registration";
 
 type JoinPageProps = {
@@ -247,7 +247,7 @@ export default function JoinPage({
       }
 
       const code = result.invite_code as string;
-      const inviteUrl = `https://forms-gamma.earlywave.in/mid/niat-cbc?bootcamp_code=join/team/${code}`;
+      const inviteUrl = `https://forms.ccbp.in/mid/niat-cbc?bootcamp_code=join/team/${code}`;
       setInviteData({ url: inviteUrl, code });
 
       const QRCode = (await import("qrcode")).default;
