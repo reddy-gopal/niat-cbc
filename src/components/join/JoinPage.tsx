@@ -49,6 +49,10 @@ const registerSchema = z.object({
   mobile: z
     .string()
     .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number."),
+  niatBootcampId: z
+    .string()
+    .trim()
+    .regex(/^NB26\d+$/, "Enter a valid NIAT Bootcamp ID (e.g. NB2610009)."),
 });
 
 type RegisterValues = z.infer<typeof registerSchema>;
@@ -131,7 +135,7 @@ export default function JoinPage({
 
     autoSubmitAttempted.current = true;
 
-    let parsed: { fullName: string; mobile: string };
+    let parsed: { fullName: string; mobile: string; niatBootcampId: string };
     try {
       parsed = JSON.parse(stored);
     } catch {
@@ -140,18 +144,18 @@ export default function JoinPage({
     }
 
     sessionStorage.removeItem(PENDING_REG_KEY);
-    void autoRegister(parsed.fullName, parsed.mobile);
+    void autoRegister(parsed.fullName, parsed.mobile, parsed.niatBootcampId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function autoRegister(fullName: string, mobile: string) {
+  async function autoRegister(fullName: string, mobile: string, niatBootcampId: string) {
     setIsLoading(true);
     setError(null);
     try {
       const response = await fetch("/api/auth/verify-sr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, mobile, sectionId, bootcampId, regionId, inviteCode }),
+        body: JSON.stringify({ fullName, mobile, sectionId, bootcampId, regionId, inviteCode, niatBootcampId }),
       });
       const result = (await response.json()) as SrVerifyResponse;
 
@@ -181,7 +185,7 @@ export default function JoinPage({
     reset,
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { fullName: "", mobile: "" },
+    defaultValues: { fullName: "", mobile: "", niatBootcampId: "" },
   });
 
   async function onRegisterSubmit(values: RegisterValues) {
@@ -206,7 +210,7 @@ export default function JoinPage({
       // SR passed — save details and redirect to Forms
       sessionStorage.setItem(
         PENDING_REG_KEY,
-        JSON.stringify({ fullName: values.fullName, mobile: values.mobile })
+        JSON.stringify({ fullName: values.fullName, mobile: values.mobile, niatBootcampId: values.niatBootcampId })
       );
 
       const formsUrl = `${FORMS_BASE_URL}?bootcamp_code=${formsRedirectCode}`;
@@ -367,6 +371,24 @@ export default function JoinPage({
                 {errors.mobile ? (
                   <p className="mt-1 text-sm text-[var(--primary)] font-medium">
                     {errors.mobile.message}
+                  </p>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2">
+                  🎓 NIAT Bootcamp ID
+                </label>
+                <input
+                  {...register("niatBootcampId")}
+                  className="input-field"
+                  placeholder="e.g. NB2610000"
+                  disabled={isLoading}
+                  suppressHydrationWarning
+                />
+                {errors.niatBootcampId ? (
+                  <p className="mt-1 text-sm text-[var(--primary)] font-medium">
+                    {errors.niatBootcampId.message}
                   </p>
                 ) : null}
               </div>

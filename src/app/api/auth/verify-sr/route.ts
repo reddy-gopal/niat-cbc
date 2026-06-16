@@ -13,6 +13,7 @@ const verifySrSchema = z.object({
   bootcampId: z.string().uuid(),
   regionId: z.string().uuid(),
   inviteCode: z.string().optional(),
+  niatBootcampId: z.string().trim().regex(/^NB26\d+$/).optional(),
 });
 
 const ACTIVE_TASK_IDS = CHALLENGES.map((c) => c.id);
@@ -68,6 +69,11 @@ export async function POST(request: Request) {
     let sessionUtmCampaign = existingStudent?.utm_campaign ?? null;
     let teamIdToAssign: string | null = null;
 
+    // Update niat_bootcamp_id on existing student if provided and not already set
+    if (existingStudent && parsed.data.niatBootcampId && !(existingStudent as Record<string, unknown>).niat_bootcamp_id) {
+      await adminClient.from("students").update({ niat_bootcamp_id: parsed.data.niatBootcampId }).eq("id", existingStudent.id);
+    }
+
     if (!existingStudent) {
       let insertSectionId = parsed.data.sectionId;
       let insertBootcampId = parsed.data.bootcampId;
@@ -116,6 +122,7 @@ export async function POST(request: Request) {
           bootcamp_id: insertBootcampId,
           region_id: insertRegionId,
           team_id: teamIdToAssign,
+          ...(parsed.data.niatBootcampId ? { niat_bootcamp_id: parsed.data.niatBootcampId } : {}),
         })
         .select("id, section_id, bootcamp_id, region_id, full_name, mobile, utm_source, utm_medium, utm_campaign")
         .single();
