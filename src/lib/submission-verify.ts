@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import { ANTHROPIC_VISION_MODEL } from "@/lib/anthropic-model";
 import { CHALLENGES } from "@/lib/challenges";
 import { adminClient } from "../../utils/supabase/admin";
 
@@ -149,7 +150,7 @@ export async function verifySubmissionById(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: ANTHROPIC_VISION_MODEL,
         max_tokens: 200,
         system: challenge.verificationPrompt ?? GLOBAL_FALLBACK_PROMPT,
         messages: [

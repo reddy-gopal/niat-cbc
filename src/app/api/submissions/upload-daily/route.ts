@@ -6,6 +6,7 @@ import { adminClient } from "../../../../../utils/supabase/admin";
 import { env } from "@/lib/env";
 import { getStartOfTodayIso } from "@/lib/calendar-day";
 import { normalizeInstagramHandleInput } from "@/lib/instagram-handle";
+import { ANTHROPIC_VISION_MODEL } from "@/lib/anthropic-model";
 import { parseModelJsonText } from "@/lib/parse-model-json";
 
 const TASK_ID = 6;
@@ -217,7 +218,7 @@ rejection_reason: first failed check name, or "" if all pass. Order: is_instagra
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: ANTHROPIC_VISION_MODEL,
         max_tokens: 300,
         system:
           "You verify NIAT bootcamp Instagram screenshots for students. ACCEPT standard feed posts when the registered username matches the post header author. ACCEPT collab posts when the student is in the header. ACCEPT when caption has @niat… and #niat…. Large NIAT graphics on the image are normal. When the header username matches the registered student, is_own_post must be true. Respond ONLY with valid JSON.",
