@@ -1,5 +1,6 @@
 import { waitUntil } from "@vercel/functions";
 import { NextResponse } from "next/server";
+import { isValidInternalSecret } from "@/lib/internal-api";
 import { verifySubmissionById } from "@/lib/submission-verify";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
@@ -11,7 +12,7 @@ type SubmissionBatchRow = {
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-internal-secret");
-  if (secret !== process.env.INTERNAL_API_SECRET) {
+  if (!isValidInternalSecret(secret)) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 

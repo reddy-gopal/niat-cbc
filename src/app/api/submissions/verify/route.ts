@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { isValidInternalSecret } from "@/lib/internal-api";
 import { verifySubmissionById } from "@/lib/submission-verify";
 
 const verifySchema = z.object({
@@ -12,7 +13,7 @@ function logVerifyPhase(phase: string, durationMs: number) {
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-internal-secret");
-  if (secret !== process.env.INTERNAL_API_SECRET) {
+  if (!isValidInternalSecret(secret)) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 

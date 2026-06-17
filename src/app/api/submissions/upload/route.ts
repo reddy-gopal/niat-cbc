@@ -1,5 +1,4 @@
 import { createHash } from "crypto";
-import { waitUntil } from "@vercel/functions";
 import { NextResponse } from "next/server";
 import { CHALLENGES } from "@/lib/challenges";
 import {
@@ -9,6 +8,7 @@ import {
   TIME_CAPSULE_TASK_ID,
 } from "@/lib/challenge-unlock";
 import { getStudentFromRequest } from "@/lib/api-auth";
+import { verifySubmissionById } from "@/lib/submission-verify";
 import { adminClient } from "../../../../../utils/supabase/admin";
 
 const PLAGIARISM_REASON =
@@ -18,6 +18,7 @@ const REFERRAL_CHALLENGE_ID = CHALLENGES.find((challenge) => challenge.isReferra
 const TEAM_SUBMISSION_CHALLENGE_IDS = new Set([5]);
 const DUPLICATE_FILE_REASON =
   "Submission rejected: this exact file was already uploaded by you for this challenge. Please upload a different proof image.";
+const PENDING_STALE_MS = 3 * 60 * 1000;
 
 export async function POST(request: Request) {
   try {
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
     const [{ data: existingSubmission }, { data: lastAttempt }] = await Promise.all([
       adminClient
         .from("submissions")
-        .select("id, resubmit_count, bootcamp_id, status, streak_day")
+        .select("id, resubmit_count, bootcamp_id, status, streak_day, verification_attempts, last_attempted_at")
         .eq("student_id", session.studentId)
         .eq("task_id", taskId)
         .maybeSingle(),
@@ -91,13 +92,44 @@ export async function POST(request: Request) {
     }
 
     if (existingSubmission?.status === "pending") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Your submission is being reviewed. Please wait for the result before submitting again.",
-        },
-        { status: 400 }
+      const attempts = existingSubmission.verification_attempts ?? 0;
+      const lastAt = existingSubmission.last_attempted_at
+        ? new Date(existingSubmission.last_attempted_at).getTime()
+        : 0;
+
+      await verifySubmissionById(existingSubmission.id).catch((error) =>
+        console.error("[upload] pending retry verify failed:", error)
       );
+
+      const { data: refreshed } = await adminClient
+        .from("submissions")
+        .select("status, verification_attempts, last_attempted_at")
+        .eq("id", existingSubmission.id)
+        .maybeSingle();
+
+      const currentStatus = refreshed?.status ?? existingSubmission.status;
+      const currentAttempts = refreshed?.verification_attempts ?? attempts;
+      const currentLastAt = refreshed?.last_attempted_at
+        ? new Date(refreshed.last_attempted_at).getTime()
+        : lastAt;
+      const stillStale = !currentLastAt || Date.now() - currentLastAt > PENDING_STALE_MS;
+
+      if (currentStatus === "accepted" && taskId !== REFERRAL_CHALLENGE_ID) {
+        return NextResponse.json(
+          { success: false, error: "Challenge already completed. Re-submission is not allowed." },
+          { status: 400 }
+        );
+      }
+
+      if (currentStatus === "pending" && currentAttempts < 3 && !stillStale) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Your submission is being reviewed. Please wait for the result before submitting again.",
+          },
+          { status: 400 }
+        );
+      }
     }
 
     if (!challenge.requiresText && !(file instanceof File)) {
@@ -367,21 +399,16 @@ export async function POST(request: Request) {
       attemptRowId = attemptRow.id;
     }
 
-    // Always verify on the same origin that handled this upload request.
-    // This avoids local uploads accidentally hitting a deployed verifier.
-    const origin = new URL(request.url).origin;
-    const internalSecret =
-      process.env.INTERNAL_SECRET ?? process.env.INTERNAL_API_SECRET ?? "";
-    waitUntil(
-      fetch(`${origin}/api/submissions/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-internal-secret": internalSecret,
-        },
-        body: JSON.stringify({ submissionId: targetSubmission.id }),
-      }).catch((error) => console.error("Verify trigger failed:", error))
-    );
+    if (taskId !== REFERRAL_CHALLENGE_ID) {
+      const verifyResult = await verifySubmissionById(targetSubmission.id);
+      if (!verifyResult.ok) {
+        console.error("[upload] verify failed", {
+          submissionId: targetSubmission.id,
+          error: verifyResult.error,
+          status: verifyResult.status,
+        });
+      }
+    }
 
     return NextResponse.json(
       {

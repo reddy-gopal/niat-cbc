@@ -1,6 +1,7 @@
 import { env } from "@/lib/env";
 import { ANTHROPIC_VISION_MODEL } from "@/lib/anthropic-model";
 import { CHALLENGES } from "@/lib/challenges";
+import { parseModelJsonText } from "@/lib/parse-model-json";
 import { adminClient } from "../../utils/supabase/admin";
 
 type AnthropicResponse = {
@@ -16,6 +17,29 @@ export type VerifySubmissionPhaseLogger = (phase: string, durationMs: number) =>
 export type VerifySubmissionResult =
   | { ok: true; verdict: "accepted" | "rejected"; reason: string }
   | { ok: false; status: 400 | 500; error: string };
+
+async function loadSubmissionImageBase64(
+  storagePath: string
+): Promise<{ base64: string; mediaType: "image/png" | "image/jpeg" } | null> {
+  const { data: signedData, error: signedError } = await adminClient.storage
+    .from("submissions")
+    .createSignedUrl(storagePath, 120);
+
+  if (signedError || !signedData?.signedUrl) return null;
+
+  const imageResponse = await fetch(signedData.signedUrl);
+  if (!imageResponse.ok) {
+    console.error("[verify] failed to download submission image:", imageResponse.status);
+    return null;
+  }
+
+  const buffer = await imageResponse.arrayBuffer();
+  const mediaType: "image/png" | "image/jpeg" = storagePath.endsWith(".png")
+    ? "image/png"
+    : "image/jpeg";
+
+  return { base64: Buffer.from(buffer).toString("base64"), mediaType };
+}
 
 async function getLatestPendingAttemptId(submissionId: string): Promise<{
   id: string;
@@ -68,6 +92,32 @@ export async function verifySubmissionById(
   }
 
   if (submission.verification_attempts >= 3) {
+    if (submission.status === "pending") {
+      const failReason =
+        "Automatic verification failed after multiple attempts. Please upload a clearer proof and try again.";
+      const verifiedAt = new Date().toISOString();
+      await adminClient
+        .from("submissions")
+        .update({
+          status: "rejected",
+          points: 0,
+          ai_reason: failReason,
+          verified_at: verifiedAt,
+          updated_at: verifiedAt,
+        })
+        .eq("id", submission.id);
+      await adminClient
+        .from("submission_attempts")
+        .update({
+          status: "rejected",
+          points: 0,
+          ai_reason: failReason,
+          verified_at: verifiedAt,
+        })
+        .eq("submission_id", submission.id)
+        .eq("status", "pending")
+        .is("verified_at", null);
+    }
     logSegment("dbFetch", segmentDb);
     onPhase?.("total", Math.round(performance.now() - totalStart));
     return { ok: false, status: 400, error: "Max verification attempts reached." };
@@ -111,29 +161,16 @@ export async function verifySubmissionById(
     return { ok: false, status: 500, error: "Failed to update submission attempt." };
   }
 
-  let signedImageUrl: string | null = null;
-  let base64Image: string | null = null;
+  let imagePayload: { base64: string; mediaType: "image/png" | "image/jpeg" } | null = null;
   if (!challenge.requiresText && submission.file_url) {
-    const { data: signedData, error: signedError } = await adminClient.storage
-      .from("submissions")
-      .createSignedUrl(submission.file_url, 60);
-
+    const segmentImage = performance.now();
+    imagePayload = await loadSubmissionImageBase64(submission.file_url as string);
     logSegment("dbFetch", segmentDb);
+    logSegment("imageDownload", segmentImage);
 
-    if (signedError || !signedData?.signedUrl) {
+    if (!imagePayload) {
       onPhase?.("total", Math.round(performance.now() - totalStart));
       return { ok: false, status: 500, error: "Unable to read submission file." };
-    }
-
-    signedImageUrl = signedData.signedUrl;
-
-    // Fallback for environments/providers that require base64 image input.
-    if (process.env.ANTHROPIC_IMAGE_SOURCE_MODE === "base64") {
-      const segmentImage = performance.now();
-      const imageResponse = await fetch(signedData.signedUrl);
-      const imageBuffer = await imageResponse.arrayBuffer();
-      base64Image = Buffer.from(imageBuffer).toString("base64");
-      logSegment("imageDownload", segmentImage);
     }
   } else {
     logSegment("dbFetch", segmentDb);
@@ -172,26 +209,16 @@ export async function verifySubmissionById(
                     ? `This is an image-only submission. Evaluate using the system prompt only.`
                     : `Challenge: ${challenge.title}. Challenge description: ${challenge.description}.${challenge.verificationHint ? ` Verification hint: ${challenge.verificationHint}` : ""} This is an image-only challenge. Apply the system prompt exactly. Accept if the image plausibly shows a related attempt, even if it is blurry, dark, cropped, partial, casual, or imperfect. Reject only if it is blank/corrupt, abusive/inappropriate, clearly unrelated, or an obvious non-attempt.`,
                 },
-                signedImageUrl
+                imagePayload
                   ? {
                     type: "image",
                     source: {
-                      type: "url",
-                      url: signedImageUrl,
+                      type: "base64",
+                      media_type: imagePayload.mediaType,
+                      data: imagePayload.base64,
                     },
                   }
-                  : base64Image
-                    ? {
-                      type: "image",
-                      source: {
-                        type: "base64",
-                        media_type: submission.file_url?.endsWith(".png")
-                          ? "image/png"
-                          : "image/jpeg",
-                        data: base64Image,
-                      },
-                    }
-                    : { type: "text", text: "(No image provided)" },
+                  : { type: "text", text: "(No image provided)" },
               ],
           },
         ],
@@ -199,8 +226,10 @@ export async function verifySubmissionById(
     });
 
     if (!anthropicResponse.ok) {
+      const errBody = await anthropicResponse.text().catch(() => "");
+      console.error("[verify] Anthropic request failed:", anthropicResponse.status, errBody);
       logSegment("anthropic", segmentAnthropic);
-      throw new Error("Anthropic request failed.");
+      throw new Error(`Anthropic request failed (${anthropicResponse.status}).`);
     }
 
     const anthropicJson = (await anthropicResponse.json()) as AnthropicResponse;
@@ -208,10 +237,20 @@ export async function verifySubmissionById(
 
     const textContent =
       anthropicJson.content?.find((item) => item.type === "text")?.text ?? "";
-    const parsedVerdict = JSON.parse(textContent) as {
-      verdict: "accepted" | "rejected";
-      reason: string;
-    };
+
+    let parsedVerdict: { verdict: "accepted" | "rejected"; reason: string };
+    try {
+      parsedVerdict = parseModelJsonText(textContent);
+      if (parsedVerdict.verdict !== "accepted" && parsedVerdict.verdict !== "rejected") {
+        throw new Error("Invalid verdict value");
+      }
+      if (typeof parsedVerdict.reason !== "string") {
+        parsedVerdict.reason = String(parsedVerdict.reason ?? "");
+      }
+    } catch (parseErr) {
+      console.error("[verify] failed to parse Anthropic JSON:", textContent, parseErr);
+      throw new Error("Invalid verification response from AI.");
+    }
 
     const verifiedAt = new Date().toISOString();
 
@@ -332,7 +371,8 @@ export async function verifySubmissionById(
       verdict: parsedVerdict.verdict,
       reason: parsedVerdict.reason,
     };
-  } catch {
+  } catch (err) {
+    console.error("[verify] verification error:", err);
     const failNow = new Date().toISOString();
     const pendingAttempt = await getLatestPendingAttemptId(submission.id as string);
     if (pendingAttempt) {
