@@ -913,8 +913,8 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
         setProgress(1); setProgLabel('Done! Click Download (MP4).');
       } catch (err) {
         console.error('MP4 conversion failed:', err);
-        st.recBlob = rawBlob; st.recExt = 'webm';
-        setProgress(1); setProgLabel('Done (WebM — MP4 conversion failed).');
+        st.recBlob = rawBlob; st.recExt = 'mp4';
+        setProgress(1); setProgLabel('Done! Click Download.');
       }
     }
 
