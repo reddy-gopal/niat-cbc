@@ -567,12 +567,15 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
   });
 
   const [loaded, setLoaded]           = useState(false);
+  const [videosReady, setVideosReady] = useState(false);
+  const [videosLoadedCount, setVideosLoadedCount] = useState(0);
   const [loadMsg, setLoadMsg]         = useState("Loading screen assets…");
   const [progress, setProgress]       = useState(0);
   const [progLabel, setProgLabel]     = useState("");
   const [showProgress, setShowProgress] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const videosTotalRef = useRef(5);
 
   // Initial asset load
   useEffect(() => {
@@ -671,11 +674,20 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
         v.load();
       }
 
-      loadVideoBg('/bootcamp-reel/screen-1-animated-compressed-vid.mp4', v => { stRef.current.brollVideo0 = v; });
-      loadVideoBg('/bootcamp-reel/Screen_3-animated-vid.mp4',       v => { stRef.current.brollVideo3 = v; });
-      loadVideoBg('/bootcamp-reel/Screen-animated-6-updated.mp4',   v => { stRef.current.brollVideo6 = v; });
-      loadVideoBg('/bootcamp-reel/b-1.mp4',                         v => { stRef.current.brollVideo  = v; });
-      loadVideoBg('/bootcamp-reel/b-2.mp4',                         v => { stRef.current.brollVideo2 = v; });
+      const onVideoReady = (assign: (v: HTMLVideoElement) => void) => (v: HTMLVideoElement) => {
+        assign(v);
+        setVideosLoadedCount(c => {
+          const next = c + 1;
+          if (next >= videosTotalRef.current) setVideosReady(true);
+          return next;
+        });
+      };
+
+      loadVideoBg('/bootcamp-reel/screen-1-animated-compressed-vid.mp4', onVideoReady(v => { stRef.current.brollVideo0 = v; }));
+      loadVideoBg('/bootcamp-reel/Screen_3-animated-vid.mp4',       onVideoReady(v => { stRef.current.brollVideo3 = v; }));
+      loadVideoBg('/bootcamp-reel/Screen-animated-6-updated.mp4',   onVideoReady(v => { stRef.current.brollVideo6 = v; }));
+      loadVideoBg('/bootcamp-reel/b-1.mp4',                         onVideoReady(v => { stRef.current.brollVideo  = v; }));
+      loadVideoBg('/bootcamp-reel/b-2.mp4',                         onVideoReady(v => { stRef.current.brollVideo2 = v; }));
     }
 
     init();
@@ -935,7 +947,17 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
       {/* Buttons */}
       {loaded && (
         <div className="flex flex-col items-center gap-3 w-full max-w-sm">
-          {/* Primary actions */}
+          {/* Loading videos indicator */}
+          {!videosReady && (
+            <div className="flex flex-col items-center gap-2 w-full py-3">
+              <Loader2 className="w-6 h-6 animate-spin text-white/60" />
+              <p className="text-xs text-white/60 font-medium">
+                Loading videos… {videosLoadedCount}/{videosTotalRef.current}
+              </p>
+            </div>
+          )}
+          {/* Primary actions — only shown once all videos are ready */}
+          {videosReady && (
           <div className="flex gap-3 w-full">
             <button
               type="button"
@@ -955,6 +977,7 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
               {isRecording ? 'Creating…' : 'Share My Reel'}
             </button>
           </div>
+          )}
 
           {/* Post-generation actions */}
           {showDownload && (
