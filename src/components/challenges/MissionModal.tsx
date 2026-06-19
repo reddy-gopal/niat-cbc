@@ -14,7 +14,24 @@ import {
 import type { StudentChallengeStatus } from "@/types/database";
 
 type UploadState = "idle" | "uploading" | "received";
-const REFERRAL_STATS_URL = "https://nxtrewards.ccbp.in/";
+function buildReferralUrl(session: import("@/types/app").StudentSession): string {
+  const campaign = [
+    session.regionName,
+    session.bootcampName,
+    session.sectionLabel,
+    session.bootcampDate,
+  ]
+    .filter(Boolean)
+    .join("+");
+
+  const params = new URLSearchParams({
+    utm_source: "cbc_community",
+    utm_medium: "whatsapp",
+    utm_campaign: campaign,
+  });
+
+  return `https://nxtrewards.ccbp.in/?${params.toString()}`;
+}
 
 export default function MissionModal({
   isOpen,
@@ -359,11 +376,11 @@ export default function MissionModal({
                     <input
                       type="text"
                       readOnly
-                      value={REFERRAL_STATS_URL}
+                      value={buildReferralUrl(session)}
                       className="flex-1 bg-white border border-orange-200 px-3 py-2 rounded text-xs text-orange-900 outline-none"
                     />
                     <a
-                      href={REFERRAL_STATS_URL}
+                      href={buildReferralUrl(session)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="bg-orange-500 text-white px-4 py-2 rounded text-xs font-bold hover:bg-orange-600 transition-colors inline-flex items-center"

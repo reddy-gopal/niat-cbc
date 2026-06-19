@@ -8,16 +8,16 @@ import type { PersonalizationPhotos } from "@/lib/personal-video/personalization
 const ASSET_BASE = "/bootcamp-reel";
 
 const IMGS_MAP: Record<string, string> = {
-  s3:  `${ASSET_BASE}/Screen_3.png`,
-  s4:  `${ASSET_BASE}/Screen_4.png`,
-  s5:  `${ASSET_BASE}/Screen_5.png`,
-  s6:  `${ASSET_BASE}/Screen_6.png`,
-  s7:  `${ASSET_BASE}/Screen_7.png`,
+  s3:  `${ASSET_BASE}/Screen_3.jpg`,
+  s4:  `${ASSET_BASE}/Screen_4.jpg`,
+  s5:  `${ASSET_BASE}/Screen_5.jpg`,
+  s6:  `${ASSET_BASE}/Screen_6.jpg`,
+  s7:  `${ASSET_BASE}/Screen_7.jpg`,
   s8:  `${ASSET_BASE}/Screen_8.png`,
-  s10: `${ASSET_BASE}/Screen_10.png`,
-  s11: `${ASSET_BASE}/Screen_11.png`,
-  s12: `${ASSET_BASE}/Screen_12.png`,
-  s14: `${ASSET_BASE}/Screen-last.png`,
+  s10: `${ASSET_BASE}/Screen_10.jpg`,
+  s11: `${ASSET_BASE}/Screen_11.jpg`,
+  s12: `${ASSET_BASE}/Screen_12.jpg`,
+  s14: `${ASSET_BASE}/Screen-last.jpg`,
 };
 
 const SLIDES: [number, number][] = [
@@ -567,12 +567,15 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
   });
 
   const [loaded, setLoaded]           = useState(false);
+  const [videosReady, setVideosReady] = useState(false);
+  const [videosLoadedCount, setVideosLoadedCount] = useState(0);
   const [loadMsg, setLoadMsg]         = useState("Loading screen assets…");
   const [progress, setProgress]       = useState(0);
   const [progLabel, setProgLabel]     = useState("");
   const [showProgress, setShowProgress] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const videosTotalRef = useRef(5);
 
   // Initial asset load
   useEffect(() => {
@@ -631,7 +634,43 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
 
       // Load B-roll videos in background (non-blocking)
       // crossOrigin='anonymous' puts the request in CORS mode which COEP always allows
+      // Play briefly and wait for requestVideoFrameCallback (or 300ms fallback)
+      // to confirm a real decoded frame exists before calling onReady.
+      function primeAndReady(v: HTMLVideoElement, onReady: (v: HTMLVideoElement) => void) {
+        const finish = () => { v.pause(); v.currentTime = 0; onReady(v); };
+        const playP = v.play();
+        if (!playP) { finish(); return; }
+        playP.then(() => {
+          if ('requestVideoFrameCallback' in v) {
+            (v as HTMLVideoElement & { requestVideoFrameCallback: (cb: () => void) => void })
+              .requestVideoFrameCallback(finish);
+          } else {
+            setTimeout(finish, 300);
+          }
+        }).catch(finish);
+      }
+
+      // Loads a video and only calls onReady once a real decoded frame is confirmed.
+      // Never calls onReady on timeout — if loading fails, it retries via blob fetch.
       function loadVideoBg(src: string, onReady: (v: HTMLVideoElement) => void) {
+        function tryBlobFallback() {
+          console.warn('[broll] trying blob fallback for:', src);
+          fetch(src)
+            .then(r => r.blob())
+            .then(blob => {
+              const v2 = document.createElement('video');
+              v2.src = URL.createObjectURL(blob);
+              v2.preload = 'auto'; v2.muted = true; v2.playsInline = true; v2.loop = true;
+              let done = false;
+              const go = () => { if (done) return; done = true; v2.currentTime = 0; v2.onseeked = () => { v2.onseeked = null; primeAndReady(v2, onReady); }; };
+              v2.oncanplaythrough = go;
+              v2.onloadeddata = go;
+              v2.onerror = () => console.error('[broll] blob fallback also failed:', src);
+              v2.load();
+            })
+            .catch(() => console.error('[broll] fetch failed:', src));
+        }
+
         const v = document.createElement('video');
         v.crossOrigin = 'anonymous';
         v.src = src; v.preload = 'auto'; v.muted = true; v.playsInline = true; v.loop = true;
@@ -639,43 +678,33 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
         const resolve = () => {
           if (resolved) return;
           resolved = true;
-          if (v.readyState >= 2) {
-            v.currentTime = 0;
-            v.onseeked = () => { v.onseeked = null; onReady(v); };
-            setTimeout(() => { if (v.onseeked) { v.onseeked = null; onReady(v); } }, 2000);
-          } else {
-            onReady(v);
-          }
+          v.currentTime = 0;
+          v.onseeked = () => { v.onseeked = null; primeAndReady(v, onReady); };
+          // If onseeked never fires within 5s, try blob fallback — do NOT call onReady
+          setTimeout(() => {
+            if (v.onseeked) { v.onseeked = null; resolved = false; tryBlobFallback(); }
+          }, 5000);
         };
-        v.onloadeddata     = resolve;
         v.oncanplaythrough = resolve;
-        v.onerror = () => {
-          console.warn('[broll] video element failed, retrying via fetch blob URL:', src);
-          // Nuclear fallback: fetch as blob URL (bypasses all COEP/CORP)
-          fetch(src).then(r => r.blob()).then(blob => {
-            const blobUrl = URL.createObjectURL(blob);
-            const v2 = document.createElement('video');
-            v2.src = blobUrl; v2.preload = 'auto'; v2.muted = true; v2.playsInline = true; v2.loop = true;
-            let r2 = false;
-            const res2 = () => {
-              if (r2) return; r2 = true;
-              v2.currentTime = 0;
-              v2.onseeked = () => { v2.onseeked = null; onReady(v2); };
-              setTimeout(() => { if (v2.onseeked) { v2.onseeked = null; onReady(v2); } }, 2000);
-            };
-            v2.onloadeddata = res2; v2.oncanplaythrough = res2;
-            v2.onerror = () => console.warn('[broll] blob fallback also failed:', src);
-            v2.load();
-          }).catch(() => console.warn('[broll] fetch fallback failed:', src));
-        };
+        v.onloadeddata = resolve;
+        v.onerror = () => { resolved = false; tryBlobFallback(); };
         v.load();
       }
 
-      loadVideoBg('/bootcamp-reel/screen-1-animated-compressed-vid.mp4', v => { stRef.current.brollVideo0 = v; });
-      loadVideoBg('/bootcamp-reel/Screen_3-animated-vid.mp4',       v => { stRef.current.brollVideo3 = v; });
-      loadVideoBg('/bootcamp-reel/Screen-animated-6-updated.mp4',   v => { stRef.current.brollVideo6 = v; });
-      loadVideoBg('/bootcamp-reel/b-1.mp4',                         v => { stRef.current.brollVideo  = v; });
-      loadVideoBg('/bootcamp-reel/b-2.mp4',                         v => { stRef.current.brollVideo2 = v; });
+      const onVideoReady = (assign: (v: HTMLVideoElement) => void) => (v: HTMLVideoElement) => {
+        assign(v);
+        setVideosLoadedCount(c => {
+          const next = c + 1;
+          if (next >= videosTotalRef.current) setVideosReady(true);
+          return next;
+        });
+      };
+
+      loadVideoBg('/bootcamp-reel/screen-1-animated-compressed-vid.mp4', onVideoReady(v => { stRef.current.brollVideo0 = v; }));
+      loadVideoBg('/bootcamp-reel/Screen_3-animated-vid.mp4',       onVideoReady(v => { stRef.current.brollVideo3 = v; }));
+      loadVideoBg('/bootcamp-reel/Screen-animated-6-updated.mp4',   onVideoReady(v => { stRef.current.brollVideo6 = v; }));
+      loadVideoBg('/bootcamp-reel/b-1.mp4',                         onVideoReady(v => { stRef.current.brollVideo  = v; }));
+      loadVideoBg('/bootcamp-reel/b-2.mp4',                         onVideoReady(v => { stRef.current.brollVideo2 = v; }));
     }
 
     init();
@@ -802,6 +831,29 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
     ].find(m => MediaRecorder.isTypeSupported(m));
     const effectiveMime = (audioCtx && mimeWithAudio) ? mimeWithAudio : (mimeType || '');
 
+    // Pre-warm every video: seek to 0, play until one real frame is decoded, then pause.
+    // This eliminates black frames at the start of each video slide during recording.
+    setProgLabel('Warming up videos…');
+    const allVideos = [st.brollVideo0, st.brollVideo3, st.brollVideo6, st.brollVideo, st.brollVideo2].filter(Boolean) as HTMLVideoElement[];
+    await Promise.all(allVideos.map(v => new Promise<void>(resolve => {
+      v.currentTime = 0;
+      const go = () => {
+        const p = v.play();
+        if (!p) { v.pause(); resolve(); return; }
+        p.then(() => {
+          type VRFC = HTMLVideoElement & { requestVideoFrameCallback: (cb: () => void) => void };
+          const vv = v as VRFC;
+          if ('requestVideoFrameCallback' in vv) {
+            vv.requestVideoFrameCallback(() => { vv.pause(); vv.currentTime = 0; resolve(); });
+          } else {
+            setTimeout(() => { (v as HTMLVideoElement).pause(); (v as HTMLVideoElement).currentTime = 0; resolve(); }, 200);
+          }
+        }).catch(() => resolve());
+      };
+      if (v.readyState >= 2) { go(); }
+      else { v.oncanplaythrough = () => { v.oncanplaythrough = null; go(); }; }
+    })));
+
     const recorder = new MediaRecorder(stream, {
       ...(effectiveMime ? { mimeType: effectiveMime } : {}),
       videoBitsPerSecond: 12_000_000,
@@ -859,8 +911,8 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
         setProgress(1); setProgLabel('Done! Click Download (MP4).');
       } catch (err) {
         console.error('MP4 conversion failed:', err);
-        st.recBlob = rawBlob; st.recExt = 'webm';
-        setProgress(1); setProgLabel('Done (WebM — MP4 conversion failed).');
+        st.recBlob = rawBlob; st.recExt = 'mp4';
+        setProgress(1); setProgLabel('Done! Click Download.');
       }
     }
 
@@ -935,7 +987,17 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
       {/* Buttons */}
       {loaded && (
         <div className="flex flex-col items-center gap-3 w-full max-w-sm">
-          {/* Primary actions */}
+          {/* Loading videos indicator */}
+          {!videosReady && (
+            <div className="flex flex-col items-center gap-2 w-full py-3">
+              <Loader2 className="w-6 h-6 animate-spin text-white/60" />
+              <p className="text-xs text-white/60 font-medium">
+                Loading videos… {videosLoadedCount}/{videosTotalRef.current}
+              </p>
+            </div>
+          )}
+          {/* Primary actions — only shown once all videos are ready */}
+          {videosReady && (
           <div className="flex gap-3 w-full">
             <button
               type="button"
@@ -955,6 +1017,7 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
               {isRecording ? 'Creating…' : 'Share My Reel'}
             </button>
           </div>
+          )}
 
           {/* Post-generation actions */}
           {showDownload && (
