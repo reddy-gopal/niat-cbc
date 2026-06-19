@@ -10,14 +10,14 @@ const ASSET_BASE = "/bootcamp-reel";
 const IMGS_MAP: Record<string, string> = {
   s3:  `${ASSET_BASE}/Screen_3.png`,
   s4:  `${ASSET_BASE}/Screen_4.png`,
-  s5:  `${ASSET_BASE}/Screen_5.png`,
-  s6:  `${ASSET_BASE}/Screen_6.png`,
+  s5:  `${ASSET_BASE}/Screen_5.jpg`,
+  s6:  `${ASSET_BASE}/Screen_6.jpg`,
   s7:  `${ASSET_BASE}/Screen_7.png`,
   s8:  `${ASSET_BASE}/Screen_8.png`,
   s10: `${ASSET_BASE}/Screen_10.png`,
-  s11: `${ASSET_BASE}/Screen_11.png`,
+  s11: `${ASSET_BASE}/Screen_11.jpg`,
   s12: `${ASSET_BASE}/Screen_12.png`,
-  s14: `${ASSET_BASE}/Screen-last.png`,
+  s14: `${ASSET_BASE}/Screen-last.jpg`,
 };
 
 const SLIDES: [number, number][] = [
