@@ -634,25 +634,43 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
 
       // Load B-roll videos in background (non-blocking)
       // crossOrigin='anonymous' puts the request in CORS mode which COEP always allows
-      // After a seek, play briefly and wait for the first real decoded frame before
-      // calling onReady — prevents black frames caused by drawImage on an undecoded video.
+      // Play briefly and wait for requestVideoFrameCallback (or 300ms fallback)
+      // to confirm a real decoded frame exists before calling onReady.
       function primeAndReady(v: HTMLVideoElement, onReady: (v: HTMLVideoElement) => void) {
         const finish = () => { v.pause(); v.currentTime = 0; onReady(v); };
         const playP = v.play();
         if (!playP) { finish(); return; }
         playP.then(() => {
           if ('requestVideoFrameCallback' in v) {
-            // Fires once a real frame has been painted to the video element
             (v as HTMLVideoElement & { requestVideoFrameCallback: (cb: () => void) => void })
               .requestVideoFrameCallback(finish);
           } else {
-            // Fallback: give the decoder 200 ms to paint the first frame
-            setTimeout(finish, 200);
+            setTimeout(finish, 300);
           }
-        }).catch(() => onReady(v));
+        }).catch(finish);
       }
 
+      // Loads a video and only calls onReady once a real decoded frame is confirmed.
+      // Never calls onReady on timeout — if loading fails, it retries via blob fetch.
       function loadVideoBg(src: string, onReady: (v: HTMLVideoElement) => void) {
+        function tryBlobFallback() {
+          console.warn('[broll] trying blob fallback for:', src);
+          fetch(src)
+            .then(r => r.blob())
+            .then(blob => {
+              const v2 = document.createElement('video');
+              v2.src = URL.createObjectURL(blob);
+              v2.preload = 'auto'; v2.muted = true; v2.playsInline = true; v2.loop = true;
+              let done = false;
+              const go = () => { if (done) return; done = true; v2.currentTime = 0; v2.onseeked = () => { v2.onseeked = null; primeAndReady(v2, onReady); }; };
+              v2.oncanplaythrough = go;
+              v2.onloadeddata = go;
+              v2.onerror = () => console.error('[broll] blob fallback also failed:', src);
+              v2.load();
+            })
+            .catch(() => console.error('[broll] fetch failed:', src));
+        }
+
         const v = document.createElement('video');
         v.crossOrigin = 'anonymous';
         v.src = src; v.preload = 'auto'; v.muted = true; v.playsInline = true; v.loop = true;
@@ -660,36 +678,16 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
         const resolve = () => {
           if (resolved) return;
           resolved = true;
-          if (v.readyState >= 2) {
-            v.currentTime = 0;
-            v.onseeked = () => { v.onseeked = null; primeAndReady(v, onReady); };
-            // Safety timeout in case onseeked never fires
-            setTimeout(() => { if (v.onseeked) { v.onseeked = null; primeAndReady(v, onReady); } }, 3000);
-          } else {
-            // readyState < 2 — wait for loadeddata to re-trigger resolve
-            v.onloadeddata = resolve;
-          }
+          v.currentTime = 0;
+          v.onseeked = () => { v.onseeked = null; primeAndReady(v, onReady); };
+          // If onseeked never fires within 5s, try blob fallback — do NOT call onReady
+          setTimeout(() => {
+            if (v.onseeked) { v.onseeked = null; resolved = false; tryBlobFallback(); }
+          }, 5000);
         };
-        v.onloadeddata     = resolve;
         v.oncanplaythrough = resolve;
-        v.onerror = () => {
-          console.warn('[broll] video element failed, retrying via fetch blob URL:', src);
-          fetch(src).then(r => r.blob()).then(blob => {
-            const blobUrl = URL.createObjectURL(blob);
-            const v2 = document.createElement('video');
-            v2.src = blobUrl; v2.preload = 'auto'; v2.muted = true; v2.playsInline = true; v2.loop = true;
-            let r2 = false;
-            const res2 = () => {
-              if (r2) return; r2 = true;
-              v2.currentTime = 0;
-              v2.onseeked = () => { v2.onseeked = null; primeAndReady(v2, onReady); };
-              setTimeout(() => { if (v2.onseeked) { v2.onseeked = null; primeAndReady(v2, onReady); } }, 3000);
-            };
-            v2.onloadeddata = res2; v2.oncanplaythrough = res2;
-            v2.onerror = () => console.warn('[broll] blob fallback also failed:', src);
-            v2.load();
-          }).catch(() => console.warn('[broll] fetch fallback failed:', src));
-        };
+        v.onloadeddata = resolve;
+        v.onerror = () => { resolved = false; tryBlobFallback(); };
         v.load();
       }
 
