@@ -634,6 +634,24 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
 
       // Load B-roll videos in background (non-blocking)
       // crossOrigin='anonymous' puts the request in CORS mode which COEP always allows
+      // After a seek, play briefly and wait for the first real decoded frame before
+      // calling onReady — prevents black frames caused by drawImage on an undecoded video.
+      function primeAndReady(v: HTMLVideoElement, onReady: (v: HTMLVideoElement) => void) {
+        const finish = () => { v.pause(); v.currentTime = 0; onReady(v); };
+        const playP = v.play();
+        if (!playP) { finish(); return; }
+        playP.then(() => {
+          if ('requestVideoFrameCallback' in v) {
+            // Fires once a real frame has been painted to the video element
+            (v as HTMLVideoElement & { requestVideoFrameCallback: (cb: () => void) => void })
+              .requestVideoFrameCallback(finish);
+          } else {
+            // Fallback: give the decoder 200 ms to paint the first frame
+            setTimeout(finish, 200);
+          }
+        }).catch(() => onReady(v));
+      }
+
       function loadVideoBg(src: string, onReady: (v: HTMLVideoElement) => void) {
         const v = document.createElement('video');
         v.crossOrigin = 'anonymous';
@@ -644,17 +662,18 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
           resolved = true;
           if (v.readyState >= 2) {
             v.currentTime = 0;
-            v.onseeked = () => { v.onseeked = null; onReady(v); };
-            setTimeout(() => { if (v.onseeked) { v.onseeked = null; onReady(v); } }, 2000);
+            v.onseeked = () => { v.onseeked = null; primeAndReady(v, onReady); };
+            // Safety timeout in case onseeked never fires
+            setTimeout(() => { if (v.onseeked) { v.onseeked = null; primeAndReady(v, onReady); } }, 3000);
           } else {
-            onReady(v);
+            // readyState < 2 — wait for loadeddata to re-trigger resolve
+            v.onloadeddata = resolve;
           }
         };
         v.onloadeddata     = resolve;
         v.oncanplaythrough = resolve;
         v.onerror = () => {
           console.warn('[broll] video element failed, retrying via fetch blob URL:', src);
-          // Nuclear fallback: fetch as blob URL (bypasses all COEP/CORP)
           fetch(src).then(r => r.blob()).then(blob => {
             const blobUrl = URL.createObjectURL(blob);
             const v2 = document.createElement('video');
@@ -663,8 +682,8 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
             const res2 = () => {
               if (r2) return; r2 = true;
               v2.currentTime = 0;
-              v2.onseeked = () => { v2.onseeked = null; onReady(v2); };
-              setTimeout(() => { if (v2.onseeked) { v2.onseeked = null; onReady(v2); } }, 2000);
+              v2.onseeked = () => { v2.onseeked = null; primeAndReady(v2, onReady); };
+              setTimeout(() => { if (v2.onseeked) { v2.onseeked = null; primeAndReady(v2, onReady); } }, 3000);
             };
             v2.onloadeddata = res2; v2.oncanplaythrough = res2;
             v2.onerror = () => console.warn('[broll] blob fallback also failed:', src);
@@ -813,6 +832,29 @@ export default function BootcampReelGenerator({ copy, photos, stonesEarned = 0 }
       'video/webm;codecs=vp9,opus',
     ].find(m => MediaRecorder.isTypeSupported(m));
     const effectiveMime = (audioCtx && mimeWithAudio) ? mimeWithAudio : (mimeType || '');
+
+    // Pre-warm every video: seek to 0, play until one real frame is decoded, then pause.
+    // This eliminates black frames at the start of each video slide during recording.
+    setProgLabel('Warming up videos…');
+    const allVideos = [st.brollVideo0, st.brollVideo3, st.brollVideo6, st.brollVideo, st.brollVideo2].filter(Boolean) as HTMLVideoElement[];
+    await Promise.all(allVideos.map(v => new Promise<void>(resolve => {
+      v.currentTime = 0;
+      const go = () => {
+        const p = v.play();
+        if (!p) { v.pause(); resolve(); return; }
+        p.then(() => {
+          type VRFC = HTMLVideoElement & { requestVideoFrameCallback: (cb: () => void) => void };
+          const vv = v as VRFC;
+          if ('requestVideoFrameCallback' in vv) {
+            vv.requestVideoFrameCallback(() => { vv.pause(); vv.currentTime = 0; resolve(); });
+          } else {
+            setTimeout(() => { (v as HTMLVideoElement).pause(); (v as HTMLVideoElement).currentTime = 0; resolve(); }, 200);
+          }
+        }).catch(() => resolve());
+      };
+      if (v.readyState >= 2) { go(); }
+      else { v.oncanplaythrough = () => { v.oncanplaythrough = null; go(); }; }
+    })));
 
     const recorder = new MediaRecorder(stream, {
       ...(effectiveMime ? { mimeType: effectiveMime } : {}),
