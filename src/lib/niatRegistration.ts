@@ -102,8 +102,40 @@ export async function validateNIATRegistration(
       };
     }
 
+    const appData = await applicationResponse.json();
+    console.log("NW_APPLICATION API Response:", JSON.stringify(appData, null, 2));
+
+    // Deep search helper to find completion_percentage == 100 anywhere in the JSON
+    const findCompletionPercentage100 = (obj: any): boolean => {
+      if (obj === null || typeof obj !== "object") return false;
+      if (Array.isArray(obj)) return obj.some(findCompletionPercentage100);
+      
+      for (const key in obj) {
+        if (key === "completion_percentage") {
+          const val = obj[key];
+          if (val === 100 || val === "100" || val === "100%" || String(val).startsWith("100")) {
+            return true;
+          }
+        }
+        if (typeof obj[key] === "object") {
+          if (findCompletionPercentage100(obj[key])) return true;
+        }
+      }
+      return false;
+    };
+
+    const isActuallyCompleted = findCompletionPercentage100(appData);
+
+    if (!isActuallyCompleted) {
+      return {
+        valid: false,
+        errorMessage: NOT_REGISTERED_ERROR,
+      };
+    }
+
     return { valid: true };
-  } catch {
+  } catch (error) {
+    console.error("validateNIATRegistration Error:", error);
     return {
       valid: false,
       errorMessage: "Could not validate NIAT registration right now. Please try again.",
