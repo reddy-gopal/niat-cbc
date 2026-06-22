@@ -52,7 +52,7 @@ const registerSchema = z.object({
   niatBootcampId: z
     .string()
     .trim()
-    .regex(/^NB26\d+$/, "Enter a valid NIAT Bootcamp ID (e.g. NB2610009)."),
+    .startsWith("NB26", "NIAT Bootcamp ID must start with NB26."),
 });
 
 type RegisterValues = z.infer<typeof registerSchema>;
