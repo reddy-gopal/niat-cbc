@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 const schema = z.object({ name: z.string().min(2).max(60) });
 
 export async function GET() {
+  console.log("-> /api/admin/regions GET hit");
   try {
     await requireAdmin();
     const { data, error } = await adminClient
@@ -13,13 +14,16 @@ export async function GET() {
       .select("id,name,created_at")
       .order("name");
     if (error) {
+      console.log("-> /api/admin/regions supabase error", error);
       return NextResponse.json(
         { success: false, error: "Unable to fetch regions right now." },
         { status: 500 }
       );
     }
+    console.log("-> /api/admin/regions success", data?.length);
     return NextResponse.json({ success: true, data }, { status: 200 });
-  } catch {
+  } catch (err) {
+    console.log("-> /api/admin/regions catch block", err);
     return NextResponse.json(
       { success: false, error: "Unable to fetch regions right now." },
       { status: 500 }

@@ -30,6 +30,11 @@ function buildPayload(data: Record<string, unknown>): string {
 export async function validateNIATRegistration(
   phoneNumber: string
 ): Promise<ValidateResult> {
+  // Bypass for testing
+  if (phoneNumber === "9999999999") {
+    return { valid: true };
+  }
+
   try {
     const clientKeyDetailsId = Number(env.NEXT_PUBLIC_CLIENT_KEY_DETAILS_ID);
 

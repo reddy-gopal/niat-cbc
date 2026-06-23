@@ -247,7 +247,7 @@ export default function JoinPage({
       }
 
       const code = result.invite_code as string;
-      const inviteUrl = `https://forms.ccbp.in/mid/niat-cbc?bootcamp_code=join/team/${code}`;
+      const inviteUrl = `https://niat-cbc.vercel.app/?bootcamp_code=join/team/${code}`;
       setInviteData({ url: inviteUrl, code });
 
       const QRCode = (await import("qrcode")).default;

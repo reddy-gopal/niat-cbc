@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import QRCode from "react-qr-code";
 import SectionActions from "@/components/admin/SectionActions";
 import { adminClient } from "../../../../../utils/supabase/admin";
@@ -20,7 +21,10 @@ export default async function BootcampDetailPage({ params }: Props) {
     .eq("bootcamp_id", bootcampId)
     .order("label", { ascending: true });
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const headersList = await headers();
+  const host = headersList.get("host") || "localhost:3000";
+  const protocol = host.includes("localhost") ? "http" : "https";
+  const siteUrl = `${protocol}://${host}`;
 
   return (
     <div>
@@ -36,7 +40,7 @@ export default async function BootcampDetailPage({ params }: Props) {
 
       <div className="space-y-4">
         {(sections ?? []).map((section) => {
-          const joinUrl = `https://forms.ccbp.in/mid/niat-cbc?bootcamp_code=join/${section.slug}`;
+          const joinUrl = `${siteUrl}/?bootcamp_code=join/${section.slug}`;
           return (
             <div key={section.id} className="card p-4">
               <div className="flex flex-col sm:flex-row sm:justify-between gap-4">

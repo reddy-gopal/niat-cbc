@@ -57,11 +57,12 @@ export default async function Home({
         redirect("/dashboard");
       }
 
-      // New student — send to join page for SR verification + registration
-      if (bootcampCode) {
-        redirect(`/${bootcampCode}`);
-      }
     }
+  }
+
+  // New student arriving with a join link but no auth token yet
+  if (bootcampCode && !authToken) {
+    redirect(`/${bootcampCode}`);
   }
 
   return <LoginPage />;

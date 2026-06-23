@@ -76,11 +76,11 @@ export async function POST(request: Request) {
       note: `Created section ${data.label}`,
     });
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+    const siteUrl = new URL(request.url).origin;
     return NextResponse.json(
       {
         success: true,
-        data: { ...data, joinUrl: `https://forms.ccbp.in/mid/niat-cbc?bootcamp_code=join/${data.slug}` },
+        data: { ...data, joinUrl: `${siteUrl}/?bootcamp_code=join/${data.slug}` },
       },
       { status: 200 }
     );
