@@ -28,7 +28,7 @@ export default function InvitePageClient({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const url = `https://forms.ccbp.in/mid/niat-cbc?bootcamp_code=join/team/${inviteCode}`;
+    const url = `https://niat-cbc.vercel.app/?bootcamp_code=join/team/${inviteCode}`;
     setInviteUrl(url);
 
     void (async () => {
