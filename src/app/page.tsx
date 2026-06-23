@@ -60,8 +60,9 @@ export default async function Home({
     }
   }
 
-  // New student arriving with a join link but no auth token yet
-  if (bootcampCode && !authToken) {
+  // Fallback: If they aren't fully registered in the system yet, but have a join link,
+  // redirect them to the join page to either start or complete registration.
+  if (bootcampCode) {
     redirect(`/${bootcampCode}`);
   }
 
