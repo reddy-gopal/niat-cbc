@@ -13,7 +13,7 @@ const verifySrSchema = z.object({
   bootcampId: z.string().uuid(),
   regionId: z.string().uuid(),
   inviteCode: z.string().nullish(),
-  niatBootcampId: z.union([z.string().trim().regex(/^NB26\d+$/), z.literal(""), z.null()]).optional(),
+  niatBootcampId: z.union([z.string().trim().startsWith("NB26"), z.literal(""), z.null()]).optional(),
 });
 
 const ACTIVE_TASK_IDS = CHALLENGES.map((c) => c.id);
