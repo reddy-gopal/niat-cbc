@@ -12,8 +12,8 @@ const verifySrSchema = z.object({
   sectionId: z.string().uuid(),
   bootcampId: z.string().uuid(),
   regionId: z.string().uuid(),
-  inviteCode: z.string().optional(),
-  niatBootcampId: z.string().trim().regex(/^NB26\d+$/).optional(),
+  inviteCode: z.string().nullish(),
+  niatBootcampId: z.union([z.string().trim().regex(/^NB26\d+$/), z.literal(""), z.null()]).optional(),
 });
 
 const ACTIVE_TASK_IDS = CHALLENGES.map((c) => c.id);
@@ -23,8 +23,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = verifySrSchema.safeParse(body);
     if (!parsed.success) {
+      console.log("verifySrSchema failed:", parsed.error.issues);
+      const errorMsg = parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ");
       return NextResponse.json(
-        { success: false, error: "Invalid request payload." },
+        { success: false, error: `Invalid request payload: ${errorMsg}` },
         { status: 400 }
       );
     }
