@@ -46,10 +46,11 @@ export default async function PersonalVideoPage() {
       .eq("id", session.studentId)
       .single(),
     supabase
-      .from("submissions")
-      .select("id", { count: "exact", head: true })
+      .from("student_challenge_status")
+      .select("task_id", { count: "exact", head: true })
       .eq("student_id", session.studentId)
-      .eq("status", "accepted"),
+      .eq("bootcamp_id", session.bootcampId)
+      .eq("is_completed", true),
   ]);
 
   const submission = submissionRes.data;
