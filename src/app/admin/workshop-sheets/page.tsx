@@ -19,7 +19,11 @@ export default async function WorkshopSheetsPage() {
       </p>
       <WorksheetSheetsClient
         bootcamps={(bootcamps ?? []) as { id: string; name: string; date: string; regions: { name?: string } | null }[]}
-        existingSheets={(existingSheets ?? []) as { bootcamp_id: string; workshop: string; sheet_url: string }[]}
+        existingSheets={((existingSheets ?? []) as any[]).map((s) => ({
+          bootcamp_id: s.bootcamp_id ?? "global",
+          workshop: s.workshop,
+          sheet_url: s.sheet_url,
+        }))}
       />
     </div>
   );

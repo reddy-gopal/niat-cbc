@@ -14,13 +14,14 @@ export async function resolvePersonalization(profile: {
   niatBootcampId?: string;
   mobile?:         string;
 }): Promise<PersonalizationContext> {
-  // 1. Load ALL sheet URLs across all bootcamps (search everywhere for the student)
+  // 1. Load sheet URLs for this bootcamp AND global fallback sheets
   const { data: sheetRows } = await adminClient
     .from("bootcamp_workshop_sheets")
-    .select("workshop, sheet_url");
+    .select("workshop, sheet_url")
+    .or(`bootcamp_id.eq.${profile.bootcampId},bootcamp_id.is.null`);
 
   if (!sheetRows || sheetRows.length === 0) {
-    console.warn("[personalization] No sheets configured anywhere → using mock");
+    console.warn("[personalization] No sheets configured for this bootcamp or globally → using mock");
     return getPersonalizationForStudent("local", profile);
   }
 

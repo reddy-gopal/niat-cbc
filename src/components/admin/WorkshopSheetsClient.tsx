@@ -28,6 +28,8 @@ function getUrls(sheets: SheetRow[], bootcampId: string): Record<Workshop, strin
   };
 }
 
+const GLOBAL_ID = "global";
+
 export default function WorkshopSheetsClient({
   bootcamps,
   existingSheets,
@@ -35,8 +37,13 @@ export default function WorkshopSheetsClient({
   bootcamps:      Bootcamp[];
   existingSheets: SheetRow[];
 }) {
-  const [selectedId, setSelectedId]   = useState<string>(bootcamps[0]?.id ?? "");
-  const [urls, setUrls]               = useState<Record<Workshop, string>>(() => getUrls(existingSheets, bootcamps[0]?.id ?? ""));
+  const options = [
+    { id: GLOBAL_ID, name: "★ Common Sheets (Fallback for All Bootcamps)", date: "", regions: null },
+    ...bootcamps,
+  ];
+
+  const [selectedId, setSelectedId]   = useState<string>(GLOBAL_ID);
+  const [urls, setUrls]               = useState<Record<Workshop, string>>(() => getUrls(existingSheets, GLOBAL_ID));
   const [saving, setSaving]           = useState(false);
   const [saved, setSaved]             = useState(false);
   const [error, setError]             = useState<string | null>(null);
@@ -72,7 +79,7 @@ export default function WorkshopSheetsClient({
     }
   }
 
-  const selected = bootcamps.find((b) => b.id === selectedId);
+  const selected = options.find((b) => b.id === selectedId);
   const filledCount = WORKSHOPS.filter((w) => urls[w.key].trim() !== "").length;
 
   return (
@@ -86,9 +93,11 @@ export default function WorkshopSheetsClient({
             onChange={(e) => selectBootcamp(e.target.value)}
             className="input-field appearance-none pr-10"
           >
-            {bootcamps.map((b) => (
+            {options.map((b) => (
               <option key={b.id} value={b.id}>
-                {b.name} — {b.date} {b.regions?.name ? `(${b.regions.name})` : ""}
+                {b.id === GLOBAL_ID 
+                  ? b.name
+                  : `${b.name} — ${b.date} ${b.regions?.name ? `(${b.regions.name})` : ""}`}
               </option>
             ))}
           </select>
@@ -96,7 +105,7 @@ export default function WorkshopSheetsClient({
         </div>
         {selected && (
           <p className="text-xs text-[var(--text-muted)] mt-2">
-            {filledCount}/4 sheets added for this bootcamp
+            {filledCount}/4 sheets added {selectedId === GLOBAL_ID ? "globally" : "for this bootcamp"}
           </p>
         )}
       </div>
