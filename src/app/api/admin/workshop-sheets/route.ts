@@ -6,7 +6,7 @@ import { adminClient } from "../../../../../utils/supabase/admin";
 const WORKSHOPS = ["iot", "smart_watch", "neuroscience", "entrepreneurship"] as const;
 
 const saveSchema = z.object({
-  bootcampId: z.string().uuid(),
+  bootcampId: z.string().uuid().or(z.literal("global")),
   sheets: z.array(
     z.object({
       workshop:  z.enum(WORKSHOPS),
@@ -22,10 +22,17 @@ export async function GET(request: Request) {
     const bootcampId = searchParams.get("bootcampId");
     if (!bootcampId) return NextResponse.json({ success: false, error: "bootcampId required" }, { status: 400 });
 
-    const { data, error } = await adminClient
+    const query = adminClient
       .from("bootcamp_workshop_sheets")
-      .select("workshop, sheet_url")
-      .eq("bootcamp_id", bootcampId);
+      .select("workshop, sheet_url");
+
+    if (bootcampId === "global") {
+      query.is("bootcamp_id", null);
+    } else {
+      query.eq("bootcamp_id", bootcampId);
+    }
+
+    const { data, error } = await query;
 
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     return NextResponse.json({ success: true, data });
@@ -42,12 +49,18 @@ export async function POST(request: Request) {
     if (!parsed.success) return NextResponse.json({ success: false, error: "Invalid payload" }, { status: 400 });
 
     const { bootcampId, sheets } = parsed.data;
+    const dbBootcampId = bootcampId === "global" ? null : bootcampId;
     const rows = sheets
       .filter((s) => s.sheet_url.trim() !== "")
-      .map((s) => ({ bootcamp_id: bootcampId, workshop: s.workshop, sheet_url: s.sheet_url }));
+      .map((s) => ({ bootcamp_id: dbBootcampId, workshop: s.workshop, sheet_url: s.sheet_url }));
 
-    // Upsert — replace existing entries for this bootcamp
-    await adminClient.from("bootcamp_workshop_sheets").delete().eq("bootcamp_id", bootcampId);
+    // Upsert — replace existing entries for this bootcamp / global
+    if (dbBootcampId === null) {
+      await adminClient.from("bootcamp_workshop_sheets").delete().is("bootcamp_id", null);
+    } else {
+      await adminClient.from("bootcamp_workshop_sheets").delete().eq("bootcamp_id", dbBootcampId);
+    }
+
     if (rows.length > 0) {
       const { error } = await adminClient.from("bootcamp_workshop_sheets").insert(rows);
       if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
