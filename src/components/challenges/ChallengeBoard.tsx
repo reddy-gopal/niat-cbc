@@ -649,7 +649,7 @@ export default function ChallengeBoard({
                 Reveal the Story
               </p>
               <p className="mt-2 text-sm sm:text-base font-semibold leading-snug text-white">
-                Complete challenges to awaken each Infinity Stone
+               Complete all 6 challenges to awaken each Infinity Stone and unlock your personliased tribe crest
               </p>
             </div>
           </>

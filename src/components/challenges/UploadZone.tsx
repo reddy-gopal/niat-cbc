@@ -52,7 +52,7 @@ export default function UploadZone({
       ) : (
         <div className="text-center px-4 flex flex-col items-center">
           <div className="text-[#f7b801] font-black tracking-[0.16em] sm:tracking-[0.2em] text-sm sm:text-lg mb-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-            DROP YOUR PROOF HERE
+            Submit for Verification
           </div>
           <div className="text-[#ffffff] font-bold text-[11px] sm:text-xs bg-[#f18701] px-3 py-1 rounded-full uppercase shadow-md">
             Click to Browse
