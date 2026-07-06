@@ -60,15 +60,6 @@ const SHORT_NAMES: Record<number, string> = {
   6: "3-day Streak",
 };
 
-// const DISPLAY_POINTS: Record<number, number> = {
-//   1: 1,
-//   2: 3,
-//   3: 10,
-//   4: 2,
-//   5: 2,
-//   6: 1,
-// };
-
 const DAILY_POST_TASK_ID = 6;
 const REFERRAL_CHALLENGE_ID = 3;
 

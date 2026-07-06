@@ -105,7 +105,7 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing wh
     id: 3,
     title: "Connect Their Dots",
     description:
-      "When the conversation is already real, share your link. Earn 10 points for each NIAT admission test fee paid.",
+      "When the conversation is already real, share your link. Earn 15 points for each NIAT admission test fee paid.",
     day: "Days 1-3",
     points: 15,
     requiresUpload: false,
