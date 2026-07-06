@@ -97,7 +97,7 @@ Examples:
 
 JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what the message actually said and why it was accepted or rejected"}`,
     day: "Day 1",
-    points: 3,
+    points: 2,
     requiresUpload: true,
     requiresText: false,
   },
@@ -105,9 +105,9 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing wh
     id: 3,
     title: "Connect Their Dots",
     description:
-      "When the conversation is already real, share your link. Earn 10 points for each NIAT admission test fee paid.",
+      "When the conversation is already real, share your link. Earn 15 points for each NIAT admission test fee paid.",
     day: "Days 1-3",
-    points: 10,
+    points: 15,
     requiresUpload: false,
     requiresText: false,
     isReferral: true,
@@ -225,7 +225,7 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing wh
     description:
       "Share your moment, tag @niat_india and drop #niatbootcamp2026 in your caption, then submit your screenshot.",
     day: "Daily",
-    points: 1,
+    points: 2,
     requiresUpload: true,
     requiresText: false,
   },
