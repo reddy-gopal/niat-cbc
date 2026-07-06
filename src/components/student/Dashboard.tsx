@@ -225,7 +225,7 @@ export default function Dashboard({
           <section>
             <div className="flex items-center gap-4 mb-6">
                 <div className="h-px flex-1 bg-[var(--card-border)]" />
-                <h2 className="text-xs font-black uppercase text-[var(--text-muted)] tracking-[0.3em]">Challenge Board</h2>
+                <h2 className="text-xs font-black uppercase text-[var(--text-muted)] tracking-[0.3em]">infinity challenge board</h2>
                 <div className="h-px flex-1 bg-[var(--card-border)]" />
             </div>
             <ChallengeBoard
