@@ -69,7 +69,7 @@ If no recognizable messaging platform UI is visible → REJECT immediately.
 
 STEP 2 — Message presence check:
 There must be a visible outgoing message sent by the student (blue/green bubble on right side).
-If only an empty chat or only received messages are visible → REJECT.
+If only an empty chat or only received messages are visible → REJECT.   
 
 STEP 3 — Content intent check (most important):
 READ the actual message content in the screenshot.
@@ -223,7 +223,7 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing wh
     id: 6,
     title: "3-day Streak",
     description:
-      "Share your moment, tag @niat_india and drop #niatbootcamp2026 in your caption, then submit your screenshot.",
+      "Share your moment, tag @niat_india and drop #niatbootcamp2026, #niat in your caption, then submit your screenshot.",
     day: "Daily",
     points: 2,
     requiresUpload: true,
