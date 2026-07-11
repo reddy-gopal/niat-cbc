@@ -60,7 +60,7 @@ JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence"}`,
     title: "You Crossed My Mind",
     description: "Someone will cross your mind today. After the session, open their chat. Write your real words. Not a forward. Just you.",
     verificationPrompt: `You are evaluating "You Crossed My Mind" for NIAT CBC.
-Task: Student reached out personally to someone they were thinking about, with a real heartfelt message.
+Task: Student reached out to someone they were thinking about, with a real heartfelt message or a message about niat bootcamp. 
 
 STEP 1 — Platform check:
 The image must show a WhatsApp chat window or Instagram DM conversation.
@@ -71,18 +71,11 @@ STEP 2 — Message presence check:
 There must be a visible outgoing message sent by the student (blue/green bubble on right side).
 If only an empty chat or only received messages are visible → REJECT.   
 
-STEP 3 — Content intent check (most important):
-READ the actual message content in the screenshot.
-The message must show genuine personal outreach — the student reaching out to someone they were thinking about.
-
 REJECT if the message is:
 - A casual greeting only ("hi", "hey", "what's up", "hello")
 - A one-word or one-emoji reply
 - A forwarded message (shows "Forwarded" label)
-- A meme, sticker, GIF, or media-only message with no personal text
-- Small talk or a routine conversation with no personal intent
-- AI-generated or copy-pasted motivational text with no personal element
-- Completely unrelated to reaching out to someone they were thinking about
+- A meme, sticker, GIF, or media-only message with no personal text or text about NIAT
 
 ACCEPT only if the message contains a genuine personal note — something the student actually wrote to connect with that person. It doesn't need to be long, but it must be real and personal.
 
@@ -92,8 +85,6 @@ Examples:
 ✅ Short personal message showing the student initiated a real conversation
 ❌ "hi" alone
 ❌ A meme or forwarded quote
-❌ A group chat screenshot
-❌ A random conversation about food/plans with no personal intent
 
 JSON only: {"verdict":"accepted"/"rejected","reason":"one sentence describing what the message actually said and why it was accepted or rejected"}`,
     day: "Day 1",
