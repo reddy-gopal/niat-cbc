@@ -9,7 +9,15 @@ export default async function VideoStatsPage() {
   const [{ data: allEvents }, { data: recentEvents }] = await Promise.all([
     adminClient
       .from("video_events")
-      .select("student_id, bootcamp_id, event_type"),
+      .select(`
+        student_id,
+        bootcamp_id,
+        event_type,
+        students(
+          region_id,
+          section_id
+        )
+      `),
     adminClient
       .from("video_events")
       .select("event_type, created_at, students(full_name), bootcamps(name)")
@@ -23,32 +31,86 @@ export default async function VideoStatsPage() {
   const counts: Record<string, number> = {
     visit: 0, preview: 0, photo_upload: 0, download: 0, share: 0,
   };
-  const bootcampMap = new Map<string, { id: string; name: string; visits: number; previews: number; downloads: number; shares: number }>();
+  const sectionMap = new Map<string, {
+    regionId: string;
+    bootcampId: string;
+    sectionId: string;
+    regionName: string;
+    bootcampName: string;
+    sectionLabel: string;
+    visits: number;
+    previews: number;
+    downloads: number;
+    shares: number;
+  }>();
 
   for (const ev of events) {
     const type = ev.event_type as string;
     if (type in counts) counts[type]++;
 
+    const student = ev.students as { region_id?: string; section_id?: string } | null;
+    const rid = student?.region_id;
+    const sid = student?.section_id;
     const bid = ev.bootcamp_id as string;
-    if (bid) {
-      if (!bootcampMap.has(bid)) bootcampMap.set(bid, { id: bid, name: bid, visits: 0, previews: 0, downloads: 0, shares: 0 });
-      const b = bootcampMap.get(bid)!;
-      if (type === "visit")    b.visits++;
-      if (type === "preview")  b.previews++;
-      if (type === "download") b.downloads++;
-      if (type === "share")    b.shares++;
+
+    if (rid && bid && sid) {
+      const key = `${rid}_${bid}_${sid}`;
+      if (!sectionMap.has(key)) {
+        sectionMap.set(key, {
+          regionId: rid,
+          bootcampId: bid,
+          sectionId: sid,
+          regionName: rid,
+          bootcampName: bid,
+          sectionLabel: sid,
+          visits: 0,
+          previews: 0,
+          downloads: 0,
+          shares: 0,
+        });
+      }
+      const s = sectionMap.get(key)!;
+      if (type === "visit")    s.visits++;
+      if (type === "preview")  s.previews++;
+      if (type === "download") s.downloads++;
+      if (type === "share")    s.shares++;
     }
   }
 
-  // Resolve bootcamp names
-  const bootcampIds = [...bootcampMap.keys()];
-  if (bootcampIds.length > 0) {
-    const { data: names } = await adminClient.from("bootcamps").select("id, name").in("id", bootcampIds);
-    for (const b of names ?? []) {
-      const e = bootcampMap.get(b.id); if (e) e.name = b.name as string;
-    }
+  // Resolve display names
+  const regionIds = new Set<string>();
+  const bootcampIds = new Set<string>();
+  const sectionIds = new Set<string>();
+
+  for (const item of sectionMap.values()) {
+    regionIds.add(item.regionId);
+    bootcampIds.add(item.bootcampId);
+    sectionIds.add(item.sectionId);
   }
-  const bootcampRows = [...bootcampMap.values()].sort((a, b) => b.downloads - a.downloads);
+
+  const [regionsRes, bootcampsRes, sectionsRes] = await Promise.all([
+    regionIds.size > 0
+      ? adminClient.from("regions").select("id, name").in("id", [...regionIds])
+      : Promise.resolve({ data: [] }),
+    bootcampIds.size > 0
+      ? adminClient.from("bootcamps").select("id, name").in("id", [...bootcampIds])
+      : Promise.resolve({ data: [] }),
+    sectionIds.size > 0
+      ? adminClient.from("sections").select("id, label").in("id", [...sectionIds])
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const regionNamesMap = new Map((regionsRes.data ?? []).map(r => [r.id, r.name]));
+  const bootcampNamesMap = new Map((bootcampsRes.data ?? []).map(b => [b.id, b.name]));
+  const sectionLabelsMap = new Map((sectionsRes.data ?? []).map(s => [s.id, s.label]));
+
+  for (const s of sectionMap.values()) {
+    s.regionName = (regionNamesMap.get(s.regionId) as string) ?? s.regionId;
+    s.bootcampName = (bootcampNamesMap.get(s.bootcampId) as string) ?? s.bootcampId;
+    s.sectionLabel = sectionLabelsMap.get(s.sectionId) ? `Section ${sectionLabelsMap.get(s.sectionId)}` : s.sectionId;
+  }
+
+  const sectionRows = [...sectionMap.values()].sort((a, b) => b.downloads - a.downloads);
 
   const exportRows = (recentEvents ?? []).map((ev) => {
     const student = ev.students as { full_name?: string } | null;
@@ -99,15 +161,17 @@ export default async function VideoStatsPage() {
         ))}
       </div>
 
-      {/* By Bootcamp */}
-      {bootcampRows.length > 0 && (
+      {/* By Section */}
+      {sectionRows.length > 0 && (
         <section className="card p-5 mb-8">
-          <h2 className="text-base font-semibold mb-4">By Bootcamp</h2>
+          <h2 className="text-base font-semibold mb-4">By Section</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[var(--text-muted)] border-b border-[var(--border)] text-xs uppercase tracking-wider">
+                  <th className="pb-3 pr-6">Region</th>
                   <th className="pb-3 pr-6">Bootcamp</th>
+                  <th className="pb-3 pr-6">Section</th>
                   <th className="pb-3 pr-6">Visits</th>
                   <th className="pb-3 pr-6">Previews</th>
                   <th className="pb-3 pr-6">Downloads</th>
@@ -115,9 +179,11 @@ export default async function VideoStatsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {bootcampRows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="py-3 pr-6 font-medium">{row.name}</td>
+                {sectionRows.map((row) => (
+                  <tr key={`${row.regionId}_${row.bootcampId}_${row.sectionId}`}>
+                    <td className="py-3 pr-6 font-medium">{row.regionName}</td>
+                    <td className="py-3 pr-6 text-[var(--text-muted)]">{row.bootcampName}</td>
+                    <td className="py-3 pr-6 font-semibold">{row.sectionLabel}</td>
                     <td className="py-3 pr-6 text-blue-400">{row.visits}</td>
                     <td className="py-3 pr-6 text-purple-400">{row.previews}</td>
                     <td className="py-3 pr-6 text-green-400">{row.downloads}</td>
